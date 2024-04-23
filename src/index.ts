@@ -4,25 +4,25 @@ import { DOMHelpers } from "./utils/DOMHelpers"
 import { EmailHelpers } from "./utils/EmailHelpers"
 import { ContentEditable } from "./utils/content-editable"
 import fuzzySubString, { FuzzySubString } from "./utils/fuzzySubString"
-import { FakeIdb, fakeIdb } from "./utils/idb-testing"
+import { FakeIdb } from "./utils/fake-idb"
 import validateRangeMatchesRules, { RangeRules } from "./utils/range-rules"
-import reduceCharactersToEssentials from "./utils/reduceCharactersToEssentials"
-import { TypedCancelableEventEmitter } from "./utils/typedCancelableEventEmitter"
 import { EnsureAllMethodsAreAsync } from "./utils/types/EnsureAllMethodsAreAsync"
 import isTypeEqual from "./utils/types/isTypeEqual"
 import isTypeExtended from "./utils/types/isTypeExtended"
-import { uid } from "./utils/uid"
 
-export {uid, sleep}
+export {sleep}
 export {CryptoHelpers};
 export {EmailHelpers};
 export {DOMHelpers};
 export {ContentEditable};
 export {fuzzySubString};
-export {fakeIdb};
-export {TypedCancelableEventEmitter};
+
+
 export {validateRangeMatchesRules};
 
+export * from './utils/typed-cancelable-event-emitter';
+export * from "./utils/uid/uid";
+export * from "./utils/fake-idb";
 
 
 export type {

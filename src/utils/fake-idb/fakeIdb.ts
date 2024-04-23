@@ -16,7 +16,3 @@ export function fakeIdb(shared?:boolean):FakeIdb {
         }
     }
 }
-
-export type {
-    FakeIdb
-}
