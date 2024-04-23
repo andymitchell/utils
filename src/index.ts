@@ -1,4 +1,4 @@
-import {  sleep } from "./utils"
+import {  sleep, uid } from "./utils"
 import { CryptoHelpers } from "./utils/CryptoHelpers"
 import { DOMHelpers } from "./utils/DOMHelpers"
 import { EmailHelpers } from "./utils/EmailHelpers"
@@ -13,6 +13,7 @@ import isTypeEqual from "./utils/types/isTypeEqual"
 import isTypeExtended from "./utils/types/isTypeExtended"
 
 export {
+    uid,
     sleep,
     reduceCharactersToEssentials,
     CryptoHelpers, 
