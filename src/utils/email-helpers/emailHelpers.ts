@@ -1,16 +1,11 @@
-export const EmailHelpers = {
-    isValidEmailAddress,
-    irreducibleEmailAddress,
-    extractDomainFromEmailAddress,
-    isGenericDomain
-}
 
-function isValidEmailAddress(emailAddress:string): boolean {
+
+export function isValidEmailAddress(emailAddress:string): boolean {
     // most minimal check possible
     return (/.+\@.+\..+/).test(emailAddress);
 }
 
-function irreducibleEmailAddress(emailAddress:string): string | undefined {
+export function irreducibleEmailAddress(emailAddress:string): string | undefined {
     if( !emailAddress ) return undefined;
     emailAddress = emailAddress.toLowerCase().trim();
     if( emailAddress.indexOf('+')>-1 || emailAddress.indexOf('@gmail.com')>-1 ) {
@@ -26,10 +21,10 @@ function irreducibleEmailAddress(emailAddress:string): string | undefined {
     return emailAddress;
 }
 
-function extractDomainFromEmailAddress(emailAddress:string): string {
+export function extractDomainFromEmailAddress(emailAddress:string): string {
     const split = emailAddress.split('@');
     return split[1];
 }
-function isGenericDomain(domain:string):boolean {
+export function isGenericDomain(domain:string):boolean {
     return [/gmail\.com/, /googlemail\.com/, /outlook\.com/, /yahoo\.com/, /hotmail\.com/].some(x => x.test(domain));
 }

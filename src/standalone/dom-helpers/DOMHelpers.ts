@@ -1,7 +1,7 @@
 import { ReactElement } from 'react';
 import {render} from 'react-dom';
 
-function emptyEl(el: HTMLElement, replacementText?: string): HTMLElement {
+export function emptyEl(el: HTMLElement, replacementText?: string): HTMLElement {
     while (el.hasChildNodes() && el.lastChild) {
         el.removeChild(el.lastChild);
     }
@@ -9,7 +9,7 @@ function emptyEl(el: HTMLElement, replacementText?: string): HTMLElement {
     return el;
 }
 
-const make = <ElementType extends HTMLElement>(nodeName: string, parent?: HTMLElement, className?: string, textContent?: string, style?: React.CSSProperties, child?: HTMLElement | ReactElement) => {
+export const make = <ElementType extends HTMLElement>(nodeName: string, parent?: HTMLElement, className?: string, textContent?: string, style?: React.CSSProperties, child?: HTMLElement | ReactElement) => {
     const el = document.createElement(nodeName);
     if (style) {
         for (const key in style) {
@@ -35,11 +35,11 @@ const make = <ElementType extends HTMLElement>(nodeName: string, parent?: HTMLEl
     return el as ElementType;
 }
 
-function isReactElement(element: any): element is ReactElement {
+export function isReactElement(element: any): element is ReactElement {
     return typeof element.type === 'function';
 }
 
-function convertNodeToElement(node: Node, ifNotElementGoToParent?: boolean): Element | undefined {
+export function convertNodeToElement(node: Node, ifNotElementGoToParent?: boolean): Element | undefined {
     if (node.nodeType === 1) {
         return node as Element;
     }
@@ -51,7 +51,7 @@ function convertNodeToElement(node: Node, ifNotElementGoToParent?: boolean): Ele
     return undefined;
 }
 
-function createIconElement(materialName: string, classNames?: Array<string>) {
+export function createIconElement(materialName: string, classNames?: Array<string>) {
     // @ts-ignore - document seems to have been overtaken by React
     const iconElement = document.createElement('span');
     iconElement.classList.add('material-icons');
@@ -60,12 +60,4 @@ function createIconElement(materialName: string, classNames?: Array<string>) {
     return iconElement;
 }
 
-
-export const DOMHelpers = {
-    emptyEl,
-    make,
-    isReactElement,
-    convertNodeToElement,
-    createIconElement
-}
 

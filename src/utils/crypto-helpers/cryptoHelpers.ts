@@ -3,19 +3,7 @@ type Sha256HexOutput = {
     hashes: Array<string>
 }
 
-export const CryptoHelpers = {
-    sha256HexArrayToObject,
-    sha256Hex,
-    sha256raw,
-    sha1Hex,
-    generateRandomString,
-    pkceS256ChallengeFromVerifier,
-    base64urlencode,
-    base64urldecode,
-    jwtDecode,
-    vernomEncrypt,
-    vernomDecrypt
-}
+
 
 function getCrypto():Crypto {
     if( typeof window==='undefined' ) {
@@ -25,7 +13,7 @@ function getCrypto():Crypto {
     }
 }
 
-async function sha256HexArrayToObject(items: Array<string>): Promise<Sha256HexOutput> {
+export async function sha256HexArrayToObject(items: Array<string>): Promise<Sha256HexOutput> {
     const output:Sha256HexOutput = {
         itemToHash: {},
         hashes: []
@@ -38,7 +26,7 @@ async function sha256HexArrayToObject(items: Array<string>): Promise<Sha256HexOu
     return output;
 }
 
-async function sha256Hex(str:string): Promise<string> {
+export async function sha256Hex(str:string): Promise<string> {
     
         const msgUint8 = new TextEncoder().encode(str);                               // encode as (utf-8) Uint8Array
         const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);           // hash the message
@@ -47,7 +35,7 @@ async function sha256Hex(str:string): Promise<string> {
     
 }
 
-async function sha256raw(plain:string): Promise<string> {
+export async function sha256raw(plain:string): Promise<string> {
     
         const encoder = new TextEncoder();
         const data = encoder.encode(plain);
@@ -70,19 +58,19 @@ export async function sha1Hex(str:string): Promise<string> {
 
 
 
-function generateRandomString(length = 28) {
+export function generateRandomString(length = 28) {
     var array = new Uint32Array(Math.round(length / 2) + 2);
     getCrypto().getRandomValues(array);
     let str = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
     return str.substr(0, length);
 }
 
-async function pkceS256ChallengeFromVerifier(v:string) {
+export async function pkceS256ChallengeFromVerifier(v:string) {
     const hashed = await sha256raw(v);
     return base64urlencode(hashed);
 }
 
-function base64urlencode(str:string) {
+export function base64urlencode(str:string) {
     // btoa accepts chars only within ascii 0-255 and base64 encodes them.
     // Then convert the base64 encoded to base64url encoded
     //   (replace + with -, replace / with _, trim trailing =)
@@ -90,16 +78,16 @@ function base64urlencode(str:string) {
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function base64urldecode(str:string) {
+export function base64urldecode(str:string) {
     // atob doesn't appear to need any padding with suffixed =, which most Base64 libraries require.
     // Unsure how well this handles edge-case encodings, but works well for JWT ID Tokens. Might need something more robust for others.
     return atob(base64urlUnescape(str));
 };
-function base64urlUnescape(str:string) {
+export function base64urlUnescape(str:string) {
     return str.replace(/\-/g, '+').replace(/_/g, '/');
 }
 
-function jwtDecode(token:string) {
+export function jwtDecode(token:string) {
 
     const segments = token.split('.');
     if (segments.length !== 3) throw new Error('Not enough or too many segments');
@@ -119,7 +107,7 @@ function jwtDecode(token:string) {
 
 
 // One Time Pad / Vernom Cipher - XOR bits
-function vernomHash(string:string, key:string) {
+export function vernomHash(string:string, key:string) {
     if (string.length !== key.length) throw new Error("EncryptionFailure: One time pad needs string and key to be the same length.");
     let ASCII;
     let vernomChar;
@@ -132,9 +120,9 @@ function vernomHash(string:string, key:string) {
     }
     return output
 }
-function vernomEncrypt(source:string, key:string) {
+export function vernomEncrypt(source:string, key:string) {
     return vernomHash(source, key);
 }
-function vernomDecrypt(encrypted:string, key:string) {
+export function vernomDecrypt(encrypted:string, key:string) {
     return vernomHash(encrypted, key);
 }

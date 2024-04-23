@@ -1,49 +1,32 @@
+import {  sleep } from "./misc"
 
 
+import { ContentEditable } from "./content-editable"
+import fuzzySubString, { FuzzySubString } from "./fuzzySubString"
+import validateRangeMatchesRules, { RangeRules } from "./range-rules"
+import { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync"
+import isTypeEqual from "./types/isTypeEqual"
+import isTypeExtended from "./types/isTypeExtended"
+
+export {sleep}
 
 
+export {ContentEditable};
+export {fuzzySubString};
 
 
+export {validateRangeMatchesRules};
+
+export * from "./uid/uid";
+
+export * as CryptoHelpers from "./crypto-helpers";
+export * as EmailHelpers from "./email-helpers";
 
 
-
-export function midnight(nowMs?: number):Date {
-    if( !nowMs ) nowMs = Date.now();
-    const d = new Date(nowMs);
-    d.setHours(0);
-    d.setMinutes(0);
-    d.setMilliseconds(0);
-    return d;
+export type {
+    isTypeEqual,
+    isTypeExtended,
+    EnsureAllMethodsAreAsync,
+    RangeRules,
+    FuzzySubString
 }
-
-
-
-
-type PromiseWithTrigger<T = any> = {
-    promise: Promise<T>,
-    trigger: ((value: T | PromiseLike<T>) => void)
-}
-export function promiseWithTrigger<T = any>():PromiseWithTrigger<T> {
-    const state:{accept?:  (value: T | PromiseLike<T>) => void} = {accept: undefined};
-    return {
-        trigger: (value: T | PromiseLike<T>) => {
-            if( !state.accept ) throw new Error("noop - should not be able to call before Promise is set up");
-            state.accept(value);
-        },
-        promise: new Promise<T>(accept => {
-            state.accept = accept;
-        })
-    };
-}
-
-
-
-export function sleep(milliseconds: number):Promise<void> {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve();
-        }, milliseconds);
-    })
-}
-
-

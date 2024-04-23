@@ -26,6 +26,30 @@
         "default": "./dist/typed-cancelable-event-emitter.mjs"
       },
       "types": "./dist/typed-cancelable-event-emitter.d.ts"
+    },
+    "./fake-idb": {
+      "module": "./dist/fake-idb.mjs",
+      "require": {
+        "types": "./dist/fake-idb.d.ts",
+        "default": "./dist/fake-idb.js"
+      },
+      "import": {
+        "types": "./dist/fake-idb.d.mts",
+        "default": "./dist/fake-idb.mjs"
+      },
+      "types": "./dist/fake-idb.d.ts"
+    },
+    "./dom-helpers": {
+      "module": "./dist/dom-helpers.mjs",
+      "require": {
+        "types": "./dist/dom-helpers.d.ts",
+        "default": "./dist/dom-helpers.js"
+      },
+      "import": {
+        "types": "./dist/dom-helpers.d.mts",
+        "default": "./dist/dom-helpers.mjs"
+      },
+      "types": "./dist/dom-helpers.d.ts"
     }
   },
   "main": "./dist/index.js",
