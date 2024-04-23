@@ -4,18 +4,19 @@
 type TextTokens = string[];
 
 export type FuzzySubString = {
-    matchedText: string, 
-    startPosition: number,
-    endPosition: number
+    matched_text: string, 
+    start_position: number,
+    end_position: number,
+    has_gaps: boolean
 };
 
-type PathPart = {needlePart:string, startPosition: number, endPosition: number, debug?: {distanceFromPrevious: number, textBetweenPrevious:string}};
+type PathPart = {needlePart:string, start_position: number, end_position: number, debug?: {distanceFromPrevious: number, textBetweenPrevious:string}};
 type Path = {
     parts: PathPart[],
     invalid?: boolean,
-    hasMissingNeedleParts: boolean,
-    hasGaps: boolean,
-    cumulativeDistanceBetweenParts:number,
+    has_missing_needle_parts: boolean,
+    has_gaps: boolean,
+    cumulative_distance_between_parts:number,
     final: FuzzySubString
 }
 
@@ -49,54 +50,55 @@ export default function fuzzySubString(haystack:string, needleParts:TextTokens, 
     if( !firstNeedlePart ) return undefined;
 
     const paths:Path[] = [];
-    let startPosition = 0;
+    let start_position = 0;
     while(true) {
-        startPosition = haystack.indexOf(firstNeedlePart, startPosition);
-        if( startPosition===-1 ) break;
-        const endPosition = startPosition + firstNeedlePart.length;
+        start_position = haystack.indexOf(firstNeedlePart, start_position);
+        if( start_position===-1 ) break;
+        const end_position = start_position + firstNeedlePart.length;
         paths.push({
-            parts: [{needlePart: firstNeedlePart, startPosition, endPosition}],
+            parts: [{needlePart: firstNeedlePart, start_position, end_position}],
             final: {
-                matchedText: firstNeedlePart,
-                startPosition,
-                endPosition
+                matched_text: firstNeedlePart,
+                start_position,
+                end_position,
+                has_gaps: false
             },
-            hasMissingNeedleParts: false,
-            hasGaps: false,
-            cumulativeDistanceBetweenParts: 0
+            has_missing_needle_parts: false,
+            has_gaps: false,
+            cumulative_distance_between_parts: 0
         })
-        startPosition = endPosition;
+        start_position = end_position;
     }
 
     // Do the remainder of the needle parts
     for( const needlePart of needlePartsNonEmpty ) {
         for( const path of paths ) {
             if( !path.invalid ) {
-                const previousPart = path.parts[path.parts.length];
+                const previousPart = path.parts[path.parts.length-1];
                 if( !previousPart ) throw new Error("No op. At least one part should already exist after firstNeedlePart processed");
-                const startPosition = haystack.indexOf(needlePart, previousPart.endPosition);
-                if( startPosition===-1 ) {
+                const start_position = haystack.indexOf(needlePart, previousPart.end_position);
+                if( start_position===-1 ) {
                     if( allowMissingNeedleParts ) {
-                        path.hasMissingNeedleParts = true;
+                        path.has_missing_needle_parts = true;
                     } else {
                         path.invalid = true;
                     }
                 } else {
-                    const endPosition = startPosition+needlePart.length;
-                    const part:PathPart = {needlePart, startPosition, endPosition};
+                    const end_position = start_position+needlePart.length;
+                    const part:PathPart = {needlePart, start_position, end_position};
                     path.parts.push(part);
 
-                    const distanceFromPrevious = startPosition-previousPart.endPosition;
-                    path.cumulativeDistanceBetweenParts += distanceFromPrevious;
+                    const distanceFromPrevious = start_position-previousPart.end_position;
+                    path.cumulative_distance_between_parts += distanceFromPrevious;
 
-                    const textBetweenPrevious = haystack.substring(previousPart.endPosition, startPosition);
-                    path.final.matchedText += textBetweenPrevious;
-                    path.final.matchedText += needlePart;
+                    const textBetweenPrevious = haystack.substring(previousPart.end_position, start_position);
+                    path.final.matched_text += textBetweenPrevious;
+                    path.final.matched_text += needlePart;
 
                     part.debug = {textBetweenPrevious, distanceFromPrevious};
 
-                    if( distanceFromPrevious>0 ) path.hasGaps = true;
-                    path.final.endPosition = endPosition;
+                    path.has_gaps = distanceFromPrevious>0;
+                    path.final.end_position = end_position;
                 }
             }
             
@@ -106,11 +108,14 @@ export default function fuzzySubString(haystack:string, needleParts:TextTokens, 
     // Find the path that's got the shortest number of gaps
     let pathWithShortestCumulativeDistanceBetweenParts:Path | undefined;
     for( const path of paths ) {
-        if( !path.invalid && (!pathWithShortestCumulativeDistanceBetweenParts || path.cumulativeDistanceBetweenParts<pathWithShortestCumulativeDistanceBetweenParts.cumulativeDistanceBetweenParts) ) {
+        if( !path.invalid && (!pathWithShortestCumulativeDistanceBetweenParts || path.cumulative_distance_between_parts<pathWithShortestCumulativeDistanceBetweenParts.cumulative_distance_between_parts) ) {
             pathWithShortestCumulativeDistanceBetweenParts = path;
         }
     }
     
+    if( pathWithShortestCumulativeDistanceBetweenParts ) {
+        pathWithShortestCumulativeDistanceBetweenParts.final.has_gaps = pathWithShortestCumulativeDistanceBetweenParts.has_gaps;
+    }
     return pathWithShortestCumulativeDistanceBetweenParts?.final;
 }
 
