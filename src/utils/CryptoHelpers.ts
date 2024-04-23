@@ -57,7 +57,7 @@ async function sha256raw(plain:string): Promise<string> {
     
 }
 
-async function sha1Hex(str:string): Promise<string> {
+export async function sha1Hex(str:string): Promise<string> {
     // BEWARE: Know that sha1 is NOT cryptographically safe (collisions possible). 
     //  Only permitted as a convenience hash that uses less space 
     

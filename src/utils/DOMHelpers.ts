@@ -1,5 +1,5 @@
 import { ReactElement } from 'react';
-import ReactDOM from 'react-dom';
+import {render} from 'react-dom';
 
 function emptyEl(el: HTMLElement, replacementText?: string): HTMLElement {
     while (el.hasChildNodes() && el.lastChild) {
@@ -26,7 +26,7 @@ const make = <ElementType extends HTMLElement>(nodeName: string, parent?: HTMLEl
 
     if (child) {
         if (isReactElement(child)) {
-            ReactDOM.render(child, el);
+            render(child, el);
         } else {
             el.appendChild(child);
         }

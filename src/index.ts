@@ -1,4 +1,4 @@
-import {  sleep, uid } from "./utils"
+import {  sleep } from "./utils"
 import { CryptoHelpers } from "./utils/CryptoHelpers"
 import { DOMHelpers } from "./utils/DOMHelpers"
 import { EmailHelpers } from "./utils/EmailHelpers"
@@ -11,6 +11,7 @@ import { TypedCancelableEventEmitter } from "./utils/typedCancelableEventEmitter
 import { EnsureAllMethodsAreAsync } from "./utils/types/EnsureAllMethodsAreAsync"
 import isTypeEqual from "./utils/types/isTypeEqual"
 import isTypeExtended from "./utils/types/isTypeExtended"
+import { uid } from "./utils/uid"
 
 export {uid, sleep}
 export {CryptoHelpers};

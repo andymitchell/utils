@@ -1,4 +1,4 @@
-import EventEmitter from "events";
+import {EventEmitter} from "events";
 import { TypedCancelableEventEmitter } from "../typedCancelableEventEmitter";
 
 export type EnsureAllMethodsAreAsyncExcludedDefault = EventEmitter | TypedCancelableEventEmitter<any>;

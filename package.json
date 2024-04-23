@@ -58,7 +58,6 @@
   },
   "dependencies": {
     "fake-indexeddb": "^5.0.2",
-    "md5": "^2.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "typed-emitter": "^2.1.0",
