@@ -20,7 +20,6 @@ export {fuzzySubString};
 
 export {validateRangeMatchesRules};
 
-export * from './utils/typed-cancelable-event-emitter';
 export * from "./utils/uid/uid";
 export * from "./utils/fake-idb";
 

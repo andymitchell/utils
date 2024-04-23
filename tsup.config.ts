@@ -1,7 +1,10 @@
 import { defineConfig } from "tsup";
  
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: {
+    'index': "src/index.ts",
+    'typed-cancelable-event-emitter': "src/utils/typed-cancelable-event-emitter/index.ts"
+  },
   publicDir: false,
   clean: true,
   minify: false,

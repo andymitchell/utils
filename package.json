@@ -1,6 +1,6 @@
 {
   "name": "@andyrmitchell/utils",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "",
   "exports": {
     ".": {
@@ -14,7 +14,19 @@
         "default": "./dist/index.mjs"
       },
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./typed-cancelable-event-emitter": {
+        "module": "./dist/typed-cancelable-event-emitter.mjs",
+        "require": {
+          "types": "./dist/typed-cancelable-event-emitter.d.ts",
+          "default": "./dist/typed-cancelable-event-emitter.js"
+        },
+        "import": {
+          "types": "./dist/typed-cancelable-event-emitter.d.mts",
+          "default": "./dist/typed-cancelable-event-emitter.mjs"
+        },
+        "types": "./dist/typed-cancelable-event-emitter.d.ts"
+      }
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
