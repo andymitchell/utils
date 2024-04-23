@@ -12,19 +12,17 @@ import { EnsureAllMethodsAreAsync } from "./utils/types/EnsureAllMethodsAreAsync
 import isTypeEqual from "./utils/types/isTypeEqual"
 import isTypeExtended from "./utils/types/isTypeExtended"
 
-export {
-    uid,
-    sleep,
-    reduceCharactersToEssentials,
-    CryptoHelpers, 
-    TypedCancelableEventEmitter,
-    validateRangeMatchesRules,
-    fakeIdb,
-    fuzzySubString,
-    ContentEditable,
-    DOMHelpers,
-    EmailHelpers
-}
+export {uid, sleep}
+export {CryptoHelpers};
+export {EmailHelpers};
+export {DOMHelpers};
+export {ContentEditable};
+export {fuzzySubString};
+export {fakeIdb};
+export {TypedCancelableEventEmitter};
+export {validateRangeMatchesRules};
+
+
 
 export type {
     isTypeEqual,
