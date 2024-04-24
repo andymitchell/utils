@@ -58,7 +58,8 @@ export function setCursorPosition(container: Node, position: { start: number, en
                         charCount = nextCharCount;
                     } else {
                         for (let i = 0; i < node.childNodes.length; i++) {
-                            if (setRange(node.childNodes[i], pos, range)) {
+                            const childNode = node.childNodes[i];
+                            if (childNode && setRange(childNode, pos, range)) {
                                 return true; // End node found
                             }
                         }

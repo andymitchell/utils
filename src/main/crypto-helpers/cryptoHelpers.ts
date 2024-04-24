@@ -90,11 +90,14 @@ export function base64urlUnescape(str:string) {
 export function jwtDecode(token:string) {
 
     const segments = token.split('.');
-    if (segments.length !== 3) throw new Error('Not enough or too many segments');
+    const headerSegment = segments[0];
+    const payloadSegment = segments[1];
+    if (!headerSegment || !payloadSegment) throw new Error('Not enough or too many segments');
 
     // base64 decode and parse JSON
-    const header = JSON.parse(base64urldecode(segments[0]));
-    const payload = JSON.parse(base64urldecode(segments[1]));
+    
+    const header = JSON.parse(base64urldecode(headerSegment));
+    const payload = JSON.parse(base64urldecode(payloadSegment));
     const signature = segments[2];
 
     return {

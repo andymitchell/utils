@@ -31,7 +31,9 @@ export function getInheritedStyles(element:HTMLElement, root = document.body):St
     const mergeStyles = (styleObj:CSSStyleDeclaration) => {
         for (let i = 0; i < styleObj.length; i++) {
             const key = styleObj[i];
-            setStyle(key, styleObj.getPropertyValue(key));
+            if( key ) {
+                setStyle(key, styleObj.getPropertyValue(key));
+            }
         }
     };
 
