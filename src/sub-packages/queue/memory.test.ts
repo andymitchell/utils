@@ -1,5 +1,6 @@
 
-import { uid } from "@andyrmitchell/utils";
+
+import { uid } from "../../main";
 import queue from "./memory";
 import standardQueueTests from "./standardQueueTests";
 import { Queue } from "./types";

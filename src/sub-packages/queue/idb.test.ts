@@ -1,5 +1,7 @@
-//import "fake-indexeddb/auto";
-import { fakeIdb, uid } from "@andyrmitchell/utils";
+import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
+
+import { uid } from "../../main";
+import { fakeIdb } from "../fake-idb";
 import queueIDB, { QueueIDB, disposeAll } from "./idb";
 import standardQueueTests from "./standardQueueTests";
 import { Queue } from "./types";

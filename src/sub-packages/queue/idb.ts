@@ -113,13 +113,11 @@ export class QueueIDB extends Dexie {
 
         const canStart = (item: QueueItemDB | undefined):boolean => !!item && item.client_id===this.client_id && !item.started_at;
         const getClientIdItems = async ():Promise<QueueItemDB[]> => {
-            
             return await this.queue.where('client_id').equals(this.client_id).sortBy('id');
         }
         
         
         const observable = liveQuery(async () => await getClientIdItems());
-        
         
         this.dexieSubscription = observable.subscribe({
             next: async (items: QueueItemDB[]) => {

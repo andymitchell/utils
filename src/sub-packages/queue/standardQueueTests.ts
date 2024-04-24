@@ -19,7 +19,6 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
         expect(state.run1).toBe(true);
     }, 1000*10)
     
-    
 
     test('Queue 3x runs', async () => {
 
