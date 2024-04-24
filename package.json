@@ -50,6 +50,18 @@
         "default": "./dist/dom-helpers.mjs"
       },
       "types": "./dist/dom-helpers.d.ts"
+    },
+    "./queue": {
+      "module": "./dist/queue.mjs",
+      "require": {
+        "types": "./dist/queue.d.ts",
+        "default": "./dist/queue.js"
+      },
+      "import": {
+        "types": "./dist/queue.d.mts",
+        "default": "./dist/queue.mjs"
+      },
+      "types": "./dist/queue.d.ts"
     }
   },
   "main": "./dist/index.js",
@@ -98,6 +110,7 @@
     "react-dom": "^18.2.0",
     "typed-emitter": "^2.1.0",
     "typescript": "^5.3.3",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "dexie": "^4.0.4"
   }
 }
