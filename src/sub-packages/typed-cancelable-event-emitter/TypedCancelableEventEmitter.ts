@@ -1,6 +1,8 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'events'; // events is installed as a dependency, not just relying on node. 
+
 import TypedEmitter, { EventMap } from "typed-emitter";
 
+// FYI could use eventemitter3 as isomorphic option, but its EventEmitter lacks setMaxListeners (because it has no limit), so would need TypedCancelableEventEmitter to implmenet the function as a placeholder, to satisfy TypedEmitter. 
 
 export type TypedCancel = () => void ;
 export class TypedCancelableEventEmitter<T extends EventMap> extends (EventEmitter as { new <U extends EventMap>(): TypedEmitter<U> })<T> {

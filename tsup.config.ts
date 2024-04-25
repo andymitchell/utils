@@ -2,7 +2,7 @@ import { defineConfig } from "tsup";
  
 export default defineConfig({
   entry: {
-    'index': "src/main/index.ts",
+    'index': "src/index.ts",
     'typed-cancelable-event-emitter': "src/sub-packages/typed-cancelable-event-emitter/index.ts",
     'fake-idb': "src/sub-packages/fake-idb/index.ts",
     'dom-helpers': "src/sub-packages/dom-helpers/index.ts",
