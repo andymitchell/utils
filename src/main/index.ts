@@ -14,6 +14,10 @@ export {sleep, promiseWithTrigger, midnight}
 export {ContentEditable};
 export {fuzzySubString};
 
+export {
+    isTypeEqual,
+    isTypeExtended
+}
 
 export {validateRangeMatchesRules};
 
@@ -24,8 +28,6 @@ export * as EmailHelpers from "./email-helpers";
 
 
 export type {
-    isTypeEqual,
-    isTypeExtended,
     EnsureAllMethodsAreAsync,
     RangeRules,
     FuzzySubString
