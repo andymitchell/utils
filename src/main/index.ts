@@ -1,4 +1,4 @@
-import {  sleep } from "./misc"
+import {  midnight, promiseWithTrigger, sleep } from "./misc"
 
 
 import { ContentEditable } from "./content-editable"
@@ -8,7 +8,7 @@ import { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync"
 import isTypeEqual from "./types/isTypeEqual"
 import isTypeExtended from "./types/isTypeExtended"
 
-export {sleep}
+export {sleep, promiseWithTrigger, midnight}
 
 
 export {ContentEditable};
