@@ -58,6 +58,44 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
         expect(state.run2).toBe(true);
         expect(state.run3).toBe(true);
     })
+
+    
+    test('Queue 2x runs even slow', async () => {
+
+        const queue = createQueue();
+
+        const state = {run1: false, run2: false};
+        queue('TEST_RUN', async () => {
+            await sleep(200);
+            state.run1 = true;
+        });
+        queue('TEST_RUN', async () => {
+            await sleep(200);
+            state.run2 = true;
+        });
+
+
+        
+        await new Promise<void>(resolve => {
+            const st = Date.now();
+            const timer = setInterval(() => {
+                const duration = Date.now()-st;
+                if( state.run1 && state.run2) {
+                    //console.log("Queue 3x run time: "+duration);
+                    clearInterval(timer);
+                    resolve();
+                }
+                if( duration > 4000 ) {
+                    //console.warn("Queue 3x timed out");
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 10);
+        })
+
+        expect(state.run1).toBe(true);
+        expect(state.run2).toBe(true);
+    })
     
     test('Queue returns', async () => {
 

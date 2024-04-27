@@ -8,7 +8,7 @@
 import Dexie, { Subscription, liveQuery } from "dexie";
 import { Queue } from "./types";
 import { FakeIdb } from "../fake-idb/types";
-import { sleep, uid } from "../../main";
+import { promiseWithTrigger, sleep, uid } from "../../main";
 
 
 
@@ -32,7 +32,7 @@ type JobItem = {
     descriptor?: string
 };
 
-type LockingRequest = {id: string, details: string};
+type LockingRequest = {id: string, details: string, promise:Promise<void>};
 export class QueueIDB extends Dexie {
     
     private client_id: string;
@@ -92,10 +92,12 @@ export class QueueIDB extends Dexie {
     }
 
     private request(details:string):() => void {
-        const request = {id: uid(), details};
+        const pwt = promiseWithTrigger<void>();
+        const request = {id: uid(), details, promise: pwt.promise};
         this.lockingRequests.push(request);
         return () => {
             this.lockingRequests = this.lockingRequests.filter(x => x.id!==request.id);
+            pwt.trigger();
         }
     }
 
@@ -150,6 +152,7 @@ export class QueueIDB extends Dexie {
         }
         if( job.running ) {
             console.warn("Already running job. Should not happen - here as a failsafe.");
+            debugger;
             return;
         }
 
@@ -234,8 +237,11 @@ export class QueueIDB extends Dexie {
 
     async dispose() {
         if( this.lockingRequests.length ) {
-            // TODO Could improve by making lockingRequests contain promises 
-            throw new Error("Cannot dispose while things still running");
+            const timeout = setTimeout(() => {
+                throw new Error("Cannot dispose while things still running");
+            }, 4000);
+            await Promise.all(this.lockingRequests.map(x => x.promise));
+            clearTimeout(timeout);
         }
 
         if( this.dexieSubscription ) {
