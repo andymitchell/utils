@@ -19,6 +19,7 @@ type QueueItemDB = {
     ts: number,
     client_id: string, 
     job_id: string,
+    run_id?: string,
     started_at?: number,
     completed_at?: number,
 }
@@ -113,7 +114,6 @@ export class QueueIDB extends Dexie {
 
     private async addDbListener() {
 
-        const canStart = (item: QueueItemDB | undefined):boolean => !!item && item.client_id===this.client_id && !item.started_at;
         const getClientIdItems = async ():Promise<QueueItemDB[]> => {
             return await this.queue.where('client_id').equals(this.client_id).sortBy('id');
         }
@@ -126,14 +126,25 @@ export class QueueIDB extends Dexie {
                 const clearRequest = this.request('subscription-next');
                 
                 const firstIncompleteItem = items.find(x => !x.completed_at);
-                if( firstIncompleteItem && canStart(firstIncompleteItem) ) {
-                    const updatedCount = await this.queue.update(firstIncompleteItem.id, {started_at: Date.now()});
-                    if( updatedCount===0 ) {
+                if( firstIncompleteItem && firstIncompleteItem.client_id===this.client_id && !firstIncompleteItem.started_at ) {
+
+                    const run_id = uid();
+                    let updatedCount:number | undefined;
+                    await this.transaction('rw', this.queue, async () => {
+                        // Double check it's not started in a race
+                        const anyRunning = await this.queue.where('client_id').equals(this.client_id).and(x => x.started_at!=undefined && x.started_at>0 && !x.completed_at).toArray();
+                        if( anyRunning.length>0 ) return;
+                        if( (await this.queue.get(firstIncompleteItem.id))?.started_at ) return;
+
+                        updatedCount = await this.queue.update(firstIncompleteItem.id, {run_id, started_at: Date.now()});
+                    })
+
+                    if( !updatedCount ) {
                         clearRequest();
                         throw new Error("Could not mark the item as started");
                     }
-                    // In theory, the subscriber could have overlapping callbacks for the same item, but this.runItem also checks for double runs. (Otherwise need a slower extra DB call to check the DB again)
-                    await this.runItem(firstIncompleteItem);
+
+                    await this.runItem(firstIncompleteItem, run_id);
                 }
                 clearRequest();
             }
@@ -143,7 +154,7 @@ export class QueueIDB extends Dexie {
         
     }
 
-    private async runItem(item:QueueItemDB) {
+    private async runItem(item:QueueItemDB, run_id:string) {
         const job = this.jobs[item.job_id];
 
         if( !job ) {
@@ -152,7 +163,10 @@ export class QueueIDB extends Dexie {
         }
         if( job.running ) {
             console.warn("Already running job. Should not happen - here as a failsafe.");
-            debugger;
+            const list = await this.queue.where('client_id').equals(this.client_id).sortBy('id');
+            if( list.filter(x => x.job_id===item.job_id).length>1 ) {
+                console.warn("The running job ID is in the db more than once.");
+            }
             return;
         }
 
@@ -164,31 +178,34 @@ export class QueueIDB extends Dexie {
             output = await job.onRun();
 
             // Mark it complete 
-            const updatedCount = await this.queue.update(item.id, {completed_at: Date.now()});
-            if( updatedCount===0 ) {
+            let updatedCount:number | undefined;
+            await this.transaction('rw', this.queue, async () => {
+                const latestItem = await this.queue.get(item.id);
+                if( latestItem?.run_id!==run_id ) {
+                    console.warn("The job running in memory did not match the job instance ID it was started with in the db.");
+                    return;
+                }
+                updatedCount = await this.queue.update(item.id, {completed_at: Date.now()});
+            });
+            if( !updatedCount ) {
                 throw new Error("Could not mark the item as complete");
             }
 
-            this.completeItem(item.job_id, output);
+
+            job.resolve(output);
+            delete this.jobs[item.job_id];
 
 
         } catch(e) {
             if( e instanceof Error ) {
-                this.completeItem(item.job_id, undefined, e);
+                job.reject(e);
+                delete this.jobs[item.job_id];
             }
         }
         
         
     }
 
-
-    private completeItem(job_id:string, output: any, error?:Error) {
-        const item = this.jobs[job_id];
-        if( !item ) throw new Error("Something went very wrong in queue: no item");
-
-        error? item.reject(error) : item.resolve(output);
-        delete this.jobs[job_id];
-    }
 
 
     private async checkTimeout(
