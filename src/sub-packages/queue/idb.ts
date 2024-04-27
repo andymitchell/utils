@@ -36,6 +36,7 @@ type JobItem = {
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
 export class QueueIDB extends Dexie {
     
+    private id:string;
     private client_id: string;
     private queue: Dexie.Table<QueueItemDB, number>; // scalar is type of primary key
     private jobs:Record<string, JobItem>;
@@ -55,6 +56,7 @@ export class QueueIDB extends Dexie {
         });
         this.queue = this.table('queue'); // Just informing Typescript what Dexie has already done...
 
+        this.id = id;
         this.lockingRequests = [];
         this.client_id = uid();
         this.jobs = {};
@@ -114,38 +116,30 @@ export class QueueIDB extends Dexie {
 
     private async addDbListener() {
 
-        const getClientIdItems = async ():Promise<QueueItemDB[]> => {
-            return await this.queue.where('client_id').equals(this.client_id).sortBy('id');
-        }
-        
-        
-        const observable = liveQuery(async () => await getClientIdItems());
+        const observable = liveQuery(async () => this.queue.where('client_id').equals(this.client_id).toArray());
         
         this.dexieSubscription = observable.subscribe({
-            next: async (items: QueueItemDB[]) => {
+            next: async () => {
                 const clearRequest = this.request('subscription-next');
-                
-                const firstIncompleteItem = items.find(x => !x.completed_at);
-                if( firstIncompleteItem && firstIncompleteItem.client_id===this.client_id && !firstIncompleteItem.started_at ) {
 
-                    const run_id = uid();
-                    let updatedCount:number | undefined;
-                    await this.transaction('rw', this.queue, async () => {
-                        // Double check it's not started in a race
-                        const anyRunning = await this.queue.where('client_id').equals(this.client_id).and(x => x.started_at!=undefined && x.started_at>0 && !x.completed_at).toArray();
-                        if( anyRunning.length>0 ) return;
-                        if( (await this.queue.get(firstIncompleteItem.id))?.started_at ) return;
+                const run_id = uid();
+                let firstIncompleteItem:QueueItemDB | undefined;
+                let updatedCount:number | undefined;
+                await this.transaction('rw', this.queue, async () => {
+                    const items = await this.queue.where('client_id').equals(this.client_id).sortBy('id');
 
+                    const somethingRunning = items.some(x => x.started_at && !x.completed_at);
+                    firstIncompleteItem = items.find(x => !x.completed_at);
+
+                    if( !somethingRunning && firstIncompleteItem ) {
                         updatedCount = await this.queue.update(firstIncompleteItem.id, {run_id, started_at: Date.now()});
-                    })
-
-                    if( !updatedCount ) {
-                        clearRequest();
-                        throw new Error("Could not mark the item as started");
                     }
+                })
 
+                if( firstIncompleteItem && updatedCount ) {
                     await this.runItem(firstIncompleteItem, run_id);
                 }
+
                 clearRequest();
             }
         })
@@ -199,8 +193,10 @@ export class QueueIDB extends Dexie {
         } catch(e) {
             if( e instanceof Error ) {
                 job.reject(e);
-                delete this.jobs[item.job_id];
+            } else {
+                job.reject("Unknown error");
             }
+            delete this.jobs[item.job_id];
         }
         
         
@@ -240,6 +236,7 @@ export class QueueIDB extends Dexie {
             for( const clientID of Object.keys(lastActivityPerClientID) ) {
                 if( lastActivityPerClientID[clientID]!<inactiveCutoff ) {
                     // Wipe all for this client ID
+                    console.warn("QueueIDB wiping a client ID", {clientID});
                     await this.queue.where('client_id').equals(clientID).delete();
                 }
             }
@@ -292,11 +289,9 @@ export async function disposeAll() {
 
 
 const queueIDB:Queue = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, testing?: {idb: FakeIdb}):Promise<T> => {
-    let q:QueueIDB | undefined = queueDbs[queueName];
-    if( !q ) { 
-        q = new QueueIDB(queueName, testing);
-        queueDbs[queueName] = q;
-    }
+    if( !queueDbs[queueName] ) queueDbs[queueName] = new QueueIDB(queueName, testing);
+    const q:QueueIDB | undefined = queueDbs[queueName];
+    if( !q ) throw new Error("noop - queue should be there");
     if( q.isTestingIdb()!==(!!testing?.idb) ) throw new Error("Must be consistent in using 'testing' on a queue name");
     
     //if( testing?.idb ) console.log("Running fake IDB");
