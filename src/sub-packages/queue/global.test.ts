@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
 
-import { disposeAllQueues, queue, queueIDB, registerQueueTestFile } from ".";
+import { disposeAllGlobalQueues, queue, queueIDB, registerTestFileUsingGlobalQueues } from ".";
 import {  uid } from "../../main";
 import { fakeIdb } from "../fake-idb";
 
@@ -11,10 +11,10 @@ import { standardQueueTests } from "./standardQueueTests";
 
 const TEST_FILE = 'global.test.ts';
 beforeAll(async () => {
-    registerQueueTestFile(TEST_FILE);
+    registerTestFileUsingGlobalQueues(TEST_FILE);
 })
 afterAll(async () => {
-    await disposeAllQueues(TEST_FILE);
+    await disposeAllGlobalQueues(TEST_FILE);
 }, 1000*10)
 
 describe('queueMemory global test', () => {

@@ -48,7 +48,7 @@ export async function disposeAllQueueMemorys(expectedQueueTestFile?:string) {
     queuesMemorys = {};
     await Promise.all(queues.map(x => x.dispose()));
 }
-export async function disposeAllQueues(expectedQueueTestFile?:string) {
+export async function disposeAllGlobalQueues(expectedQueueTestFile?:string) {
     if( expectedQueueTestFile ) checkTestFilesInMemoryAsExpected(expectedQueueTestFile);
     await disposeAllQueueMemorys();
     await disposeAllQueueIDBs();
@@ -58,7 +58,7 @@ function checkTestFilesInMemoryAsExpected(expectedQueueTestFile:string) {
         throw new Error(`It appears this memory space is being shared with other test files. Expected only ${expectedQueueTestFile}. Found: ${queueTestFiles.join(', ')}`);
     }
 }
-export function registerQueueTestFile(name:string) {
+export function registerTestFileUsingGlobalQueues(name:string) {
     queueTestFiles.push(name);
 }
 

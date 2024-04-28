@@ -1,5 +1,8 @@
 
-import { disposeAllQueueIDBs, disposeAllQueues, queue, queueIDB, registerQueueTestFile } from "./global";
+import { QueueIDB } from "./QueueIDB";
+import { QueueMemory } from "./QueueMemory";
+import { QueueWorkspace } from "./QueueWorkspace";
+import { disposeAllGlobalQueues, queue, queueIDB, registerTestFileUsingGlobalQueues } from "./global";
 
 
 import { QueueFunction } from "./types";
@@ -7,8 +10,11 @@ import { QueueFunction } from "./types";
 export {
     queue,
     queueIDB,
-    registerQueueTestFile,
-    disposeAllQueues
+    QueueMemory,
+    QueueIDB,
+    QueueWorkspace,
+    registerTestFileUsingGlobalQueues,
+    disposeAllGlobalQueues
 }
 
 export type {
