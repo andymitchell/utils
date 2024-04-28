@@ -70,7 +70,8 @@ export class QueueMemory implements IQueue {
     }
 
     private next() {
-    
+        if( this.disposed ) return;
+
         if( this.queue[0] && !this.queue[0].running ) {
             this.runItem(this.queue[0]);
         }
@@ -78,6 +79,8 @@ export class QueueMemory implements IQueue {
     }
 
     private async runItem(q:QueueItem) {
+        if( this.disposed ) return;
+
         q.running = true;
 
         try {
@@ -89,6 +92,8 @@ export class QueueMemory implements IQueue {
     }
 
     private completeItem(q:QueueItem, output: any, error?:any) {
+        if( this.disposed ) return;
+        
         if( !q.halted && this.queue[0]!==q ) {
             throw new Error("Something went wrong in queue");
         }

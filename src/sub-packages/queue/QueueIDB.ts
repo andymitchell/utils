@@ -73,7 +73,7 @@ export class QueueIDB extends Dexie implements IQueue {
 
         this.checkTimeout();
         
-        if( this.isTestingIdb() ) this.testingInitialHealthCheck();
+        if( this.isTestingIdb() && !testing?.idb_with_multiple_clients ) this.testingInitialHealthCheck();
         
     }
 
@@ -107,7 +107,6 @@ export class QueueIDB extends Dexie implements IQueue {
                 if( halt ) {
                     halt.then(async () => {
                         await this.completeItem(item, undefined, "Externally halted.", true);
-                        await this.disposeIfEmptyToClearTests();
                     });
                 }
             })
@@ -132,17 +131,11 @@ export class QueueIDB extends Dexie implements IQueue {
     private async testingInitialHealthCheck() {
         const rows = await this.queue.toArray();
         if( rows.length>0 ) {
-            console.log(`QueueIDB [${this.id}] with client ID ${this.client_id} is being constructed in testing mode, but there's already ${rows.length} items in the queue. This might be ok - e.g. if testing simulating multiple tabs. But it might also indicate an undesirable sharing of fake IDB.`);
+            console.debug(`QueueIDB [${this.id}] with client ID ${this.client_id} is being constructed in testing mode, but there's already ${rows.length} items in the queue. It might indicate an undesirable sharing of fake IDB. If you're intentionally testing multiple tabs, set 'idb_with_multiple_clients to true.`);
         }
     }
     async getQueueForTesting() {
         return await this.queue.toArray();
-    }
-    private async disposeIfEmptyToClearTests() {
-        const items = await this.queue.where('client_id').equals(this.client_id).toArray();
-        if(items.length===0) {
-            await this.dispose();
-        }
     }
 
 
@@ -153,6 +146,8 @@ export class QueueIDB extends Dexie implements IQueue {
         
         this.dexieSubscription = observable.subscribe({
             next: async () => {
+                if( this.disposed ) return;
+
                 const clearRequest = this.request('subscription-next');
 
                 const run_id = uid();
@@ -186,6 +181,8 @@ export class QueueIDB extends Dexie implements IQueue {
     }
 
     private async runItem(item:QueueItemDB) {
+        if( this.disposed ) return;
+
         const job = this.jobs[item.job_id];
 
         if( !job ) {
@@ -280,14 +277,28 @@ export class QueueIDB extends Dexie implements IQueue {
         clearRequest();
 
         if( this.nextTimeout ) clearTimeout(this.nextTimeout);
-        this.nextTimeout = setTimeout(() => {
-            this.checkTimeout();
-        }, 10000);
+        if( !this.disposed ) {
+            this.nextTimeout = setTimeout(() => {
+                this.checkTimeout();
+            }, 10000);
+        }
     }
 
     
     async dispose() {
         this.disposed = true;
+
+        if( this.dexieSubscription ) {
+            this.dexieSubscription.unsubscribe();
+        }
+        if( this.nextTimeout  ) clearTimeout(this.nextTimeout);
+
+        const jobs = Object.values(this.jobs);
+        this.jobs = {};
+        jobs.forEach(job => {
+            job.resolve(null);
+        })
+
         if( this.lockingRequests.length ) {
             const timeout = setTimeout(() => {
                 throw new Error("Cannot dispose while things still running");
@@ -296,23 +307,10 @@ export class QueueIDB extends Dexie implements IQueue {
             clearTimeout(timeout);
         }
 
-        if( this.dexieSubscription ) {
-            this.dexieSubscription.unsubscribe();
-        }
 
         await this.queue.where('client_id').equals(this.client_id).delete();
 
         super.close();
-
-        if( this.nextTimeout  ) {
-            clearTimeout(this.nextTimeout);
-        }
-
-        const jobs = Object.values(this.jobs);
-        this.jobs = {};
-        jobs.forEach(job => {
-            job.resolve(null);
-        })
 
         // Dexie's unsubscribe (and maybe close) aren't promises, but they do take time to run, breaking tests by leaving open handles. 
         await sleep(3000);
