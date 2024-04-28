@@ -1,9 +1,8 @@
-
-
 import { promiseWithTrigger, sleep } from "../../main";
 import { QueueFunction } from "./types";
 
-export default function implementationQueueTests(test: jest.It, expect: jest.Expect, createQueue: () => QueueFunction) {
+export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueue: () => QueueFunction) {
+    
     test('Queue basic', async () => {
 
         const queue = createQueue();
@@ -19,6 +18,32 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
         expect(state.run1).toBe(true);
     }, 1000*10)
     
+
+    test('Queue is sequential', async () => {
+        const queue = createQueue();
+
+        const st = Date.now();
+        const state:{q1_finished_ts?: number, q2_finished_ts?: number} = {
+            q1_finished_ts: undefined,
+            q2_finished_ts: undefined
+        }
+        const addedFirst = promiseWithTrigger<void>();
+        queue('TEST_SEQUENTIAL', async () => {
+            await sleep(200);
+            state.q1_finished_ts = Date.now();
+        }, 'test1', undefined, addedFirst.trigger);
+        await addedFirst.promise;
+        await queue('TEST_SEQUENTIAL', async () => {
+            await sleep(200);
+            state.q2_finished_ts = Date.now();
+        }, 'test2');
+
+        expect(state.q2_finished_ts!>0).toBe(true);
+        const secondRunTime = (state.q2_finished_ts!-state.q1_finished_ts!);
+        expect(secondRunTime>=200).toBe(true);
+        expect((state.q2_finished_ts!-st)>=400).toBe(true);
+
+    }, 1000*10)
 
     test('Queue 3x runs', async () => {
 
@@ -177,20 +202,30 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
         
         expect(error!.message).toBe("Bad Test ABC 3");
     })
+    
+    
 
     test('Queue halt - while running', async () => {
 
+        const SLEEP_TIME = 1500;
+
+        
         const queue = createQueue();
 
         const startedRun1 = promiseWithTrigger<void>();
         const halt = promiseWithTrigger<void>();
         const state = {run1: false, run2: false};
         
-        const runPromise1 = queue('TEST_RUN', async () => {
+        let startSleep: number | undefined;
+        let errorThrown = false;
+        queue('TEST_RUN', async () => {
             startedRun1.trigger();
-            await sleep(1000);
+            startSleep = Date.now();
+            await sleep(SLEEP_TIME);
             state.run1 = true;
-        }, undefined, {halt: halt.promise});
+        }, undefined, halt.promise).catch(e => {
+            errorThrown = true;
+        });
 
         const runPromise2 = queue('TEST_RUN', async () => {
             state.run2 = true;
@@ -198,23 +233,28 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
 
         await startedRun1.promise;
         halt.trigger();
+        const oneEndedAt = Date.now();
 
         await runPromise2;
+        const twoEndedAt = Date.now();
 
-        expect(state.run1).toBe(true); // It will run, as it gets started 
         expect(state.run2).toBe(true); 
-        let errorThrown = false;
-        try {
-            const run1 = await runPromise1;
-        } catch(e) {
-            errorThrown = true;
-        }
-        expect(errorThrown).toBe(true);
         
+        expect(errorThrown).toBe(true);
+
+        // Even though queue item 1's function takes time to run, two should have begun immediately after the one is halted
+        const timeBetweenTests = Math.abs(oneEndedAt!-twoEndedAt);
+        expect(timeBetweenTests<500).toBe(true); // IDB can be slow, but as long as it's less than SLEEP_TIME it's ok
+
+        // Let the test runner know something might not be finished yet
+        await sleep(SLEEP_TIME-(Date.now()-startSleep!));
     })
+    
+    
+    test('Queue halt - never runs second', async () => {
 
-
-    test('Queue halt - never runs', async () => {
+        const SLEEP_TIME = 1500;
+        let startSleep: number | undefined;
 
         const queue = createQueue();
 
@@ -224,51 +264,33 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
         
         const runPromise1 = queue('TEST_RUN', async () => {
             startedRun1.trigger();
-            await sleep(1000);
+            startSleep = Date.now();
+            await sleep(SLEEP_TIME);
             state.run1 = true;
         });
 
-        const runPromise2 = queue('TEST_RUN', async () => {
+        let errorThrown = false;
+        let errorPromise = promiseWithTrigger<void>();
+        queue('TEST_RUN', async () => {
             state.run2 = true;
-        }, undefined, {halt: halt.promise});
+        }, undefined, halt.promise).catch(e => {
+            errorThrown = true;
+            errorPromise.trigger();
+        })
 
         await startedRun1.promise;
         halt.trigger();
 
+        await errorPromise.promise;
         await runPromise1;
-        await sleep(500);
 
         expect(state.run1).toBe(true);
         expect(state.run2).toBe(false); 
-        let errorThrown = false;
-        try {
-            const run2 = await runPromise2;
-        } catch(e) {
-            errorThrown = true;
-        }
+        
         expect(errorThrown).toBe(true);
         
+        // Let the test runner know something might not be finished yet
+        await sleep(SLEEP_TIME-(Date.now()-startSleep!));
     })
 
-    /*
-    test('Queue does not propogate non-awaited async error', async () => {
-
-        const queue = createQueue();
-
-        let error: Error | undefined;
-        try {
-            queue('TEST_RUN', async () => {
-                throw new Error("Intentional Uncaught Error In Promise");
-            });
-        } catch(e) {
-            if( e instanceof Error ) {
-                error = e;
-            }
-        }
-
-        await sleep(200);
-        
-        expect(error).toBe(undefined);
-    })
-    */
 }

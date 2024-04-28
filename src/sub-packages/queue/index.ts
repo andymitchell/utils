@@ -1,10 +1,14 @@
-import queueIDB from "./idb";
-import queue from "./memory";
+
+import { disposeAllQueueIDBs, disposeAllQueues, queue, queueIDB, registerQueueTestFile } from "./global";
+
+
 import { QueueFunction } from "./types";
 
 export {
     queue,
-    queueIDB
+    queueIDB,
+    registerQueueTestFile,
+    disposeAllQueues
 }
 
 export type {
