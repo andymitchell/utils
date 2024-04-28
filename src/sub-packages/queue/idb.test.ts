@@ -4,7 +4,7 @@ import { uid } from "../../main";
 import { fakeIdb } from "../fake-idb";
 import queueIDB, { QueueIDB, disposeAll } from "./idb";
 import standardQueueTests from "./standardQueueTests";
-import { Queue } from "./types";
+import { QueueFunction } from "./types";
 
 afterAll(async () => {
     await disposeAll();
@@ -15,8 +15,10 @@ describe('QueueIDB test', () => {
     standardQueueTests(test, expect, () => {
         const queueNameSpace = uid();
         return ((queueName:string, onRun:() => void, descriptor?: string, testing?: any) => {
-            return queueIDB(queueNameSpace+queueName, onRun, descriptor,  {idb: fakeIdb()})
-        }) as Queue
+            if( !testing ) testing = {};
+            testing.idb = fakeIdb();
+            return queueIDB(queueNameSpace+queueName, onRun, descriptor, testing)
+        }) as QueueFunction
     });
     
 });

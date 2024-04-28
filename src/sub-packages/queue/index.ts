@@ -1,6 +1,6 @@
 import queueIDB from "./idb";
 import queue from "./memory";
-import { Queue } from "./types";
+import { QueueFunction } from "./types";
 
 export {
     queue,
@@ -8,5 +8,5 @@ export {
 }
 
 export type {
-    Queue
+    QueueFunction
 }

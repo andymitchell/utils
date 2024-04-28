@@ -1,12 +1,16 @@
 /**
- * Works across tabs, backed by an IndexedDB 
- * E.g. read and upload data sequentially from a database, without duplicating the behaviour in each tab that tracks the database.
+ * Goal is to be a queue that works across tabs. 
+ * Despite using IndexedDB, it's not intended to be durable: it still holds its jobs in memory.
+ *  The IDB is just there to enforce sequential/non-concurrent task order across tabs, if they share the same IDB. 
+ * 
+ * Use cases
+ *  - You want to run a heavy operation only once across tabs that share data. So whichever tab picks up the job first runs it, marks it complete, and no other tab races to run it concurrently. 
  * 
  * (Potentially this can also be implemented with a Broadcast Channel API, if using IndexedDB isn't desirable - e.g. too slow/heavy)
  */
 
 import Dexie, { Subscription, liveQuery } from "dexie";
-import { Queue } from "./types";
+import { QueueFunction, Testing } from "./types";
 import { FakeIdb } from "../fake-idb/types";
 import { promiseWithTrigger, sleep, uid } from "../../main";
 
@@ -19,6 +23,7 @@ type QueueItemDB = {
     ts: number,
     client_id: string, 
     job_id: string,
+    client_id_job_count: number,
     run_id?: string,
     started_at?: number,
     completed_at?: number,
@@ -43,9 +48,11 @@ export class QueueIDB extends Dexie {
     private testing_idb: boolean;
     private nextTimeout?: number | NodeJS.Timeout;
     private dexieSubscription?: Subscription;
+    private maxRunTimeMs:number = 1000*60*5;
     private lockingRequests:LockingRequest[];
+    private disposed:boolean;
 
-    constructor(id:string, testing?: {idb: FakeIdb}) {
+    constructor(id:string, testing?: Testing) {
         super(`queue-idb-${id}`, testing?.idb);
 
         this.testing_idb = !!testing?.idb;
@@ -61,13 +68,16 @@ export class QueueIDB extends Dexie {
         this.client_id = uid();
         this.jobs = {};
         this.addDbListener();
+        this.disposed = false;
 
         this.checkTimeout();
         
+        if( this.isTestingIdb() ) this.testingInitialHealthCheck();
         
     }
 
-    async run<T>(onRun:(...args: any[]) => T | PromiseLike<T>,descriptor?: string):Promise<T> {
+    async run<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, testing?: Testing):Promise<T> {
+        if( this.disposed ) throw new Error(`QueueIDB [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`);
         const job_id = uid();
 
         return new Promise((resolve, reject) => {
@@ -80,16 +90,25 @@ export class QueueIDB extends Dexie {
             };
 
             const clearRequest = this.request('run');
-            this.queue.add({
+            const item:QueueItemDB = {
                 // @ts-ignore IDB will fill 'id' in
                 id: undefined,
                 ts: Date.now(),
                 client_id: this.client_id, 
+                client_id_job_count: Object.values(this.jobs).length,
                 job_id
-            }).then(() => {
+            }
+            this.queue.add(item).then((id:number) => {
+                item.id = id;
                 clearRequest();
+                if( testing?.halt ) {
+                    testing.halt.then(async () => {
+                        await this.completeItem(item, undefined, "Externally halted.", true);
+                        await this.disposeIfEmptyToClearTests();
+                    });
+                }
             })
-                
+
         });
         
     }
@@ -107,16 +126,27 @@ export class QueueIDB extends Dexie {
     isTestingIdb() {
         return this.testing_idb;
     }
-
+    private async testingInitialHealthCheck() {
+        const rows = await this.queue.toArray();
+        if( rows.length>0 ) {
+            console.log(`QueueIDB [${this.id}] is being constructed in testing mode, but there's already ${rows.length} items in the queue. This might be ok - e.g. if testing simulating multiple tabs.`);
+        }
+    }
     async getQueueForTesting() {
         return await this.queue.toArray();
+    }
+    private async disposeIfEmptyToClearTests() {
+        const items = await this.queue.where('client_id').equals(this.client_id).toArray();
+        if(items.length===0) {
+            await this.dispose();
+        }
     }
 
 
 
     private async addDbListener() {
 
-        const observable = liveQuery(async () => this.queue.where('client_id').equals(this.client_id).toArray());
+        const observable = liveQuery(async () => this.queue.toArray());
         
         this.dexieSubscription = observable.subscribe({
             next: async () => {
@@ -124,20 +154,23 @@ export class QueueIDB extends Dexie {
 
                 const run_id = uid();
                 let firstIncompleteItem:QueueItemDB | undefined;
-                let updatedCount:number | undefined;
+                let markedStarted:boolean = false;
                 await this.transaction('rw', this.queue, async () => {
-                    const items = await this.queue.where('client_id').equals(this.client_id).sortBy('id');
+                    const items = await this.queue.orderBy('id').toArray();
 
                     const somethingRunning = items.some(x => x.started_at && !x.completed_at);
-                    firstIncompleteItem = items.find(x => !x.completed_at);
+                    firstIncompleteItem = items.find(x => !x.completed_at && x.client_id===this.client_id);
 
                     if( !somethingRunning && firstIncompleteItem ) {
-                        updatedCount = await this.queue.update(firstIncompleteItem.id, {run_id, started_at: Date.now()});
+                        const now = Date.now();
+                        firstIncompleteItem.run_id = run_id;
+                        firstIncompleteItem.started_at = now;
+                        markedStarted = (await this.queue.update(firstIncompleteItem.id, {run_id, started_at: now}))>0;
                     }
                 })
 
-                if( firstIncompleteItem && updatedCount ) {
-                    await this.runItem(firstIncompleteItem, run_id);
+                if( firstIncompleteItem && markedStarted ) {
+                    await this.runItem(firstIncompleteItem);
                 }
 
                 clearRequest();
@@ -148,98 +181,99 @@ export class QueueIDB extends Dexie {
         
     }
 
-    private async runItem(item:QueueItemDB, run_id:string) {
+    private async runItem(item:QueueItemDB) {
         const job = this.jobs[item.job_id];
 
         if( !job ) {
-            console.warn("Job not found.");
+            console.warn(`QueueIDB [${this.id}] Job not found.`);
             return;
         }
         if( job.running ) {
-            console.warn("Already running job. Should not happen - here as a failsafe.");
-            const list = await this.queue.where('client_id').equals(this.client_id).sortBy('id');
-            if( list.filter(x => x.job_id===item.job_id).length>1 ) {
-                console.warn("The running job ID is in the db more than once.");
-            }
+            console.warn(`QueueIDB [${this.id}] Already running job. Should not happen - here as a failsafe.`);
             return;
         }
+        if( this.isTestingIdb() && (Date.now()-item.ts)>4000 ) {
+            console.log(`QueueIDB [${this.id}] is running in testing mode, and the job has taken a several seconds to start - typically unexpected and raises possibility the test is sharing its IDB with other tests.`, {time_to_start: (Date.now()-item.ts), item});
+        }
 
-        let output: any;
-        
         // Try to run the job's function
         try {
             job.running = true;
-            output = await job.onRun();
+            const output = await job.onRun();
+            this.completeItem(item, output, undefined);
+        } catch(e) {
+            this.completeItem(item, undefined, e);
+        }
+    }
+
+    private async completeItem(item:QueueItemDB, output:unknown, error:unknown, ignoreIfAlreadyComplete?: boolean) {
+        const job = this.jobs[item.job_id];
+
+        try {
+
+            delete this.jobs[item.job_id];
 
             // Mark it complete 
-            let updatedCount:number | undefined;
+            let latestItem: QueueItemDB | undefined;
+            let markedComplete:boolean = false;
             await this.transaction('rw', this.queue, async () => {
-                const latestItem = await this.queue.get(item.id);
-                if( latestItem?.run_id!==run_id ) {
-                    console.warn("The job running in memory did not match the job instance ID it was started with in the db.");
+                latestItem = await this.queue.get(item.id);
+                if( latestItem?.run_id!==item.run_id ) {
+                    if( latestItem && !ignoreIfAlreadyComplete ) {
+                        console.warn(`QueueIDB [${this.id}] The job running in memory did not match the job instance ID it was started with in the db.`, {latestItem, item});
+                    }
                     return;
                 }
-                updatedCount = await this.queue.update(item.id, {completed_at: Date.now()});
+                markedComplete = (await this.queue.update(item.id, {completed_at: Date.now()})>0);
             });
-            if( !updatedCount ) {
-                throw new Error("Could not mark the item as complete");
+            if( !markedComplete && !ignoreIfAlreadyComplete ) {
+                throw new Error(`QueueIDB [${this.id}] Could not mark the item as complete.\n\n${JSON.stringify({item, latestItem})}`);
             }
-
-
-            job.resolve(output);
-            delete this.jobs[item.job_id];
-
-
         } catch(e) {
+            const originalErrorText =  error? `[Original Error: ${error instanceof Error? error.message : error}]` : '';
             if( e instanceof Error ) {
-                job.reject(e);
+                e.message += ` ${originalErrorText}`;
+                error = e;
             } else {
-                job.reject("Unknown error");
+                error = new Error(`Unknown error during complete. ${originalErrorText}`);
             }
-            delete this.jobs[item.job_id];
         }
-        
+
+        if( job ) {
+            if( error ) {
+                job.reject(error);
+            } else {
+                job.resolve(output);
+            }
+        }
         
     }
 
 
-
     private async checkTimeout(
-        inactiveCutoff = Date.now()-(1000*30),
-        startedCutoff = Date.now()-(1000*60*1),
-        completedCutoff = Date.now()-(1000*60*10)
+        notStartedCutoff = Date.now()-(1000*60*60*24),
+        startedCutoff = Date.now()-this.maxRunTimeMs,
+        completedCutoff = Date.now()-(1000*60*1)
     ) {
         
-        // Get all items (any client)
-        // If started + this client_id, and it's older than X minutes, kill it 
-        // If completed > X mins ago, clear it 
-        // If previous client_id finished X mins ago, and the next one hasn't started, clear all client ids
-        
-
         const clearRequest = this.request('checkTimeout');
         await this.transaction('rw', this.queue, async () => {
-            const lastActivityPerClientID:Record<string, number> = {};
             const items = await this.queue.orderBy('id').toArray();
     
             for( const item of items ) {
+                const clientIdText = this.client_id!==item.client_id? `[Different client ID to item: ${this.client_id}]` : '';
                 if( item.completed_at && item.completed_at<completedCutoff ) {
-                    console.log("QueueIDB cleaning up a completed item.", {item});
+                    console.log(`QueueIDB [${this.id}] cleaning up a completed item. ${clientIdText}`, {item});
                     await this.queue.delete(item.id);
-                } else if( item.started_at && item.started_at<startedCutoff && item.client_id===this.client_id ) {
-                    console.warn("QueueIDB a started item timed out, which should never happen.", {item});
-                    await this.queue.delete(item.id);
-                } else {
-                    if(item.started_at) lastActivityPerClientID[item.client_id] = item.completed_at ?? item.started_at;
+                } else if( item.started_at && !item.completed_at && item.started_at<startedCutoff ) {
+                    console.warn(`QueueIDB [${this.id}] a started item timed out, which should never happen. ${clientIdText}`, {item});
+                    await this.completeItem(item, undefined, "Started, but timed out", true);
+                } else if( !item.started_at && !item.completed_at && item.ts<notStartedCutoff ) {
+                    console.warn(`QueueIDB [${this.id}] an item never started, which should never happen. ${clientIdText}`, {item});
+                    await this.completeItem(item, undefined, "Item never started, timed out", true);
                 }
             }
 
-            for( const clientID of Object.keys(lastActivityPerClientID) ) {
-                if( lastActivityPerClientID[clientID]!<inactiveCutoff ) {
-                    // Wipe all for this client ID
-                    console.warn("QueueIDB wiping a client ID", {clientID});
-                    await this.queue.where('client_id').equals(clientID).delete();
-                }
-            }
         });
         clearRequest();
 
@@ -249,7 +283,9 @@ export class QueueIDB extends Dexie {
         }, 10000);
     }
 
+    
     async dispose() {
+        this.disposed = true;
         if( this.lockingRequests.length ) {
             const timeout = setTimeout(() => {
                 throw new Error("Cannot dispose while things still running");
@@ -261,6 +297,8 @@ export class QueueIDB extends Dexie {
         if( this.dexieSubscription ) {
             this.dexieSubscription.unsubscribe();
         }
+
+        await this.queue.where('client_id').equals(this.client_id).delete();
 
         super.close();
 
@@ -288,7 +326,7 @@ export async function disposeAll() {
 }
 
 
-const queueIDB:Queue = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, testing?: {idb: FakeIdb}):Promise<T> => {
+const queueIDB:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, testing?: Testing):Promise<T> => {
     if( !queueDbs[queueName] ) queueDbs[queueName] = new QueueIDB(queueName, testing);
     const q:QueueIDB | undefined = queueDbs[queueName];
     if( !q ) throw new Error("noop - queue should be there");
@@ -296,6 +334,6 @@ const queueIDB:Queue = async <T>(queueName:string, onRun:(...args: any[]) => T |
     
     //if( testing?.idb ) console.log("Running fake IDB");
     
-    return q.run(onRun, descriptor);
+    return q.run(onRun, descriptor, testing);
 }
 export default queueIDB;

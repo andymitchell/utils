@@ -1,9 +1,9 @@
 
 
-import { sleep } from "../../main";
-import { Queue } from "./types";
+import { promiseWithTrigger, sleep } from "../../main";
+import { QueueFunction } from "./types";
 
-export default function implementationQueueTests(test: jest.It, expect: jest.Expect, createQueue: () => Queue) {
+export default function implementationQueueTests(test: jest.It, expect: jest.Expect, createQueue: () => QueueFunction) {
     test('Queue basic', async () => {
 
         const queue = createQueue();
@@ -59,7 +59,7 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
         expect(state.run3).toBe(true);
     })
 
-    
+
     test('Queue 2x runs even slow', async () => {
 
         const queue = createQueue();
@@ -176,6 +176,78 @@ export default function implementationQueueTests(test: jest.It, expect: jest.Exp
         }
         
         expect(error!.message).toBe("Bad Test ABC 3");
+    })
+
+    test('Queue halt - while running', async () => {
+
+        const queue = createQueue();
+
+        const startedRun1 = promiseWithTrigger<void>();
+        const halt = promiseWithTrigger<void>();
+        const state = {run1: false, run2: false};
+        
+        const runPromise1 = queue('TEST_RUN', async () => {
+            startedRun1.trigger();
+            await sleep(1000);
+            state.run1 = true;
+        }, undefined, {halt: halt.promise});
+
+        const runPromise2 = queue('TEST_RUN', async () => {
+            state.run2 = true;
+        });
+
+        await startedRun1.promise;
+        halt.trigger();
+
+        await runPromise2;
+
+        expect(state.run1).toBe(true); // It will run, as it gets started 
+        expect(state.run2).toBe(true); 
+        let errorThrown = false;
+        try {
+            const run1 = await runPromise1;
+        } catch(e) {
+            errorThrown = true;
+        }
+        expect(errorThrown).toBe(true);
+        
+    })
+
+
+    test('Queue halt - never runs', async () => {
+
+        const queue = createQueue();
+
+        const startedRun1 = promiseWithTrigger<void>();
+        const halt = promiseWithTrigger<void>();
+        const state = {run1: false, run2: false};
+        
+        const runPromise1 = queue('TEST_RUN', async () => {
+            startedRun1.trigger();
+            await sleep(1000);
+            state.run1 = true;
+        });
+
+        const runPromise2 = queue('TEST_RUN', async () => {
+            state.run2 = true;
+        }, undefined, {halt: halt.promise});
+
+        await startedRun1.promise;
+        halt.trigger();
+
+        await runPromise1;
+        await sleep(500);
+
+        expect(state.run1).toBe(true);
+        expect(state.run2).toBe(false); 
+        let errorThrown = false;
+        try {
+            const run2 = await runPromise2;
+        } catch(e) {
+            errorThrown = true;
+        }
+        expect(errorThrown).toBe(true);
+        
     })
 
     /*

@@ -2,7 +2,7 @@
  * Works in memory (e.g. in one tab). 
  */
 
-import { Queue } from "./types";
+import { QueueFunction, Testing } from "./types";
 
 type QueueItem = {
     queueName: string,
@@ -17,7 +17,9 @@ const queues:{[queueName:string]: Array<QueueItem>} = {};
 
 const emptyFunction = () => {};
 
-export function queueRunSyncIfPossible(queueName:string, onRun:Function, descriptor?: string):void {
+
+
+export function queueRunSyncIfPossible(queueName:string, onRun:Function, descriptor?: string, testing?: Testing):void {
     if( !queues[queueName] ) queues[queueName] = [];
 
     if( queues[queueName]!.length===0 ) {
@@ -48,11 +50,11 @@ export function queueRunSyncIfPossible(queueName:string, onRun:Function, descrip
 }
 
 
-const queue:Queue = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string):Promise<T> => {
+const queue:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, testing?: Testing):Promise<T> => {
     if( !queues[queueName] ) queues[queueName] = [];
     
     return new Promise<T>((resolve, reject) => {
-        queues[queueName] = [...(queues[queueName] ?? []), {
+        const q:QueueItem = {
             queueName,
             resolve: (result:T) => {
                 resolve(result)
@@ -63,8 +65,11 @@ const queue:Queue = async <T>(queueName:string, onRun:(...args: any[]) => T | Pr
             running: false,
             onRun,
             descriptor
-        }];
+        }
+        queues[queueName] = [...(queues[queueName] ?? []), q];
         next();
+
+        if( testing?.halt ) testing.halt.then(() => completeItem(q, undefined, "Externally halted.", true));
     })
 }
 export default queue;
@@ -90,9 +95,10 @@ async function runItem(q:QueueItem) {
     }
 }
 
-function completeItem(q:QueueItem, output: any, error?:any) {
+function completeItem(q:QueueItem, output: any, error?:any, force?: boolean) {
     const queueItem = queues[q.queueName];
-    if( !queueItem || queueItem[0]!==q ) throw new Error("Something went very wrong in queue");
+    if( !queueItem ) return;
+    if( !force && queueItem[0]!==q ) throw new Error("Something went very wrong in queue");
 
     error? q.reject(error) : q.resolve(output);
     queues[q.queueName] = queueItem.filter(x => x!==q);
