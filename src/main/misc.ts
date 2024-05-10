@@ -19,7 +19,7 @@ export function midnight(nowMs?: number):Date {
 
 
 
-type PromiseWithTrigger<T = any> = {
+export type PromiseWithTrigger<T = any> = {
     promise: Promise<T>,
     trigger: ((value: T | PromiseLike<T>) => void)
 }

@@ -1,4 +1,4 @@
-import {  midnight, promiseWithTrigger, sleep } from "./misc"
+import {  PromiseWithTrigger, midnight, promiseWithTrigger, sleep } from "./misc"
 
 
 import { ContentEditable } from "./content-editable"
@@ -30,5 +30,6 @@ export * as EmailHelpers from "./email-helpers";
 export type {
     EnsureAllMethodsAreAsync,
     RangeRules,
-    FuzzySubString
+    FuzzySubString,
+    PromiseWithTrigger
 }
