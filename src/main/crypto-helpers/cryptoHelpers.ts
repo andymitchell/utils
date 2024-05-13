@@ -5,11 +5,17 @@ type Sha256HexOutput = {
 
 
 
-function getCrypto():Crypto {
-    if( typeof window==='undefined' ) {
-        return self.crypto;
-    } else {
+export function getCrypto() {
+    if (typeof window !== 'undefined' && window.crypto) {
+        // We're in a browser environment
         return window.crypto;
+    } else if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+        // We're in a Node.js environment
+        return require('crypto').webcrypto;
+        //const crypto = await import('crypto');
+        //return crypto.webcrypto;
+    } else {
+        throw new Error('Crypto not available');
     }
 }
 
@@ -28,6 +34,7 @@ export async function sha256HexArrayToObject(items: Array<string>): Promise<Sha2
 
 export async function sha256Hex(str:string): Promise<string> {
     
+    const crypto = await getCrypto();
         const msgUint8 = new TextEncoder().encode(str);                               // encode as (utf-8) Uint8Array
         const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);           // hash the message
         const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
@@ -37,9 +44,10 @@ export async function sha256Hex(str:string): Promise<string> {
 
 export async function sha256raw(plain:string): Promise<string> {
     
+    const crypto = await getCrypto();
         const encoder = new TextEncoder();
         const data = encoder.encode(plain);
-        const sha256inBuffer: ArrayBuffer = await getCrypto().subtle.digest('SHA-256', data);
+        const sha256inBuffer: ArrayBuffer = await crypto.subtle.digest('SHA-256', data);
         // @ts-ignore
         return String.fromCharCode.apply(null, new Uint8Array(sha256inBuffer));
     
@@ -49,6 +57,7 @@ export async function sha1Hex(str:string): Promise<string> {
     // BEWARE: Know that sha1 is NOT cryptographically safe (collisions possible). 
     //  Only permitted as a convenience hash that uses less space 
     
+    const crypto = await getCrypto();
         const msgUint8 = new TextEncoder().encode(str);                               // encode as (utf-8) Uint8Array
         const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8);             // hash the message
         const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
@@ -60,7 +69,7 @@ export async function sha1Hex(str:string): Promise<string> {
 
 export function generateRandomString(length = 28) {
     var array = new Uint32Array(Math.round(length / 2) + 2);
-    getCrypto().getRandomValues(array);
+    crypto.getRandomValues(array);
     let str = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
     return str.substr(0, length);
 }

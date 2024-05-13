@@ -2,6 +2,7 @@ import {
     base64urldecode, 
     base64urlencode, 
     generateRandomString, 
+    getCrypto, 
     jwtDecode, 
     pkceS256ChallengeFromVerifier, 
     sha1Hex, 
@@ -12,6 +13,7 @@ import {
     vernomEncrypt } from "./cryptoHelpers";
 
 export {
+    getCrypto,
     sha256HexArrayToObject,
     sha256Hex,
     sha256raw,
