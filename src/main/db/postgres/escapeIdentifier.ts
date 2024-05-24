@@ -28,10 +28,18 @@ export function isEscapedIdentifier(str:string):boolean {
     });
 }
 
-export function escapeIdentifier(str:string):string {
-    if( isEscapedIdentifier(str) ) return str;
-    str = str.replace(/"/g, '""');
-    if( LINE_RETURNS_REGEX.test(str) ) throw new Error("Invalid character");
+/**
+ * Make an identifier (e.g. schema, table name) safe for use in Postgres. 
+ * 
+ * It automatically checks if it's already escaped, and doesn't change it if so. 
+ * 
+ * @param identifierToEscapeOrAlreadyEscaped
+ * @returns 
+ */
+export function escapeIdentifier(identifierToEscapeOrAlreadyEscaped:string):string {
+    if( isEscapedIdentifier(identifierToEscapeOrAlreadyEscaped) ) return identifierToEscapeOrAlreadyEscaped;
+    identifierToEscapeOrAlreadyEscaped = identifierToEscapeOrAlreadyEscaped.replace(/"/g, '""');
+    if( LINE_RETURNS_REGEX.test(identifierToEscapeOrAlreadyEscaped) ) throw new Error("Invalid character");
 
-    return `"${str}"`;
+    return `"${identifierToEscapeOrAlreadyEscaped}"`;
 }
