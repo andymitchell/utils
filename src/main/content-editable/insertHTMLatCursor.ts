@@ -1,3 +1,6 @@
+// With thanks to InboxSDK https://github.com/InboxSDK/InboxSDK/blob/d4f3e466da54c4c2e7021613959d15712e37e506/src/platform-implementation-js/lib/dom/insert-html-at-cursor.ts#L5
+// This wasn't imported, because a) we just need this file, b) we wanted no deps on kefir 
+
 export default function insertHTMLatCursor(
     element: HTMLElement,
     html: string | HTMLElement
@@ -68,7 +71,7 @@ export default function insertHTMLatCursor(
                 range.insertNode(frag);
 
                 
-                // Simulate a mousedown event to kill any existing focus-fixers.
+                // Simulate a mousedown event to stop pre-existing focus handlers
                 var event = document.createEvent('MouseEvents');
                 (event as any).initMouseEvent(
                     'mousedown',
@@ -94,21 +97,6 @@ export default function insertHTMLatCursor(
                 sel.removeAllRanges();
                 sel.addRange(range);
                 
-                /*
-                var nextUserCursorMove = Kefir.merge([
-                    Kefir.fromEvents(element, 'mousedown'),
-                    Kefir.fromEvents(element, 'keypress'),
-                ]);
-                // Whenever the body element gets focus, manually make sure the cursor
-                // is in the right position, because Chrome likes to put it in the
-                // previous location instead because it hates us.
-                var focus = Kefir.fromEvents(element, 'focus')
-                    .takeUntilBy(nextUserCursorMove)
-                    .onValue(function () {
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                    });
-                */
                 return firstChild;
             }
         }
