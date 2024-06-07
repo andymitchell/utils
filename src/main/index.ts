@@ -1,4 +1,4 @@
-import {  PromiseWithTrigger, midnight, promiseWithTrigger, sleep } from "./misc"
+import {  PromiseWithTrigger, dLog, dLogDebug, dLogWarn, midnight, promiseWithTrigger, sleep } from "./misc"
 
 
 import { ContentEditable } from "./content-editable"
@@ -31,5 +31,8 @@ export type {
     EnsureAllMethodsAreAsync,
     RangeRules,
     FuzzySubString,
-    PromiseWithTrigger
+    PromiseWithTrigger,
+    dLog,
+    dLogDebug,
+    dLogWarn
 }
