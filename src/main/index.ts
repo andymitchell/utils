@@ -8,7 +8,14 @@ import { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync"
 import isTypeEqual from "./types/isTypeEqual"
 import isTypeExtended from "./types/isTypeExtended"
 
-export {sleep, promiseWithTrigger, midnight}
+export {
+    sleep, 
+    promiseWithTrigger, 
+    midnight,
+    dLog,
+    dLogDebug,
+    dLogWarn
+}
 
 
 export {ContentEditable};
@@ -32,7 +39,4 @@ export type {
     RangeRules,
     FuzzySubString,
     PromiseWithTrigger,
-    dLog,
-    dLogDebug,
-    dLogWarn
 }
