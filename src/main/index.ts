@@ -1,4 +1,4 @@
-import {  PromiseWithTrigger, dLog, dLogDebug, dLogWarn, midnight, promiseWithTrigger, sleep } from "./misc"
+import {  PromiseWithTrigger, dLog, dLogDebug, dLogWarn, getGlobal, midnight, promiseWithTrigger, sleep } from "./misc"
 
 
 import { ContentEditable } from "./content-editable"
@@ -14,7 +14,8 @@ export {
     midnight,
     dLog,
     dLogDebug,
-    dLogWarn
+    dLogWarn,
+    getGlobal
 }
 
 

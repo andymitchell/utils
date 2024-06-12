@@ -67,3 +67,15 @@ export function dLogDebug(area: string, message: string, meta?: any):void {
 export function dLogWarn(area: string, message: string, meta?: any):void {
     dLog(area, message, meta, 'warn');
 }
+
+export function getGlobal(): Window & typeof globalThis | typeof globalThis | undefined {
+    if (typeof window !== 'undefined') {
+      return window;
+    } else if (typeof self !== 'undefined') {
+      return self;
+    } else if (typeof global !== 'undefined') {
+      return global;
+    } else {
+      return undefined
+    }
+  }
