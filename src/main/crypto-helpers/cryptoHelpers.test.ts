@@ -5,4 +5,9 @@ describe("CryptoHelpers", () => {
         const txt = await CryptoHelpers.sha1Hex("hello world");
         expect(txt).toBe("2aae6c35c94fcfb415dbe95f408b9ce91ee846ed");
     })
+
+    test("Crypto generates random string", async () => {
+        const txt = await CryptoHelpers.generateRandomString();
+        expect(typeof txt).toBe('string');
+    })
 })

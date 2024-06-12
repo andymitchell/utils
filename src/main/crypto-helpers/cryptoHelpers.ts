@@ -75,7 +75,7 @@ export async function sha1Hex(str:string): Promise<string> {
 export async function generateRandomString(length = 28) {
     const crypto = await getCrypto();
     var array = new Uint32Array(Math.round(length / 2) + 2);
-    self.crypto.getRandomValues(array);
+    crypto.getRandomValues(array);
     let str = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
     return str.substr(0, length);
 }
