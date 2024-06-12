@@ -7,21 +7,13 @@ type Sha256HexOutput = {
 
 
 
-export async function getCrypto() {
-    
+export async function getCrypto():Promise<Crypto> {
     
     if (typeof process !== 'undefined' && process.versions && process.versions.node) {
         // We're in a Node.js environment
+        const { webcrypto } = await import('node:crypto');
+        return webcrypto as Crypto;
         
-        if (typeof require !== 'undefined') {
-            // CommonJS
-            return require('crypto').webcrypto;
-          } else {
-            // ESM
-            
-            const { webcrypto } = await import('crypto');
-            return webcrypto;
-          }
     } else {
         const glob = getGlobal();
         if( glob ) {
@@ -83,7 +75,7 @@ export async function sha1Hex(str:string): Promise<string> {
 export async function generateRandomString(length = 28) {
     const crypto = await getCrypto();
     var array = new Uint32Array(Math.round(length / 2) + 2);
-    crypto.getRandomValues(array);
+    self.crypto.getRandomValues(array);
     let str = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
     return str.substr(0, length);
 }

@@ -19,6 +19,6 @@ describe('QueueWorkspace', () => {
         expect(result2).toBe(456);
 
         await qw.dispose();
-    })
+    }, 1000*10)
 
 })

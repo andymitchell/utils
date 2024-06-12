@@ -4,70 +4,29 @@
   "description": "",
   "exports": {
     ".": {
-      "module": "./dist/index.mjs",
-      "require": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "import": {
-        "types": "./dist/index.d.mts",
-        "default": "./dist/index.mjs"
-      },
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./typed-cancelable-event-emitter": {
-      "module": "./dist/typed-cancelable-event-emitter.mjs",
-      "require": {
-        "types": "./dist/typed-cancelable-event-emitter.d.ts",
-        "default": "./dist/typed-cancelable-event-emitter.js"
-      },
-      "import": {
-        "types": "./dist/typed-cancelable-event-emitter.d.mts",
-        "default": "./dist/typed-cancelable-event-emitter.mjs"
-      },
-      "types": "./dist/typed-cancelable-event-emitter.d.ts"
+      "types": "./dist/typed-cancelable-event-emitter.d.ts",
+      "default": "./dist/typed-cancelable-event-emitter.js"
     },
     "./fake-idb": {
-      "module": "./dist/fake-idb.mjs",
-      "require": {
-        "types": "./dist/fake-idb.d.ts",
-        "default": "./dist/fake-idb.js"
-      },
-      "import": {
-        "types": "./dist/fake-idb.d.mts",
-        "default": "./dist/fake-idb.mjs"
-      },
-      "types": "./dist/fake-idb.d.ts"
+      "types": "./dist/fake-idb.d.ts",
+      "default": "./dist/fake-idb.js"
     },
     "./dom-helpers": {
-      "module": "./dist/dom-helpers.mjs",
-      "require": {
-        "types": "./dist/dom-helpers.d.ts",
-        "default": "./dist/dom-helpers.js"
-      },
-      "import": {
-        "types": "./dist/dom-helpers.d.mts",
-        "default": "./dist/dom-helpers.mjs"
-      },
-      "types": "./dist/dom-helpers.d.ts"
+      "types": "./dist/dom-helpers.d.ts",
+      "default": "./dist/dom-helpers.js"
     },
     "./queue": {
-      "module": "./dist/queue.mjs",
-      "require": {
-        "types": "./dist/queue.d.ts",
-        "default": "./dist/queue.js"
-      },
-      "import": {
-        "types": "./dist/queue.d.mts",
-        "default": "./dist/queue.mjs"
-      },
-      "types": "./dist/queue.d.ts"
+      "types": "./dist/queue.d.ts",
+      "default": "./dist/queue.js"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "type": "commonjs",
+  "type": "module",
   "files": [
     "dist",
     "README.MD",
@@ -82,9 +41,8 @@
     "pkglint": "./build/publint_pipeable.sh",
     "build_prepare": "npm run build && npm run pkglint",
     "prepublishOnly": "npm run build_prepare",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test_esm": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "vitest",
+    "test:watch": "vitest --watch"
   },
   "author": "",
   "license": "MIT",
@@ -101,6 +59,7 @@
     "@types/uuid": "^9.0.8",
     "babel-jest": "^29.7.0",
     "babel-plugin-transform-import-meta": "^2.2.1",
+    "fake-indexeddb": "^6.0.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.2",
     "tsup": "^8.0.1",
@@ -109,7 +68,6 @@
   "dependencies": {
     "dexie": "^4.0.4",
     "events": "^3.3.0",
-    "fake-indexeddb": "^5.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "typed-emitter": "^2.1.0",
