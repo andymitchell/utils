@@ -1,5 +1,5 @@
 import { getGlobal } from "../misc";
-import {webcrypto} from 'node:crypto';
+
 
 type Sha256HexOutput = {
     itemToHash: { [item: string]: string };
@@ -8,35 +8,19 @@ type Sha256HexOutput = {
 
 
 
-/*
-let _nodeWebCrypto:Crypto | undefined;
-(async () => {
-    if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-        // We're in a Node.js environment
-        const { webcrypto } = await import('node:crypto');
-        _nodeWebCrypto = webcrypto as Crypto;
-    }
-})()
-*/
-
 export function getCrypto(): Crypto {
     const glob = getGlobal();
     if( !glob ) throw new Error('Glob not available');
     if( glob.crypto ) {
         return glob.crypto;
     } else {
-        if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-            if( !webcrypto ) throw new Error("Cannot find webcrypto in Node. If you're just testing, consider a global setup file that uses a fixed import from 'node:crypto', and sets `globalThis.crypto = `");
-            // We're in a Node.js environment
-            return webcrypto as Crypto;
-        } else {
-            throw new Error('Crypto not available');
-        }
+        throw new Error("Crypto is unavailable in your environment (presumably Node). Either upgrade to Node >=20. Or use getCryptoAsync instead (or uuidAsync). If all you want is a UUID synchronously, you can also consider the npm package 'uuid' which is cross platform.")
+        
     }
 }
 
-/*
-export async function getCrypto():Promise<Crypto> {
+
+export async function getCryptoAsync():Promise<Crypto> {
     
     if (typeof process !== 'undefined' && process.versions && process.versions.node) {
         // We're in a Node.js environment
@@ -52,10 +36,14 @@ export async function getCrypto():Promise<Crypto> {
         }
     }
 }
-    */
 
 export function uuid():string {
     const crypto = getCrypto();
+    return crypto.randomUUID();
+}
+
+export async function uuidAsync():Promise<string> {
+    const crypto = await getCryptoAsync();
     return crypto.randomUUID();
 }
 
@@ -74,7 +62,7 @@ export async function sha256HexArrayToObject(items: Array<string>): Promise<Sha2
 
 export async function sha256Hex(str:string): Promise<string> {
     
-    const crypto = await getCrypto();
+    const crypto = await getCryptoAsync();
         const msgUint8 = new TextEncoder().encode(str);                               // encode as (utf-8) Uint8Array
         const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);           // hash the message
         const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
@@ -84,7 +72,7 @@ export async function sha256Hex(str:string): Promise<string> {
 
 export async function sha256raw(plain:string): Promise<string> {
     
-    const crypto = await getCrypto();
+    const crypto = await getCryptoAsync();
         const encoder = new TextEncoder();
         const data = encoder.encode(plain);
         const sha256inBuffer: ArrayBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -97,7 +85,7 @@ export async function sha1Hex(str:string): Promise<string> {
     // BEWARE: Know that sha1 is NOT cryptographically safe (collisions possible). 
     //  Only permitted as a convenience hash that uses less space 
     
-    const crypto = await getCrypto();
+    const crypto = await getCryptoAsync();
         const msgUint8 = new TextEncoder().encode(str);                               // encode as (utf-8) Uint8Array
         const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8);             // hash the message
         const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
@@ -108,7 +96,7 @@ export async function sha1Hex(str:string): Promise<string> {
 
 
 export async function generateRandomString(length = 28) {
-    const crypto = await getCrypto();
+    const crypto = await getCryptoAsync();
     var array = new Uint32Array(Math.round(length / 2) + 2);
     crypto.getRandomValues(array);
     let str = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');

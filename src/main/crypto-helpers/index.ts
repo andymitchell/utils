@@ -1,5 +1,6 @@
 import { 
     uuid,
+    uuidAsync,
     base64urldecode, 
     base64urlencode, 
     generateRandomString, 
@@ -11,11 +12,14 @@ import {
     sha256HexArrayToObject, 
     sha256raw, 
     vernomDecrypt, 
-    vernomEncrypt } from "./cryptoHelpers";
+    vernomEncrypt, 
+    getCryptoAsync} from "./cryptoHelpers";
 
 export {
     uuid,
+    uuidAsync,
     getCrypto,
+    getCryptoAsync,
     sha256HexArrayToObject,
     sha256Hex,
     sha256raw,
