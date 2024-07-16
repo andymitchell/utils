@@ -1,4 +1,5 @@
 import { 
+    uuid,
     base64urldecode, 
     base64urlencode, 
     generateRandomString, 
@@ -13,6 +14,7 @@ import {
     vernomEncrypt } from "./cryptoHelpers";
 
 export {
+    uuid,
     getCrypto,
     sha256HexArrayToObject,
     sha256Hex,

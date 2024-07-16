@@ -1,4 +1,5 @@
 import { getGlobal } from "../misc";
+import {webcrypto} from 'node:crypto';
 
 type Sha256HexOutput = {
     itemToHash: { [item: string]: string };
@@ -7,6 +8,34 @@ type Sha256HexOutput = {
 
 
 
+/*
+let _nodeWebCrypto:Crypto | undefined;
+(async () => {
+    if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+        // We're in a Node.js environment
+        const { webcrypto } = await import('node:crypto');
+        _nodeWebCrypto = webcrypto as Crypto;
+    }
+})()
+*/
+
+export function getCrypto(): Crypto {
+    const glob = getGlobal();
+    if( !glob ) throw new Error('Glob not available');
+    if( glob.crypto ) {
+        return glob.crypto;
+    } else {
+        if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+            if( !webcrypto ) throw new Error("Cannot find webcrypto in Node. If you're just testing, consider a global setup file that uses a fixed import from 'node:crypto', and sets `globalThis.crypto = `");
+            // We're in a Node.js environment
+            return webcrypto as Crypto;
+        } else {
+            throw new Error('Crypto not available');
+        }
+    }
+}
+
+/*
 export async function getCrypto():Promise<Crypto> {
     
     if (typeof process !== 'undefined' && process.versions && process.versions.node) {
@@ -22,6 +51,12 @@ export async function getCrypto():Promise<Crypto> {
             throw new Error('Crypto not available');
         }
     }
+}
+    */
+
+export function uuid():string {
+    const crypto = getCrypto();
+    return crypto.randomUUID();
 }
 
 export async function sha256HexArrayToObject(items: Array<string>): Promise<Sha256HexOutput> {

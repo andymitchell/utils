@@ -10,4 +10,10 @@ describe("CryptoHelpers", () => {
         const txt = await CryptoHelpers.generateRandomString();
         expect(typeof txt).toBe('string');
     })
+
+    test("Crypto generates uuid", async () => {
+        const txt = CryptoHelpers.uuid();
+        expect(typeof txt).toBe('string');
+        expect(txt.length).toBe(36);
+    })
 })

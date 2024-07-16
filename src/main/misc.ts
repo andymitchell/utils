@@ -68,14 +68,20 @@ export function dLogWarn(area: string, message: string, meta?: any):void {
     dLog(area, message, meta, 'warn');
 }
 
-export function getGlobal(): Window & typeof globalThis | typeof globalThis | undefined {
+
+export function getGlobal(): typeof globalThis {
+    return globalThis;
+    /*
     if (typeof window !== 'undefined') {
-      return window;
+        return window;
     } else if (typeof self !== 'undefined') {
-      return self;
+        return self;
+    } else if (typeof globalThis !== 'undefined') {
+        return globalThis;
     } else if (typeof global !== 'undefined') {
-      return global;
+        return global;
     } else {
-      return undefined
+        throw new Error("Cannot find global object");
     }
-  }
+    */
+}
