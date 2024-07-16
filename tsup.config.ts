@@ -10,8 +10,9 @@ export default defineConfig({
   },
   publicDir: false,
   clean: true,
-  target: ['es2020'],
+  target: ['esnext'],
   minify: false,
+  external: ['dexie'],
   dts: true,
   format: ['esm'], // When this changes, update 'type' in package.json 
 });

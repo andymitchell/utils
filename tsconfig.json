@@ -1,12 +1,12 @@
 {
     "compilerOptions": {
-        "module": "esnext",
+        "module": "ESNext",
         "moduleResolution": "node",
         "strict": true,
         "noUncheckedIndexedAccess": true,
         "noImplicitOverride": true,
         "lib": [
-            "ES2020",
+            "ESNext",
             "DOM",
             "DOM.Iterable"
         ]
