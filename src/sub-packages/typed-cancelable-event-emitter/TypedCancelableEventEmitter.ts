@@ -11,7 +11,15 @@ export class TypedCancelableEventEmitter<T extends EventMap> extends (EventEmitt
         return () => this.off(event, listener);
     }
 
-    onceConditionMet<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs = 30000, errorOnTimeout = false): Promise<{status: 'success' | 'timeout', events: Parameters<T[E]>[]}> {
+    /**
+     * A promise that returns when the event has fired with parameters that fulfil the predicate
+     * @param event 
+     * @param condition 
+     * @param timeoutMs 
+     * @param errorOnTimeout 
+     * @returns 
+     */
+    onceConditionMet<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs = 30000, errorOnTimeout = false): Promise<{status: 'ok' | 'timeout', events: Parameters<T[E]>[]}> {
         return new Promise((resolve, reject) => {
             const state:{cancel?:TypedCancel, timeout?: ReturnType<typeof setTimeout>, events: Parameters<T[E]>[]} = {events: []}
             const wrappedListener = (...args:Parameters<T[E]>) => {
@@ -19,7 +27,7 @@ export class TypedCancelableEventEmitter<T extends EventMap> extends (EventEmitt
                 if( condition(...args) ) {
                     state.cancel!();
                     clearTimeout(state.timeout!);
-                    resolve({status: 'success', events: state.events})
+                    resolve({status: 'ok', events: state.events})
                 }
             };
             state.cancel = this.onCancelable(event, wrappedListener as T[E]);
@@ -30,6 +38,37 @@ export class TypedCancelableEventEmitter<T extends EventMap> extends (EventEmitt
                     reject(`onceConditionMet ${event.toString()} timeout. Did not achieve condition: ${condition.toString()}`)
                 } else {
                     resolve({status: 'timeout', events: state.events});
+                }
+            }, timeoutMs);
+        })
+        
+    }
+
+    /**
+     * Make sure that the final firing of the event, in the time period, has parameters that fulfil the predicate. 
+     * 
+     * E.g. in testing, to check a view subscription event, it's useful to test the negative case (no view items emitted, []). But if you tried that with onceConditionMet, an earlier firing of the view event might pass (as it has no items), failing to see that it fires again with the items.
+     * @param event 
+     * @param condition 
+     * @param timeoutMs 
+     * @returns 
+     */
+    conditionMetAfterTimeout<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs = 30000): Promise<{status: 'ok' | 'fail', events: Parameters<T[E]>[]}> {
+        
+        return new Promise((resolve, reject) => {
+            const state:{cancel?:TypedCancel, timeout?: ReturnType<typeof setTimeout>, events: Parameters<T[E]>[], last_condition_met?: boolean} = {events: []}
+            const wrappedListener = (...args:Parameters<T[E]>) => {
+                state.events.push(args);
+                state.last_condition_met = condition(...args);
+            };
+            state.cancel = this.onCancelable(event, wrappedListener as T[E]);
+            state.timeout = setTimeout(() => {
+                state.cancel!();
+                
+                if( state.last_condition_met ) {
+                    resolve({status: 'ok', events: state.events})
+                } else {
+                    resolve({status: 'fail', events: state.events});
                 }
             }, timeoutMs);
         })
