@@ -47,7 +47,6 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@andyrmitchell/trowser": "^0.2.3",
     "@babel/core": "^7.23.9",
     "@babel/preset-env": "^7.23.9",
     "@babel/preset-typescript": "^7.23.3",
