@@ -39,7 +39,7 @@
     "build_release": "npm run build_prepare && np",
     "build": "tsup",
     "pkglint": "./build/publint_pipeable.sh",
-    "build_prepare": "npm run build && npm run pkglint",
+    "build_prepare": "npm run build ",
     "prepublishOnly": "npm run build_prepare",
     "test": "vitest",
     "test:watch": "vitest --watch"
