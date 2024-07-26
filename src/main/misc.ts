@@ -69,8 +69,14 @@ export function dLogWarn(area: string, message: string, meta?: any):void {
 }
 
 
-export function getGlobal(): typeof globalThis {
-    return globalThis;
+
+/**
+ * Get the environment's global.
+ * Optionally adorn it with extra property types.
+ * @returns 
+ */
+export function getGlobal<T extends Record<string, any> = Record<string, any>>(): typeof globalThis & T {
+    return globalThis as typeof globalThis & T;
     /*
     if (typeof window !== 'undefined') {
         return window;
