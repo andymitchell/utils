@@ -5,6 +5,7 @@
         "strict": true,
         "noUncheckedIndexedAccess": true,
         "noImplicitOverride": true,
+        "target": "ESNext",
         "lib": [
             "ESNext",
             "DOM",

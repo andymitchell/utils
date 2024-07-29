@@ -51,6 +51,7 @@ export class QueueIDB extends Dexie implements IQueue {
     private dexieSubscription?: Subscription;
     private maxRunTimeMs:number = 1000*60*5;
     private lockingRequests:LockingRequest[];
+    private testing?: Testing;
     private disposed:boolean;
 
     constructor(id:string, testing?: Testing) {
@@ -70,6 +71,7 @@ export class QueueIDB extends Dexie implements IQueue {
         this.jobs = {};
         this.addDbListener();
         this.disposed = false;
+        this.testing = testing;
 
         this.checkTimeout();
         
@@ -193,7 +195,7 @@ export class QueueIDB extends Dexie implements IQueue {
             console.warn(`QueueIDB [${this.id}] Already running job. Should not happen - here as a failsafe.`);
             return;
         }
-        if( this.isTestingIdb() && (Date.now()-item.ts)>4000 ) {
+        if( this.isTestingIdb() && (Date.now()-item.ts)>4000 && !this.testing?.suppress_long_running_warning ) {
             console.log(`QueueIDB [${this.id}] is running in testing mode, and the job has taken a several seconds to start - typically unexpected and raises possibility the test is sharing its IDB with other tests.`, {time_to_start: (Date.now()-item.ts), item});
         }
 
