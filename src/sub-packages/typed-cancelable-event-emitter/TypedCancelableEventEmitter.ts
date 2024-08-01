@@ -4,11 +4,11 @@ import TypedEmitter, { EventMap } from "typed-emitter";
 
 // FYI could use eventemitter3 as isomorphic option, but its EventEmitter lacks setMaxListeners (because it has no limit), so would need TypedCancelableEventEmitter to implmenet the function as a placeholder, to satisfy TypedEmitter. 
 
-interface BaseEventMap {
-    newListener: (eventName: string | symbol, listener: (...args: any[]) => void) => void;
-    removeListener: (eventName: string | symbol, listener: (...args: any[]) => void) => void;
+interface BaseEventMap<T extends EventMap> {
+    newListener: (eventName: keyof MergedEventMap<T>, listener: (...args: any[]) => void) => void;
+    removeListener: (eventName: keyof MergedEventMap<T>, listener: (...args: any[]) => void) => void;
 }
-type MergedEventMap<T extends EventMap> = T & BaseEventMap;
+type MergedEventMap<T extends EventMap> = T & BaseEventMap<T>;
 
 
 
@@ -83,4 +83,3 @@ export class TypedCancelableEventEmitter<T extends EventMap> extends (EventEmitt
 
     }
 }
-
