@@ -34,6 +34,7 @@ export * from "./uid/uid";
 export * as CryptoHelpers from "./crypto-helpers";
 export * as EmailHelpers from "./email-helpers";
 export * as PostgresHelpers from './db/postgres';
+export * as CompositeTimestamps from './composite-timestamps';
 
 export type {
     EnsureAllMethodsAreAsync,
