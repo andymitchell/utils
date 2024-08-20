@@ -23,15 +23,22 @@ export type PromiseWithTrigger<T = any> = {
     promise: Promise<T>,
     trigger: ((value: T | PromiseLike<T>) => void)
 }
-export function promiseWithTrigger<T = any>():PromiseWithTrigger<T> {
-    const state:{accept?:  (value: T | PromiseLike<T>) => void} = {accept: undefined};
+export function promiseWithTrigger<T = any>(timeoutMs?: number):PromiseWithTrigger<T> {
+    const state:{accept?:  (value: T | PromiseLike<T>) => void, timeout?: NodeJS.Timeout | number} = {accept: undefined};
     return {
         trigger: (value: T | PromiseLike<T>) => {
             if( !state.accept ) throw new Error("noop - should not be able to call before Promise is set up");
             state.accept(value);
+            if( state.timeout!==undefined ) clearTimeout(state.timeout);
         },
-        promise: new Promise<T>(accept => {
+        promise: new Promise<T>((accept, reject) => {
             state.accept = accept;
+
+            if( typeof timeoutMs==='number' ) {
+                state.timeout = setTimeout(() => {
+                    reject(new Error("Timed out"));
+                }, timeoutMs);
+            }
         })
     };
 }
