@@ -5,7 +5,7 @@ import { QueueWorkspace } from "./QueueWorkspace";
 import { disposeAllGlobalQueues, queue, queueIDB, registerTestFileUsingGlobalQueues } from "./global";
 
 
-import { QueueFunction } from "./types";
+import { IQueue, QueueFunction } from "./types";
 
 export {
     queue,
@@ -18,5 +18,6 @@ export {
 }
 
 export type {
+    IQueue,
     QueueFunction
 }
