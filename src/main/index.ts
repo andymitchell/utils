@@ -6,7 +6,7 @@ import fuzzySubString, { FuzzySubString } from "./fuzzySubString"
 import validateRangeMatchesRules, { RangeRules } from "./range-rules"
 import { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync"
 import isTypeEqual, {isTypeEqualIgnoringPartials} from "./types/isTypeEqual"
-import isTypeExtended, { isUnionTypeExtended } from "./types/isTypeExtended"
+import isTypeExtended from "./types/isTypeExtended"
 import typeHasKeys from "./types/typeHasKeys"
 
 
@@ -28,7 +28,6 @@ export {
     isTypeEqual,
     isTypeEqualIgnoringPartials,
     isTypeExtended,
-    isUnionTypeExtended,
     typeHasKeys
 }
 
