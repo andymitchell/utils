@@ -7,6 +7,7 @@ import validateRangeMatchesRules, { RangeRules } from "./range-rules"
 import { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync"
 import isTypeEqual, {isTypeEqualIgnoringPartials} from "./types/isTypeEqual"
 import isTypeExtended from "./types/isTypeExtended"
+import typeHasKeys from "./types/typeHasKeys"
 
 
 export {
@@ -26,7 +27,8 @@ export {fuzzySubString};
 export {
     isTypeEqual,
     isTypeEqualIgnoringPartials,
-    isTypeExtended
+    isTypeExtended,
+    typeHasKeys
 }
 
 export {validateRangeMatchesRules};
