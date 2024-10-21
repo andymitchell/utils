@@ -47,6 +47,9 @@ describe('sql function', () => {
     };
 
     function sql<T>(strings: TemplateStringsArray, ...params: any[]): SQL<T> {
+        params = Array.isArray(params[0]) && params.length === 1 ? params[0] : params;
+
+
         const query = strings.reduce((acc, str, i) => acc + str + (params[i] !== undefined ? `$${i + 1}` : ''), '');
 
 
@@ -67,12 +70,17 @@ describe('sql function', () => {
         const templateArray = convertPlaceholderToTemplateStringsArray(placeholderString);
 
         const resultWithFunction = sql(templateArray, 1, '2024-01-01');
+        const resultWithFunctionUsingParamArray = sql(templateArray, [1, '2024-01-01']);
         const resultWithLiteral = sql`SELECT * FROM users WHERE id = ${1} AND updated_at > ${'2024-01-01'}`;
 
 
         expect(resultWithFunction.query).toBe(resultWithLiteral.query);
         expect(resultWithFunction.params).toEqual(resultWithLiteral.params);
         expect(resultWithFunction.prepared).toBe(resultWithLiteral.prepared);
+
+        expect(resultWithFunction.query).toBe(resultWithFunctionUsingParamArray.query);
+        expect(resultWithFunction.params).toEqual(resultWithFunctionUsingParamArray.params);
+        expect(resultWithFunction.prepared).toBe(resultWithFunctionUsingParamArray.prepared);
 
         expect(resultWithFunction.prepared).toBe("SELECT * FROM users WHERE id = 1 AND updated_at > 2024-01-01");
     });
@@ -81,11 +89,16 @@ describe('sql function', () => {
         const templateArray = convertPlaceholderToTemplateStringsArray("INSERT INTO users (id, name) VALUES ($1, $2)");
         
         const resultWithFunction = sql(templateArray, 1, 'John');
+        const resultWithFunctionUsingParamArray = sql(templateArray, [1, 'John']);
         const resultWithLiteral = sql`INSERT INTO users (id, name) VALUES (${1}, ${'John'})`;
 
         expect(resultWithFunction.query).toBe(resultWithLiteral.query);
         expect(resultWithFunction.params).toEqual(resultWithLiteral.params);
         expect(resultWithFunction.prepared).toBe(resultWithLiteral.prepared);
+
+        expect(resultWithFunction.query).toBe(resultWithFunctionUsingParamArray.query);
+        expect(resultWithFunction.params).toEqual(resultWithFunctionUsingParamArray.params);
+        expect(resultWithFunction.prepared).toBe(resultWithFunctionUsingParamArray.prepared);
 
         expect(resultWithFunction.prepared).toBe("INSERT INTO users (id, name) VALUES (1, John)");
     });
@@ -94,11 +107,16 @@ describe('sql function', () => {
         const templateArray = convertPlaceholderToTemplateStringsArray("UPDATE users SET name = $1 WHERE id = $2");
         
         const resultWithFunction = sql(templateArray, 'John', 1);
+        const resultWithFunctionUsingParamArray = sql(templateArray, ['John', 1]);
         const resultWithLiteral = sql`UPDATE users SET name = ${'John'} WHERE id = ${1}`;
 
         expect(resultWithFunction.query).toBe(resultWithLiteral.query);
         expect(resultWithFunction.params).toEqual(resultWithLiteral.params);
         expect(resultWithFunction.prepared).toBe(resultWithLiteral.prepared);
+
+        expect(resultWithFunction.query).toBe(resultWithFunctionUsingParamArray.query);
+        expect(resultWithFunction.params).toEqual(resultWithFunctionUsingParamArray.params);
+        expect(resultWithFunction.prepared).toBe(resultWithFunctionUsingParamArray.prepared);
 
         expect(resultWithFunction.prepared).toBe("UPDATE users SET name = John WHERE id = 1");
     });
