@@ -8,6 +8,8 @@ import { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync"
 import isTypeEqual, {isTypeEqualIgnoringPartials} from "./types/isTypeEqual"
 import isTypeExtended from "./types/isTypeExtended"
 import typeHasKeys from "./types/typeHasKeys"
+import { convertPlaceholderToTemplateStringsArray } from "./convert-placeholder-to-template-strings-array"
+
 
 
 export {
@@ -32,6 +34,10 @@ export {
 }
 
 export {validateRangeMatchesRules};
+
+export {
+    convertPlaceholderToTemplateStringsArray
+}
 
 export * from "./uid/uid";
 
