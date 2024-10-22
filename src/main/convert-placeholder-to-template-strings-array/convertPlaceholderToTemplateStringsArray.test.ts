@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import convertPlaceholderToTemplateStringsArray from './convertPlaceholderToTemplateStringsArray';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import * as util from 'util';
+import applyPlaceholderToTemplateStringFunction from './applyPlaceholderToTemplateStringFunction';
 
 describe('convertPlaceholderToTemplateStringsArray', () => {
     
@@ -38,16 +42,16 @@ describe('convertPlaceholderToTemplateStringsArray', () => {
 
 
 
-describe('sql function', () => {
+describe('test a template string function (a fake sql, as that is most common)', () => {
 
     type SQL<T> = {
         query: string;
         params: any[];
-        prepared: string;
+        prepared?: string;
     };
 
-    function sql<T>(strings: TemplateStringsArray, ...params: any[]): SQL<T> {
-        params = Array.isArray(params[0]) && params.length === 1 ? params[0] : params;
+    function testSql<T>(strings: TemplateStringsArray, ...params: any[]): SQL<T> {
+        //params = Array.isArray(params[0]) && params.length === 1 ? params[0] : params;
 
 
         const query = strings.reduce((acc, str, i) => acc + str + (params[i] !== undefined ? `$${i + 1}` : ''), '');
@@ -65,22 +69,18 @@ describe('sql function', () => {
     }
 
 
+
     it('should return the same result when using convertPlaceholderToTemplateStringsArray and tagged template literal', () => {
         const placeholderString = "SELECT * FROM users WHERE id = $1 AND updated_at > $2";
         const templateArray = convertPlaceholderToTemplateStringsArray(placeholderString);
 
-        const resultWithFunction = sql(templateArray, 1, '2024-01-01');
-        const resultWithFunctionUsingParamArray = sql(templateArray, [1, '2024-01-01']);
-        const resultWithLiteral = sql`SELECT * FROM users WHERE id = ${1} AND updated_at > ${'2024-01-01'}`;
+        const resultWithFunction = testSql(templateArray, 1, '2024-01-01');
+        const resultWithLiteral = testSql`SELECT * FROM users WHERE id = ${1} AND updated_at > ${'2024-01-01'}`;
 
 
         expect(resultWithFunction.query).toBe(resultWithLiteral.query);
         expect(resultWithFunction.params).toEqual(resultWithLiteral.params);
         expect(resultWithFunction.prepared).toBe(resultWithLiteral.prepared);
-
-        expect(resultWithFunction.query).toBe(resultWithFunctionUsingParamArray.query);
-        expect(resultWithFunction.params).toEqual(resultWithFunctionUsingParamArray.params);
-        expect(resultWithFunction.prepared).toBe(resultWithFunctionUsingParamArray.prepared);
 
         expect(resultWithFunction.prepared).toBe("SELECT * FROM users WHERE id = 1 AND updated_at > 2024-01-01");
     });
@@ -88,17 +88,12 @@ describe('sql function', () => {
     it('should correctly format a simple INSERT query with placeholders', () => {
         const templateArray = convertPlaceholderToTemplateStringsArray("INSERT INTO users (id, name) VALUES ($1, $2)");
         
-        const resultWithFunction = sql(templateArray, 1, 'John');
-        const resultWithFunctionUsingParamArray = sql(templateArray, [1, 'John']);
-        const resultWithLiteral = sql`INSERT INTO users (id, name) VALUES (${1}, ${'John'})`;
+        const resultWithFunction = testSql(templateArray, 1, 'John');
+        const resultWithLiteral = testSql`INSERT INTO users (id, name) VALUES (${1}, ${'John'})`;
 
         expect(resultWithFunction.query).toBe(resultWithLiteral.query);
         expect(resultWithFunction.params).toEqual(resultWithLiteral.params);
         expect(resultWithFunction.prepared).toBe(resultWithLiteral.prepared);
-
-        expect(resultWithFunction.query).toBe(resultWithFunctionUsingParamArray.query);
-        expect(resultWithFunction.params).toEqual(resultWithFunctionUsingParamArray.params);
-        expect(resultWithFunction.prepared).toBe(resultWithFunctionUsingParamArray.prepared);
 
         expect(resultWithFunction.prepared).toBe("INSERT INTO users (id, name) VALUES (1, John)");
     });
@@ -106,19 +101,46 @@ describe('sql function', () => {
     it('should correctly format an UPDATE query with placeholders', () => {
         const templateArray = convertPlaceholderToTemplateStringsArray("UPDATE users SET name = $1 WHERE id = $2");
         
-        const resultWithFunction = sql(templateArray, 'John', 1);
-        const resultWithFunctionUsingParamArray = sql(templateArray, ['John', 1]);
-        const resultWithLiteral = sql`UPDATE users SET name = ${'John'} WHERE id = ${1}`;
+        const resultWithFunction = testSql(templateArray, 'John', 1);
+        const resultWithLiteral = testSql`UPDATE users SET name = ${'John'} WHERE id = ${1}`;
 
         expect(resultWithFunction.query).toBe(resultWithLiteral.query);
         expect(resultWithFunction.params).toEqual(resultWithLiteral.params);
         expect(resultWithFunction.prepared).toBe(resultWithLiteral.prepared);
 
-        expect(resultWithFunction.query).toBe(resultWithFunctionUsingParamArray.query);
-        expect(resultWithFunction.params).toEqual(resultWithFunctionUsingParamArray.params);
-        expect(resultWithFunction.prepared).toBe(resultWithFunctionUsingParamArray.prepared);
 
         expect(resultWithFunction.prepared).toBe("UPDATE users SET name = John WHERE id = 1");
     });
 
 });
+
+describe('drizzle sql function', () => {
+
+    it(`output should match drizzle's sql function`, () => {
+
+        const usersTable = 'users';
+        const id = 12;
+
+        const placeholderString = "select * from $1 where id = $2";
+        const params = [usersTable, id];
+        const templateArray = convertPlaceholderToTemplateStringsArray(placeholderString);
+        
+        const pgDialect = new PgDialect();
+        const query1 = pgDialect.sqlToQuery(sql`select * from ${usersTable} where id = ${id}`);
+        const query2 = pgDialect.sqlToQuery(sql(templateArray, ...params));
+        const query3 = pgDialect.sqlToQuery(applyPlaceholderToTemplateStringFunction(sql, placeholderString, params))
+        
+        //console.log( testingLogDeepObject({query1, query2, templateArray}));
+
+        expect(query1.sql).toBe(placeholderString);
+        expect(query1.params).toEqual(params);
+        
+        expect(query2.sql).toBe(placeholderString);
+        expect(query2.params).toEqual(params);
+
+        expect(query3.sql).toBe(placeholderString);
+        expect(query3.params).toEqual(params);
+
+    });
+})
+
