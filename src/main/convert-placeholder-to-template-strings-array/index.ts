@@ -1,5 +1,7 @@
+import applyPlaceholderToTemplateStringFunction from "./applyPlaceholderToTemplateStringFunction";
 import convertPlaceholderToTemplateStringsArray from "./convertPlaceholderToTemplateStringsArray";
 
 export {
-    convertPlaceholderToTemplateStringsArray
+    convertPlaceholderToTemplateStringsArray,
+    applyPlaceholderToTemplateStringFunction
 }
