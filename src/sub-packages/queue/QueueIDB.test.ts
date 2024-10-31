@@ -3,7 +3,7 @@ import { promiseWithTrigger, sleep } from "../../main";
 import { fakeIdb } from "../fake-idb";
 import { QueueIDB } from "./QueueIDB";
 import { standardQueueTests } from "./standardQueueTests";
-import { HaltPromise, Testing } from "./types";
+import { HaltPromise, PrecheckFunction, Testing } from "./types";
 
 
 let queueIDBs:Record<string, QueueIDB> = {};
@@ -30,9 +30,9 @@ describe('QueueIDB class test', () => {
 
     
     standardQueueTests(test, expect, () => {
-        return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing) => {
+        return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: Testing) => {
             const queueIDB = newQueueIDB(queueName, testing);
-            return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
+            return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback, precheck);
         })
     });
     

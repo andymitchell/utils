@@ -2,7 +2,7 @@
 import { QueueIDB } from "./QueueIDB";
 import { QueueMemory } from "./QueueMemory";
 import { QueueWorkspace } from "./QueueWorkspace";
-import { disposeAllGlobalQueues, queue, queueIDB, registerTestFileUsingGlobalQueues } from "./global";
+import { disposeAllGlobalQueues, queue, queueIDB, registerTestFileUsingGlobalQueues } from "./global-queue";
 
 
 import { IQueue, QueueFunction } from "./types";

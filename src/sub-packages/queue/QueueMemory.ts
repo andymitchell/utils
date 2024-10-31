@@ -3,7 +3,7 @@
  */
 
 import { uid } from "../../main";
-import { HaltPromise, IQueue, QueueFunction, Testing } from "./types";
+import type { HaltPromise, IQueue, PrecheckFunction } from "./types";
 
 type QueueItem = {
     job_id: string,
@@ -12,7 +12,9 @@ type QueueItem = {
 	reject: Function,
     onRun: Function,
     halted?: boolean,
-    descriptor?: string
+    descriptor?: string,
+    start_after_ts?: number,
+    precheck?: PrecheckFunction
 };
 
 
@@ -26,16 +28,16 @@ export class QueueMemory implements IQueue {
     private disposed:boolean;
     private client_id:string;
 
-    constructor(id:string, testing?:Testing) {
+    constructor(id:string) {
         this.id = id;
         this.queue = [];
         this.disposed = false;
         this.client_id = uid();
     }
 
-    async enqueue<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):Promise<T> {
+    async enqueue<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):Promise<T> {
         if( this.disposed ) throw new Error(`Queue [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`); 
-        return new Promise<T>((resolve, reject) => {
+        return new Promise<T>(async (resolve, reject) => {
             const q:QueueItem = {
                 job_id: uid(),
                 resolve: (result:T) => {
@@ -46,7 +48,8 @@ export class QueueMemory implements IQueue {
                 },
                 running: false,
                 onRun,
-                descriptor
+                descriptor,
+                precheck
             }
             this.queue = [...this.queue, q];
             if( enqueuedCallback ) enqueuedCallback();
@@ -72,8 +75,9 @@ export class QueueMemory implements IQueue {
     private next() {
         if( this.disposed ) return;
 
-        if( this.queue[0] && !this.queue[0].running ) {
-            this.runItem(this.queue[0]);
+        const queueItem = this.queue[0];
+        if( queueItem && !queueItem.running ) {
+            this.runItem(queueItem);
         }
         
     }
@@ -82,6 +86,24 @@ export class QueueMemory implements IQueue {
         if( this.disposed ) return;
 
         q.running = true;
+
+        if( q.precheck ) {
+            const precheck = await q.precheck();
+            if( precheck.cancel ) {
+                q.halted = true;
+                const e = new Error("Request cancel job");
+                this.completeItem(q, undefined, e);
+                return;
+            } else if( !precheck.proceed ) {
+                q.start_after_ts = Date.now() + precheck.wait_for_ms;
+            }
+        }
+        if( q.start_after_ts && q.start_after_ts>Date.now() ) {
+            q.running = false;
+            setTimeout(() => this.next(), (q.start_after_ts-Date.now())+1);
+            return;
+        }
+
 
         try {
             const output = await q.onRun();
@@ -103,7 +125,7 @@ export class QueueMemory implements IQueue {
         this.next();
     }
 
-    runSyncIfPossible<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise):void {
+    runSyncIfPossible<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):void {
         if( this.queue.length===0 ) {
             // Can run sync 
             

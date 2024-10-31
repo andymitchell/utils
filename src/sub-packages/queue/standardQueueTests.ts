@@ -1,5 +1,5 @@
 import { promiseWithTrigger, sleep } from "../../main";
-import { QueueFunction } from "./types";
+import { PrecheckFunction, QueueFunction } from "./types";
 
 export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueue: () => QueueFunction) {
     
@@ -291,6 +291,124 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         
         // Let the test runner know something might not be finished yet
         await sleep(SLEEP_TIME-(Date.now()-startSleep!));
+    })
+
+    test('Queue precheck - cancels', async () => {
+
+        const queue = createQueue();
+
+        const startedRun2 = promiseWithTrigger<void>();
+        const state = {precheckCount: 0, run1: false, run2: false};
+
+        const precheck:PrecheckFunction = () => {
+            const precheckCount = state.precheckCount;
+            state.precheckCount++;
+            if( precheckCount===0 ) {
+                return {cancel: true};
+            } else {
+                return {proceed: true};
+            }
+        }
+        
+        queue('TEST_RUN', async () => {
+            state.run1 = true;
+        }, 'Run 1', undefined, undefined, precheck).catch(e => null);
+
+        queue('TEST_RUN', async () => {
+            startedRun2.trigger();
+            state.run2 = true;
+        }, 'Run 2', undefined, undefined, precheck);
+
+
+        await startedRun2.promise;
+        
+        expect(state.run1).toBe(false);
+        expect(state.run2).toBe(true); 
+        expect(state.precheckCount).toBe(2);
+        
+    })
+
+    test('Queue precheck - delay execution', async () => {
+
+        const queue = createQueue();
+
+        const wait_for_ms = 10;
+        const startedRun2 = promiseWithTrigger<void>();
+        const state = {precheckCount: 0, run1: false, run2: false};
+
+        const precheck:PrecheckFunction = () => {
+            const precheckCount = state.precheckCount;
+            state.precheckCount++;
+            if( precheckCount===0 ) {
+                return {proceed: false, wait_for_ms};
+            } else {
+                return {proceed: true};
+            }
+        }
+        
+        const st = Date.now();
+        queue('TEST_RUN', async () => {
+            state.run1 = true;
+        }, 'Run 1', undefined, undefined, precheck).catch(e => null);
+
+        queue('TEST_RUN', async () => {
+            startedRun2.trigger();
+            state.run2 = true;
+        }, 'Run 2', undefined, undefined, precheck);
+
+
+        await startedRun2.promise;
+        
+        expect(state.run1).toBe(true);
+        expect(state.run2).toBe(true);
+        expect(state.precheckCount).toBe(3);
+
+        const duration = Date.now()-st;
+        expect(duration).toBeGreaterThan(wait_for_ms);
+        expect(duration).toBeLessThan(wait_for_ms*3);
+        
+    })
+
+
+    test('Queue precheck - delay execution by a lot', async () => {
+
+        const queue = createQueue();
+
+        const wait_for_ms = 200;
+        const startedRun2 = promiseWithTrigger<void>();
+        const state = {precheckCount: 0, run1: false, run2: false};
+
+        const precheck:PrecheckFunction = () => {
+            const precheckCount = state.precheckCount;
+            state.precheckCount++;
+            if( precheckCount===0 ) {
+                return {proceed: false, wait_for_ms};
+            } else {
+                return {proceed: true};
+            }
+        }
+        
+        const st = Date.now();
+        queue('TEST_RUN', async () => {
+            state.run1 = true;
+        }, 'Run 1', undefined, undefined, precheck).catch(e => null);
+
+        queue('TEST_RUN', async () => {
+            startedRun2.trigger();
+            state.run2 = true;
+        }, 'Run 2', undefined, undefined, precheck);
+
+
+        await startedRun2.promise;
+        
+        expect(state.run1).toBe(true);
+        expect(state.run2).toBe(true);
+        expect(state.precheckCount).toBe(3);
+
+        const duration = Date.now()-st;
+        expect(duration).toBeGreaterThan(wait_for_ms);
+        expect(duration).toBeLessThan(wait_for_ms*3);
+        
     })
 
 }

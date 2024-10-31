@@ -10,26 +10,26 @@ This is fixed if your test runner isolates global variables per test file (as Je
 
 import { QueueIDB } from "./QueueIDB";
 import { QueueMemory } from "./QueueMemory";
-import { HaltPromise, QueueFunction, Testing } from "./types";
+import { HaltPromise, PrecheckFunction, QueueFunction, Testing } from "./types";
 
 const queueTestFiles:string[] = [];
 let queuesMemorys:{[queueName:string]: QueueMemory} = {};
 let queueDbs:{[queueName:string]: QueueIDB} = {};
 
-export const queueRunSyncIfPossible = <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, testing?: Testing):void => {
-    if( !queuesMemorys[queueName] ) queuesMemorys[queueName] = new QueueMemory(queueName, testing);
+export const queueRunSyncIfPossible = <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, precheck?: PrecheckFunction, testing?: Testing):void => {
+    if( !queuesMemorys[queueName] ) queuesMemorys[queueName] = new QueueMemory(queueName);
     const q:QueueMemory | undefined = queuesMemorys[queueName];
     if( !q ) throw new Error("noop - queue should be there");
     
     return q.runSyncIfPossible(onRun, descriptor, halt);
 }
     
-export const queue:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing):Promise<T> => {
-    if( !queuesMemorys[queueName] ) queuesMemorys[queueName] = new QueueMemory(queueName, testing);
+export const queue:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction,testing?: Testing):Promise<T> => {
+    if( !queuesMemorys[queueName] ) queuesMemorys[queueName] = new QueueMemory(queueName);
     const q:QueueMemory | undefined = queuesMemorys[queueName];
     if( !q ) throw new Error("noop - queue should be there");
     
-    return q.enqueue(onRun, descriptor, halt, enqueuedCallback);
+    return q.enqueue(onRun, descriptor, halt, enqueuedCallback, precheck);
 }
 
 
@@ -62,7 +62,7 @@ export function registerTestFileUsingGlobalQueues(name:string) {
     queueTestFiles.push(name);
 }
 
-export const queueIDB:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing):Promise<T> => {
+export const queueIDB:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: Testing):Promise<T> => {
     if( !queueDbs[queueName] ) queueDbs[queueName] = new QueueIDB(queueName, testing);
     const q:QueueIDB | undefined = queueDbs[queueName];
     if( !q ) throw new Error("noop - queue should be there");
@@ -70,5 +70,6 @@ export const queueIDB:QueueFunction = async <T>(queueName:string, onRun:(...args
     
     //if( testing?.idb ) console.log("Running fake IDB");
     
-    return q.enqueue(onRun, descriptor, halt, enqueuedCallback);
+    return q.enqueue(onRun, descriptor, halt, enqueuedCallback, precheck);
 }
+

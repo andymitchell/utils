@@ -15,16 +15,16 @@ export class QueueWorkspace {
         this.disposed = false;
     }
 
-    enqueue:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?) => {
+    enqueue:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?, precheck?) => {
         if( this.disposed ) throw new Error("QueueWorkspace is disposed. Can't enqueue.");
-        if( !this.queueMemorys[queueName] ) this.queueMemorys[queueName] = new QueueMemory(queueName, this.testing);
-        return this.queueMemorys[queueName]!.enqueue(onRun, descriptor, halt, enqueuedCallback);
+        if( !this.queueMemorys[queueName] ) this.queueMemorys[queueName] = new QueueMemory(queueName);
+        return this.queueMemorys[queueName]!.enqueue(onRun, descriptor, halt, enqueuedCallback, precheck);
     }
 
-    enqueueIDB:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?) => {
+    enqueueIDB:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?, precheck?) => {
         if( this.disposed ) throw new Error("QueueWorkspace is disposed. Can't enqueue.");
         if( !this.queueIDBs[queueName] ) this.queueIDBs[queueName] = new QueueIDB(queueName, this.testing);
-        return this.queueIDBs[queueName]!.enqueue(onRun, descriptor, halt, enqueuedCallback);
+        return this.queueIDBs[queueName]!.enqueue(onRun, descriptor, halt, enqueuedCallback, precheck);
     }
 
     async dispose() {

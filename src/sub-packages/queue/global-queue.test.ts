@@ -6,7 +6,7 @@ import { fakeIdb } from "../fake-idb";
 
 
 
-import { HaltPromise, QueueFunction } from "./types";
+import { HaltPromise, PrecheckFunction, QueueFunction } from "./types";
 import { standardQueueTests } from "./standardQueueTests";
 
 const TEST_FILE = 'global.test.ts';
@@ -21,8 +21,8 @@ describe('queueMemory global test', () => {
 
     standardQueueTests(test, expect, () => {
         const queueNameSpace = uid();
-        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: any) => {
-            return queue(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
+        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: any) => {
+            return queue(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, precheck, testing)
         }) as QueueFunction
     });
     
@@ -34,10 +34,10 @@ describe('queueIDB global test', () => {
 
     standardQueueTests(test, expect, () => {
         const queueNameSpace = uid();
-        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: any) => {
+        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: any) => {
             if( !testing ) testing = {};
             testing.idb = fakeIdb();
-            return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
+            return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, precheck, testing)
         }) as QueueFunction
     });
     

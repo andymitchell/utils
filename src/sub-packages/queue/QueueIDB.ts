@@ -10,7 +10,7 @@
  */
 
 import Dexie, { Subscription, liveQuery } from "dexie";
-import { HaltPromise, IQueue, QueueFunction, Testing } from "./types";
+import { HaltPromise, IQueue, PrecheckFunction, QueueFunction, Testing } from "./types";
 import { FakeIdb } from "../fake-idb/types";
 import { promiseWithTrigger, sleep, uid } from "../../main";
 
@@ -26,6 +26,8 @@ type QueueItemDB = {
     client_id_job_count: number,
     descriptor?: string,
     run_id?: string,
+    precheck_delayed_count: number,
+    start_after_ts: number,
     started_at?: number,
     completed_at?: number,
 }
@@ -36,7 +38,8 @@ type JobItem = {
 	reject: Function,
     onRun: Function,
     running?: boolean,
-    descriptor?: string
+    descriptor?: string,
+    precheck?: PrecheckFunction
 };
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
@@ -79,7 +82,7 @@ export class QueueIDB extends Dexie implements IQueue {
         
     }
 
-    async enqueue<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?:() => void):Promise<T> {
+    async enqueue<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?:() => void, precheck?: PrecheckFunction):Promise<T> {
         if( this.disposed ) throw new Error(`QueueIDB [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`);
         const job_id = uid();
 
@@ -89,18 +92,22 @@ export class QueueIDB extends Dexie implements IQueue {
                 resolve,
                 reject,
                 onRun,
-                descriptor
+                descriptor,
+                precheck
             };
 
             const clearRequest = this.request('run');
             const item:QueueItemDB = {
                 // @ts-ignore IDB will fill 'id' in
                 id: undefined,
+
                 ts: Date.now(),
                 client_id: this.client_id, 
                 client_id_job_count: Object.values(this.jobs).length,
                 job_id,
-                descriptor
+                descriptor,
+                start_after_ts: 0,
+                precheck_delayed_count: 0
             }
             this.queue.add(item).then((id:number) => {
                 item.id = id;
@@ -148,33 +155,9 @@ export class QueueIDB extends Dexie implements IQueue {
         
         this.dexieSubscription = observable.subscribe({
             next: async () => {
-                if( this.disposed ) return;
-
-                const clearRequest = this.request('subscription-next');
-
-                const run_id = uid();
-                let items:QueueItemDB[] | undefined;
-                let firstIncompleteItem:QueueItemDB | undefined;
-                let markedStarted:boolean = false;
-                await this.transaction('rw', this.queue, async () => {
-                    items = await this.queue.orderBy('id').toArray();
-
-                    const somethingRunning = items.some(x => x.started_at && !x.completed_at);
-                    firstIncompleteItem = items.find(x => !x.completed_at );
-
-                    if( !somethingRunning && firstIncompleteItem && firstIncompleteItem.client_id===this.client_id ) {
-                        const now = Date.now();
-                        firstIncompleteItem.run_id = run_id;
-                        firstIncompleteItem.started_at = now;
-                        markedStarted = (await this.queue.update(firstIncompleteItem.id, {run_id, started_at: now}))>0;
-                    }
-                })
-
-                if( firstIncompleteItem && markedStarted ) {
-                    await this.runItem(firstIncompleteItem);
-                }
-
-                clearRequest();
+                
+                await this.next();
+                
             }
         })
         
@@ -182,7 +165,45 @@ export class QueueIDB extends Dexie implements IQueue {
         
     }
 
-    private async runItem(item:QueueItemDB) {
+    private async next() {
+        if( this.disposed ) return;
+        
+        const clearRequest = this.request('next');
+
+        const run_id = uid();
+        let items:QueueItemDB[] | undefined;
+        let firstIncompleteItem:QueueItemDB | undefined;
+        let markedStarted:boolean = false;
+        await this.transaction('rw', this.queue, async () => {
+
+            
+
+            items = await this.queue.orderBy('id').toArray();
+
+            const somethingRunning = items.some(x => x.started_at && !x.completed_at);
+            firstIncompleteItem = items.find(x => !x.completed_at );
+
+            if( !somethingRunning && firstIncompleteItem && firstIncompleteItem.client_id===this.client_id && (firstIncompleteItem.start_after_ts < Date.now()) ) {
+                const now = Date.now();
+                firstIncompleteItem.run_id = run_id;
+                firstIncompleteItem.started_at = now;
+                markedStarted = (await this.queue.update(firstIncompleteItem.id, {run_id, started_at: now}))>0;
+            }
+        })
+
+        if( firstIncompleteItem && markedStarted ) {
+            const result = await this.runItem(firstIncompleteItem);
+            if( result && result.delayed_until_ts ) {
+                const markedUnstarted = (await this.queue.update(firstIncompleteItem.id, {run_id, started_at: undefined, start_after_ts: result.delayed_until_ts}))>0;
+                setTimeout(() => this.next(), (result.delayed_until_ts-Date.now())+1);
+            }
+        }
+
+        clearRequest();
+    }
+
+
+    private async runItem(item:QueueItemDB):Promise<{delayed_until_ts?: number} | void> {
         if( this.disposed ) return;
 
         const job = this.jobs[item.job_id];
@@ -202,11 +223,25 @@ export class QueueIDB extends Dexie implements IQueue {
         // Try to run the job's function
         try {
             job.running = true;
+
+            if( job.precheck ) {
+                const result = await job.precheck();
+                if( result.cancel ) {
+                    const e = new Error("Request cancel job");
+                    this.completeItem(item, undefined, e);
+                    return;
+                } else if( !result.proceed ) {
+                    job.running = false;
+                    return {delayed_until_ts: result.wait_for_ms+Date.now()};
+                }
+            }
+
             const output = await job.onRun();
             this.completeItem(item, output, undefined);
         } catch(e) {
             this.completeItem(item, undefined, e);
         }
+
     }
 
     private async completeItem(item:QueueItemDB, output:unknown, error:unknown, force?: boolean) {
