@@ -411,4 +411,95 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         
     })
 
+    test('Queue precheck - returns correctly after delay (second run)', async () => {
+
+        const queue = createQueue();
+
+        const wait_for_ms = 50;
+        let runCount = 0;
+
+        const precheck:PrecheckFunction = () => {
+            runCount++;
+            if( runCount<=1 ) {
+                return {proceed: false, wait_for_ms};
+            } else {
+                return {proceed: true};
+            }
+        }
+
+        const result = await queue('TEST_RUN', async (job) => {
+
+            return {count: runCount};
+            
+        }, 'Run 1', undefined, undefined, precheck);
+
+
+        expect(result.count).toBe(2); // Expect it to use the final returned value
+        
+        
+    })
+
+    test('Queue preventCompletion', async () => {
+
+        const queue = createQueue();
+
+        const wait_for_ms = 200;
+        const startedRun2 = promiseWithTrigger<void>();
+        const state = {run1Attempts: 0, run1aborted: false, run1: false, run2: false};
+
+        const st = Date.now();
+        queue('TEST_RUN', async (job) => {
+            state.run1Attempts++;
+            if( state.run1Attempts<=1 ) {
+                state.run1aborted = true;
+                job.preventCompletion(wait_for_ms);
+                return;
+            }
+
+            state.run1 = true;
+        }, 'Run 1').catch(e => null);
+
+        queue('TEST_RUN', async (job) => {
+            startedRun2.trigger();
+            state.run2 = true;
+        }, 'Run 2');
+
+
+        await startedRun2.promise;
+        
+        expect(state.run1).toBe(true);
+        expect(state.run2).toBe(true);
+        expect(state.run1aborted).toBe(true);
+        expect(state.run1Attempts).toBe(2);
+
+        const duration = Date.now()-st;
+        expect(duration).toBeGreaterThan(wait_for_ms);
+        expect(duration).toBeLessThan(wait_for_ms*3);
+        
+    })
+
+    test('Queue preventCompletion - returns correctly after delay (second run)', async () => {
+
+        const queue = createQueue();
+
+        const wait_for_ms = 50;
+        let runCount = 0;
+
+        
+        const result = await queue('TEST_RUN', async (job) => {
+            runCount++;
+            if( runCount<=1 ) {
+                job.preventCompletion(wait_for_ms);
+            }
+
+            return {count: runCount};
+            
+        }, 'Run 1');
+
+
+        expect(result.count).toBe(2); // Expect it to use the final returned value
+        
+        
+    })
+
 }

@@ -3,14 +3,15 @@
  */
 
 import { uid } from "../../main";
-import type { HaltPromise, IQueue, PrecheckFunction } from "./types";
+import preventCompletionFactory from "./preventCompletionFactory";
+import type { HaltPromise, IQueue, OnRun, PrecheckFunction } from "./types";
 
 type QueueItem = {
     job_id: string,
 	running: boolean,
 	resolve: Function,
 	reject: Function,
-    onRun: Function,
+    onRun: OnRun,
     halted?: boolean,
     descriptor?: string,
     start_after_ts?: number,
@@ -35,7 +36,7 @@ export class QueueMemory implements IQueue {
         this.client_id = uid();
     }
 
-    async enqueue<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):Promise<T> {
+    async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):Promise<T> {
         if( this.disposed ) throw new Error(`Queue [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`); 
         return new Promise<T>(async (resolve, reject) => {
             const q:QueueItem = {
@@ -98,15 +99,27 @@ export class QueueMemory implements IQueue {
                 q.start_after_ts = Date.now() + precheck.wait_for_ms;
             }
         }
-        if( q.start_after_ts && q.start_after_ts>Date.now() ) {
+        const delay = (delayMs:number) => {
             q.running = false;
-            setTimeout(() => this.next(), (q.start_after_ts-Date.now())+1);
+            setTimeout(() => this.next(), delayMs+1);
+        }
+        if( q.start_after_ts && q.start_after_ts>Date.now() ) {
+            delay(q.start_after_ts-Date.now());
             return;
         }
 
 
         try {
-            const output = await q.onRun();
+            const preventCompletionContainer = preventCompletionFactory();
+            const output = await q.onRun({
+                id: q.job_id,
+                preventCompletion: preventCompletionContainer.preventCompletion
+            });
+            const delayMs = preventCompletionContainer.getDelayMs();
+            if( typeof delayMs==='number' ) {
+                delay(delayMs);
+                return;
+            }
             this.completeItem(q, output);
         } catch(e) {
             this.completeItem(q, undefined, e);
@@ -125,13 +138,14 @@ export class QueueMemory implements IQueue {
         this.next();
     }
 
-    runSyncIfPossible<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):void {
+    runSyncIfPossible<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):void {
         if( this.queue.length===0 ) {
             // Can run sync 
             
+            const id = uid();
             // Create item to inhibit others
             const item:QueueItem = {
-                job_id: uid(),
+                job_id: id,
                 running: true,
                 resolve: emptyFunction,
                 reject: emptyFunction,
@@ -141,15 +155,26 @@ export class QueueMemory implements IQueue {
             this.queue = [...this.queue, item];
             // Run it
             try {
-                const output = onRun();
-                // Clear it
-                this.completeItem(item, output);
+                const preventCompletionContainer = preventCompletionFactory();
+                const output = onRun({id, preventCompletion: preventCompletionContainer.preventCompletion });
+
+                if( preventCompletionContainer.getDelayMs()===undefined ) {
+                    // Clear it
+                    this.completeItem(item, output);
+                } else {
+                    // Let it continue to run as normal
+                }
+
+                
             } catch(e) {
                 this.completeItem(item, undefined, e);
             }
+            
+            return;
         } else {
+            
             // @ts-ignore
-            this.run.apply(this, arguments);
+            this.enqueue.apply(this, arguments);
         }
     }
 

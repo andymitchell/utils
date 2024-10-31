@@ -10,9 +10,10 @@
  */
 
 import Dexie, { Subscription, liveQuery } from "dexie";
-import { HaltPromise, IQueue, PrecheckFunction, QueueFunction, Testing } from "./types";
+import { HaltPromise, IQueue, OnRun, PrecheckFunction, QueueFunction, Testing } from "./types";
 import { FakeIdb } from "../fake-idb/types";
 import { promiseWithTrigger, sleep, uid } from "../../main";
+import preventCompletionFactory from "./preventCompletionFactory";
 
 
 
@@ -36,7 +37,7 @@ type JobItem = {
     job_id: string,
 	resolve: Function,
 	reject: Function,
-    onRun: Function,
+    onRun: OnRun,
     running?: boolean,
     descriptor?: string,
     precheck?: PrecheckFunction
@@ -82,7 +83,7 @@ export class QueueIDB extends Dexie implements IQueue {
         
     }
 
-    async enqueue<T>(onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?:() => void, precheck?: PrecheckFunction):Promise<T> {
+    async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?:() => void, precheck?: PrecheckFunction):Promise<T> {
         if( this.disposed ) throw new Error(`QueueIDB [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`);
         const job_id = uid();
 
@@ -236,7 +237,18 @@ export class QueueIDB extends Dexie implements IQueue {
                 }
             }
 
-            const output = await job.onRun();
+            const preventCompletionContainer = preventCompletionFactory();
+            const output = await job.onRun({
+                id: job.job_id,
+                preventCompletion: preventCompletionContainer.preventCompletion
+            });
+
+            const delayMs = preventCompletionContainer.getDelayMs();
+            if( typeof delayMs==='number' ) {
+                job.running = false;
+                return {delayed_until_ts: Date.now()+delayMs};
+            }
+
             this.completeItem(item, output, undefined);
         } catch(e) {
             this.completeItem(item, undefined, e);

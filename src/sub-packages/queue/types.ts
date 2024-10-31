@@ -3,6 +3,13 @@ import { FakeIdb } from "../fake-idb/types";
 export type HaltPromise = Promise<void>;
 export type Testing = {idb?:FakeIdb, idb_with_multiple_clients?: boolean, suppress_long_running_warning?: boolean};
 
+
+type PublicQueueItem = {
+    id: string, 
+    preventCompletion: (delayRetryMs:number) => void
+}
+export type OnRun<T = any> = (queueItem:PublicQueueItem) => T | PromiseLike<T>
+
 /**
  * Enqueue a job
  * 
@@ -13,7 +20,7 @@ export type Testing = {idb?:FakeIdb, idb_with_multiple_clients?: boolean, suppre
  * @param enqueuedCallback Callback after successfully added to the queue
  * @param precheck A function that runs just before the job, and can delay it or cancel it 
  */
-export type QueueFunction = <T>(queueName: string, onRun: (...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: Testing) => Promise<T>;
+export type QueueFunction = <T>(queueName: string, onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: Testing) => Promise<T>;
 
 type PrecheckFunctionResponse = {
     cancel: true
@@ -32,6 +39,6 @@ type PrecheckFunctionResponse = {
 export type PrecheckFunction = () => PrecheckFunctionResponse | PromiseLike<PrecheckFunctionResponse>
 
 export interface IQueue {
-    enqueue<T>(onRun: (...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):PromiseLike<T>
+    enqueue<T>(onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):PromiseLike<T>
     dispose():Promise<void>
 }
