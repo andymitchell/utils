@@ -63,6 +63,10 @@ export class QueueMemory implements IQueue {
         })
     }
 
+    async count():Promise<number> {
+        return this.queue.length;
+    }
+
     async dispose() {
         this.disposed = true;
 

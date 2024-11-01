@@ -22,23 +22,12 @@ export type OnRun<T = any> = (queueItem:PublicQueueItem) => T | PromiseLike<T>
  */
 export type QueueFunction = <T>(queueName: string, onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing) => Promise<T>;
 
-type PrecheckFunctionResponse = {
-    cancel: true
-} | {
-    cancel?: false,
-    proceed:true, 
-    wait_for_ms?: undefined
-} | {
-    cancel?: boolean,
-    proceed: false, 
-    /**
-     * Delay before trying again 
-     */
-    wait_for_ms: number
-}
-export type PrecheckFunction = () => PrecheckFunctionResponse | PromiseLike<PrecheckFunctionResponse>
 
 export interface IQueue {
-    enqueue<T>(onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):PromiseLike<T>
+    enqueue<T>(onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):PromiseLike<T>,
+    /**
+     * The number of active jobs in the queue
+     */
+    count():Promise<number>;
     dispose():Promise<void>
 }

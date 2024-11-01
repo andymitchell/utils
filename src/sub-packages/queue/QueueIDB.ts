@@ -10,8 +10,8 @@
  */
 
 import Dexie, { Subscription, liveQuery } from "dexie";
-import { HaltPromise, IQueue, OnRun, PrecheckFunction, QueueFunction, Testing } from "./types";
-import { FakeIdb } from "../fake-idb/types";
+import { HaltPromise, IQueue, OnRun, QueueFunction, Testing } from "./types";
+
 import { promiseWithTrigger, sleep, uid } from "../../main";
 import preventCompletionFactory from "./preventCompletionFactory";
 
@@ -29,7 +29,7 @@ type QueueItemDB = {
     run_id?: string,
     start_after_ts: number,
     started_at?: number,
-    completed_at?: number,
+    completed_at: number,
 }
 
 type JobItem = {
@@ -64,7 +64,7 @@ export class QueueIDB extends Dexie implements IQueue {
         
         
         this.version(1).stores({
-            queue: '++id,ts,eligible_at,client_id,started_at' 
+            queue: '++id,ts,eligible_at,client_id,started_at,completed_at' 
         });
         this.queue = this.table('queue'); // Just informing Typescript what Dexie has already done...
 
@@ -106,7 +106,8 @@ export class QueueIDB extends Dexie implements IQueue {
                 client_id_job_count: Object.values(this.jobs).length,
                 job_id,
                 descriptor,
-                start_after_ts: 0
+                start_after_ts: 0,
+                completed_at: 0
             }
             this.queue.add(item).then((id:number) => {
                 item.id = id;
@@ -121,6 +122,11 @@ export class QueueIDB extends Dexie implements IQueue {
 
         });
         
+    }
+
+
+    async count():Promise<number> {
+        return this.queue.where('completed_at').equals(0).count();
     }
 
     private request(details:string):() => void {

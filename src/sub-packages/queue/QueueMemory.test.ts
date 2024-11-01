@@ -1,8 +1,9 @@
 import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
 
 import { standardQueueTests } from "./standardQueueTests";
-import { HaltPromise, PrecheckFunction, Testing } from "./types";
+import { HaltPromise, Testing } from "./types";
 import { QueueMemory } from "./QueueMemory";
+import {v4 as uuidV4} from 'uuid';
 
 
 let queues:Record<string, QueueMemory> = {};
@@ -25,12 +26,19 @@ function newQueue(queueName:string, testing?: Testing):QueueMemory {
 describe('QueueMemory class test', () => {
 
     
-    standardQueueTests(test, expect, () => {
-        return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing) => {
-            const queueMemory = newQueue(queueName, testing);
-            return await queueMemory.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
-        })
-    });
+    standardQueueTests(
+        test, 
+        expect, 
+        () => {
+            return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing) => {
+                const queueMemory = newQueue(queueName, testing);
+                return await queueMemory.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
+            })
+        },
+        () => {
+            return newQueue(uuidV4());
+        }
+    );
     
     
 

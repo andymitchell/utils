@@ -1,11 +1,11 @@
 import { promiseWithTrigger, sleep } from "../../main";
-import { PrecheckFunction, QueueFunction } from "./types";
+import { IQueue, QueueFunction } from "./types";
 
-export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueue: () => QueueFunction) {
+export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueueFunction: () => QueueFunction, createQueue: () => IQueue) {
     
     test('Queue basic', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const state = {run1: false};
         const st = Date.now();
@@ -20,7 +20,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
     
 
     test('Queue is sequential', async () => {
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const st = Date.now();
         const state:{q1_finished_ts?: number, q2_finished_ts?: number} = {
@@ -47,7 +47,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
     test('Queue 3x runs', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const state = {run1: false, run2: false, run3: false};
         queue('TEST_RUN', async () => {
@@ -87,7 +87,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
     test('Queue 2x runs even slow', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const state = {run1: false, run2: false};
         queue('TEST_RUN', async () => {
@@ -124,7 +124,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
     
     test('Queue returns', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         
         const result = await queue('TEST_RUN', async () => {
@@ -137,7 +137,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
     
     test('Queue throws async error', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         let error: Error | undefined;
         try {
@@ -156,7 +156,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
     test('Queue throws async error when enqueued/delayed', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const state = {run1: 0, run2: 0};
 
@@ -187,7 +187,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
     test('Queue throws non-async error', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         let error: Error | undefined;
         try {
@@ -210,7 +210,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         const SLEEP_TIME = 1500;
 
         
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const startedRun1 = promiseWithTrigger<void>();
         const halt = promiseWithTrigger<void>();
@@ -256,7 +256,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         const SLEEP_TIME = 1500;
         let startSleep: number | undefined;
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const startedRun1 = promiseWithTrigger<void>();
         const halt = promiseWithTrigger<void>();
@@ -295,12 +295,12 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
     test('Queue - cancels', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const startedRun2 = promiseWithTrigger<void>();
         const state = {precheckCount: 0, run1: false, run2: false};
 
-        const precheck:PrecheckFunction = () => {
+        const precheck = () => {
             const precheckCount = state.precheckCount;
             state.precheckCount++;
             if( precheckCount===0 ) {
@@ -333,7 +333,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
     test('Queue preventCompletion', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const wait_for_ms = 200;
         const startedRun2 = promiseWithTrigger<void>();
@@ -372,7 +372,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
     test('Queue preventCompletion - returns correctly after delay (second run)', async () => {
 
-        const queue = createQueue();
+        const queue = createQueueFunction();
 
         const wait_for_ms = 50;
         let runCount = 0;
@@ -390,6 +390,26 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
 
         expect(result.count).toBe(2); // Expect it to use the final returned value
+        
+        
+    })
+
+
+    test('Queue count', async () => {
+
+        const queue = createQueue();
+
+        
+        const complete = queue.enqueue(async (job) => {
+            await sleep(50);
+        }, 'Run 1');
+
+
+        expect(await queue.count()).toBe(1);
+
+        await complete;
+
+        expect(await queue.count()).toBe(0);
         
         
     })

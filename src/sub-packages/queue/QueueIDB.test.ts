@@ -3,8 +3,8 @@ import { promiseWithTrigger, sleep } from "../../main";
 import { fakeIdb } from "../fake-idb";
 import { QueueIDB } from "./QueueIDB";
 import { standardQueueTests } from "./standardQueueTests";
-import { HaltPromise, PrecheckFunction, Testing } from "./types";
-
+import { HaltPromise,  Testing } from "./types";
+import {v4 as uuidV4} from 'uuid';
 
 let queueIDBs:Record<string, QueueIDB> = {};
 let miscQueueIDBs:QueueIDB[] = [];
@@ -29,12 +29,19 @@ function newQueueIDB(queueName:string, testing?: Testing):QueueIDB {
 describe('QueueIDB class test', () => {
 
     
-    standardQueueTests(test, expect, () => {
-        return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void,  testing?: Testing) => {
-            const queueIDB = newQueueIDB(queueName, testing);
-            return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
-        })
-    });
+    standardQueueTests(
+        test, 
+        expect, 
+        () => {
+            return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void,  testing?: Testing) => {
+                const queueIDB = newQueueIDB(queueName, testing);
+                return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
+            })
+        },
+        () => {
+            return newQueueIDB(uuidV4());
+        }
+    );
     
     
 
