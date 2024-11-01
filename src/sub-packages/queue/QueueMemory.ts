@@ -14,8 +14,8 @@ type QueueItem = {
     onRun: OnRun,
     halted?: boolean,
     descriptor?: string,
-    start_after_ts?: number,
-    precheck?: PrecheckFunction
+    created_at: number,
+    start_after_ts?: number
 };
 
 
@@ -36,7 +36,7 @@ export class QueueMemory implements IQueue {
         this.client_id = uid();
     }
 
-    async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):Promise<T> {
+    async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):Promise<T> {
         if( this.disposed ) throw new Error(`Queue [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`); 
         return new Promise<T>(async (resolve, reject) => {
             const q:QueueItem = {
@@ -47,10 +47,10 @@ export class QueueMemory implements IQueue {
                 reject: (...args:any[]) => {
                     reject(...args)
                 },
+                created_at: Date.now(),
                 running: false,
                 onRun,
-                descriptor,
-                precheck
+                descriptor
             }
             this.queue = [...this.queue, q];
             if( enqueuedCallback ) enqueuedCallback();
@@ -88,17 +88,6 @@ export class QueueMemory implements IQueue {
 
         q.running = true;
 
-        if( q.precheck ) {
-            const precheck = await q.precheck();
-            if( precheck.cancel ) {
-                q.halted = true;
-                const e = new Error("Request cancel job");
-                this.completeItem(q, undefined, e);
-                return;
-            } else if( !precheck.proceed ) {
-                q.start_after_ts = Date.now() + precheck.wait_for_ms;
-            }
-        }
         const delay = (delayMs:number) => {
             q.running = false;
             setTimeout(() => this.next(), delayMs+1);
@@ -113,6 +102,7 @@ export class QueueMemory implements IQueue {
             const preventCompletionContainer = preventCompletionFactory();
             const output = await q.onRun({
                 id: q.job_id,
+                created_at: q.created_at,
                 preventCompletion: preventCompletionContainer.preventCompletion
             });
             const delayMs = preventCompletionContainer.getDelayMs();
@@ -138,7 +128,7 @@ export class QueueMemory implements IQueue {
         this.next();
     }
 
-    runSyncIfPossible<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):void {
+    runSyncIfPossible<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):void {
         if( this.queue.length===0 ) {
             // Can run sync 
             
@@ -147,6 +137,7 @@ export class QueueMemory implements IQueue {
             const item:QueueItem = {
                 job_id: id,
                 running: true,
+                created_at: Date.now(),
                 resolve: emptyFunction,
                 reject: emptyFunction,
                 onRun: emptyFunction,
@@ -156,7 +147,7 @@ export class QueueMemory implements IQueue {
             // Run it
             try {
                 const preventCompletionContainer = preventCompletionFactory();
-                const output = onRun({id, preventCompletion: preventCompletionContainer.preventCompletion });
+                const output = onRun({id, created_at: item.created_at, preventCompletion: preventCompletionContainer.preventCompletion });
 
                 if( preventCompletionContainer.getDelayMs()===undefined ) {
                     // Clear it

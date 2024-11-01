@@ -21,8 +21,8 @@ describe('queueMemory global test', () => {
 
     standardQueueTests(test, expect, () => {
         const queueNameSpace = uid();
-        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: any) => {
-            return queue(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, precheck, testing)
+        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: any) => {
+            return queue(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
         }) as QueueFunction
     });
     
@@ -34,10 +34,10 @@ describe('queueIDB global test', () => {
 
     standardQueueTests(test, expect, () => {
         const queueNameSpace = uid();
-        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: any) => {
+        return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: any) => {
             if( !testing ) testing = {};
             testing.idb = fakeIdb();
-            return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, precheck, testing)
+            return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
         }) as QueueFunction
     });
     

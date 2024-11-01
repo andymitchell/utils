@@ -27,7 +27,6 @@ type QueueItemDB = {
     client_id_job_count: number,
     descriptor?: string,
     run_id?: string,
-    precheck_delayed_count: number,
     start_after_ts: number,
     started_at?: number,
     completed_at?: number,
@@ -35,12 +34,12 @@ type QueueItemDB = {
 
 type JobItem = {
     job_id: string,
+    created_at: number,
 	resolve: Function,
 	reject: Function,
     onRun: OnRun,
     running?: boolean,
-    descriptor?: string,
-    precheck?: PrecheckFunction
+    descriptor?: string
 };
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
@@ -83,18 +82,18 @@ export class QueueIDB extends Dexie implements IQueue {
         
     }
 
-    async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?:() => void, precheck?: PrecheckFunction):Promise<T> {
+    async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?:() => void):Promise<T> {
         if( this.disposed ) throw new Error(`QueueIDB [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`);
         const job_id = uid();
 
         return new Promise((resolve, reject) => {
             this.jobs[job_id] = {
                 job_id,
+                created_at: Date.now(),
                 resolve,
                 reject,
                 onRun,
-                descriptor,
-                precheck
+                descriptor
             };
 
             const clearRequest = this.request('run');
@@ -107,8 +106,7 @@ export class QueueIDB extends Dexie implements IQueue {
                 client_id_job_count: Object.values(this.jobs).length,
                 job_id,
                 descriptor,
-                start_after_ts: 0,
-                precheck_delayed_count: 0
+                start_after_ts: 0
             }
             this.queue.add(item).then((id:number) => {
                 item.id = id;
@@ -225,21 +223,11 @@ export class QueueIDB extends Dexie implements IQueue {
         try {
             job.running = true;
 
-            if( job.precheck ) {
-                const result = await job.precheck();
-                if( result.cancel ) {
-                    const e = new Error("Request cancel job");
-                    this.completeItem(item, undefined, e);
-                    return;
-                } else if( !result.proceed ) {
-                    job.running = false;
-                    return {delayed_until_ts: result.wait_for_ms+Date.now()};
-                }
-            }
 
             const preventCompletionContainer = preventCompletionFactory();
             const output = await job.onRun({
                 id: job.job_id,
+                created_at: job.created_at,
                 preventCompletion: preventCompletionContainer.preventCompletion
             });
 

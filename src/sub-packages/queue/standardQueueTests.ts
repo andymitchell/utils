@@ -293,7 +293,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         await sleep(SLEEP_TIME-(Date.now()-startSleep!));
     })
 
-    test('Queue precheck - cancels', async () => {
+    test('Queue - cancels', async () => {
 
         const queue = createQueue();
 
@@ -304,20 +304,22 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
             const precheckCount = state.precheckCount;
             state.precheckCount++;
             if( precheckCount===0 ) {
-                return {cancel: true};
+                throw new Error("Cancelling");
             } else {
                 return {proceed: true};
             }
         }
         
         queue('TEST_RUN', async () => {
+            precheck();
             state.run1 = true;
-        }, 'Run 1', undefined, undefined, precheck).catch(e => null);
+        }, 'Run 1').catch(e => null);
 
         queue('TEST_RUN', async () => {
+            precheck();
             startedRun2.trigger();
             state.run2 = true;
-        }, 'Run 2', undefined, undefined, precheck);
+        }, 'Run 2');
 
 
         await startedRun2.promise;
@@ -328,116 +330,6 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         
     })
 
-    test('Queue precheck - delay execution', async () => {
-
-        const queue = createQueue();
-
-        const wait_for_ms = 10;
-        const startedRun2 = promiseWithTrigger<void>();
-        const state = {precheckCount: 0, run1: false, run2: false};
-
-        const precheck:PrecheckFunction = () => {
-            const precheckCount = state.precheckCount;
-            state.precheckCount++;
-            if( precheckCount===0 ) {
-                return {proceed: false, wait_for_ms};
-            } else {
-                return {proceed: true};
-            }
-        }
-        
-        const st = Date.now();
-        queue('TEST_RUN', async () => {
-            state.run1 = true;
-        }, 'Run 1', undefined, undefined, precheck).catch(e => null);
-
-        queue('TEST_RUN', async () => {
-            startedRun2.trigger();
-            state.run2 = true;
-        }, 'Run 2', undefined, undefined, precheck);
-
-
-        await startedRun2.promise;
-        
-        expect(state.run1).toBe(true);
-        expect(state.run2).toBe(true);
-        expect(state.precheckCount).toBe(3);
-
-        const duration = Date.now()-st;
-        expect(duration).toBeGreaterThan(wait_for_ms);
-        expect(duration).toBeLessThan(wait_for_ms*3);
-        
-    })
-
-
-    test('Queue precheck - delay execution by a lot', async () => {
-
-        const queue = createQueue();
-
-        const wait_for_ms = 200;
-        const startedRun2 = promiseWithTrigger<void>();
-        const state = {precheckCount: 0, run1: false, run2: false};
-
-        const precheck:PrecheckFunction = () => {
-            const precheckCount = state.precheckCount;
-            state.precheckCount++;
-            if( precheckCount===0 ) {
-                return {proceed: false, wait_for_ms};
-            } else {
-                return {proceed: true};
-            }
-        }
-        
-        const st = Date.now();
-        queue('TEST_RUN', async () => {
-            state.run1 = true;
-        }, 'Run 1', undefined, undefined, precheck).catch(e => null);
-
-        queue('TEST_RUN', async () => {
-            startedRun2.trigger();
-            state.run2 = true;
-        }, 'Run 2', undefined, undefined, precheck);
-
-
-        await startedRun2.promise;
-        
-        expect(state.run1).toBe(true);
-        expect(state.run2).toBe(true);
-        expect(state.precheckCount).toBe(3);
-
-        const duration = Date.now()-st;
-        expect(duration).toBeGreaterThan(wait_for_ms);
-        expect(duration).toBeLessThan(wait_for_ms*3);
-        
-    })
-
-    test('Queue precheck - returns correctly after delay (second run)', async () => {
-
-        const queue = createQueue();
-
-        const wait_for_ms = 50;
-        let runCount = 0;
-
-        const precheck:PrecheckFunction = () => {
-            runCount++;
-            if( runCount<=1 ) {
-                return {proceed: false, wait_for_ms};
-            } else {
-                return {proceed: true};
-            }
-        }
-
-        const result = await queue('TEST_RUN', async (job) => {
-
-            return {count: runCount};
-            
-        }, 'Run 1', undefined, undefined, precheck);
-
-
-        expect(result.count).toBe(2); // Expect it to use the final returned value
-        
-        
-    })
 
     test('Queue preventCompletion', async () => {
 

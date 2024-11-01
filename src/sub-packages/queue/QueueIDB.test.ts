@@ -30,9 +30,9 @@ describe('QueueIDB class test', () => {
 
     
     standardQueueTests(test, expect, () => {
-        return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: Testing) => {
+        return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void,  testing?: Testing) => {
             const queueIDB = newQueueIDB(queueName, testing);
-            return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback, precheck);
+            return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
         })
     });
     

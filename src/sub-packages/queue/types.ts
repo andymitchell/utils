@@ -6,6 +6,7 @@ export type Testing = {idb?:FakeIdb, idb_with_multiple_clients?: boolean, suppre
 
 type PublicQueueItem = {
     id: string, 
+    created_at: number,
     preventCompletion: (delayRetryMs:number) => void
 }
 export type OnRun<T = any> = (queueItem:PublicQueueItem) => T | PromiseLike<T>
@@ -18,9 +19,8 @@ export type OnRun<T = any> = (queueItem:PublicQueueItem) => T | PromiseLike<T>
  * @param descriptor Useful name to identify it in logging / debugging
  * @param halt A mechanism to stop the job from running, externally 
  * @param enqueuedCallback Callback after successfully added to the queue
- * @param precheck A function that runs just before the job, and can delay it or cancel it 
  */
-export type QueueFunction = <T>(queueName: string, onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction, testing?: Testing) => Promise<T>;
+export type QueueFunction = <T>(queueName: string, onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing) => Promise<T>;
 
 type PrecheckFunctionResponse = {
     cancel: true
@@ -39,6 +39,6 @@ type PrecheckFunctionResponse = {
 export type PrecheckFunction = () => PrecheckFunctionResponse | PromiseLike<PrecheckFunctionResponse>
 
 export interface IQueue {
-    enqueue<T>(onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, precheck?: PrecheckFunction):PromiseLike<T>
+    enqueue<T>(onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):PromiseLike<T>
     dispose():Promise<void>
 }
