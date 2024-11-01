@@ -4,7 +4,7 @@
 
 import { uid } from "../../main";
 import preventCompletionFactory from "./preventCompletionFactory";
-import type { HaltPromise, IQueue, OnRun, PrecheckFunction } from "./types";
+import type { HaltPromise, IQueue, OnRun } from "./types";
 
 type QueueItem = {
     job_id: string,

@@ -10,7 +10,7 @@ This is fixed if your test runner isolates global variables per test file (as Je
 
 import { QueueIDB } from "./QueueIDB";
 import { QueueMemory } from "./QueueMemory";
-import { HaltPromise, PrecheckFunction, QueueFunction, Testing } from "./types";
+import { HaltPromise, QueueFunction, Testing } from "./types";
 
 const queueTestFiles:string[] = [];
 let queuesMemorys:{[queueName:string]: QueueMemory} = {};
