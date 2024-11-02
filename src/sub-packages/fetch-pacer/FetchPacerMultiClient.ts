@@ -6,27 +6,40 @@ import {v4 as uuidv4} from 'uuid';
 
 import FetchPacer from './FetchPacer';
 
+
 /**
- * Pre-emptively rate limit and handle 429 back offs for multiple resources / multiple users of a resource 
+ * Proactively rate-limit and retry on server 429s, for smooth request handling. 
+ * 
+ * Protect the server health
+ * - Avoid 429s by applying points to each request, and blocking it if it has exceeded a maximum points/second rate. 
+ * 
+ * Simplify retry handling 
+ * - Optionally automatically retry blocked requests for a time period. 
  */
 export default class FetchPacerMultiClient {
 
     #clients:Record<string, FetchPacer> = {};
 
-    #defaultResourceId = uuidv4()
+    #resourceId: string;
     #options?:FetchPacerOptions;
 
 
-    constructor(options?:FetchPacerOptions) {        
+    /**
+     * 
+     * @param resourceId A resource is the primary thing you're rate limiting, e.g. the Gmail API 
+     * @param options 
+     */
+    constructor(resourceId: string, options?:FetchPacerOptions) {        
+        this.#resourceId = resourceId;
         this.#options = options;
     }
 
-    #getFetchPacer(resourceId?:string):FetchPacer {
-        if( !resourceId ) resourceId = this.#defaultResourceId;
-        if( !this.#clients[resourceId] ) {
-            this.#clients[resourceId] = new FetchPacer(resourceId, this.#options);
+    #getFetchPacer(clientId?:string):FetchPacer {
+        if( !clientId ) clientId = 'default'; // Just rely on the resource id 
+        if( !this.#clients[clientId] ) {
+            this.#clients[clientId] = new FetchPacer(`${this.#resourceId}:${clientId}`, this.#options);
         }
-        return this.#clients[resourceId]!;
+        return this.#clients[clientId]!;
     }
 
     /**
@@ -34,12 +47,12 @@ export default class FetchPacerMultiClient {
      * @param url 
      * @param options 
      * @param points The number of units this will consume. Used to rate limit if max_points_per_second is defined.
-     * @param resourceId Track the pace for a given id (e.g.  for each user of a resource)
+     * @param clientId Track the pace for a given user/device/client id of this resource. (E.g. the Gmail API has a quota of 250 points per user per second... so the resourceId is the Gmail API, and the client id is the user)
      * @returns 
      */
-    async fetch(url: FetchURL, options?: FetchOptions, points?: number, resourceId?:string): Promise<Response | BackOffResponse> {
+    async fetch(url: FetchURL, options?: FetchOptions, points?: number, clientId?:string): Promise<Response | BackOffResponse> {
 
-        const fetchPacer = this.#getFetchPacer(resourceId);
+        const fetchPacer = this.#getFetchPacer(clientId);
         return fetchPacer.fetch(url, options, points);
         
     }

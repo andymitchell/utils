@@ -5,9 +5,25 @@ import {v4 as uuidv4} from 'uuid';
 import { sleep } from '../../main';
 import PaceTracker from './PaceTracker';
 
+export const fetchPacerOptionsDefault:FetchPacerOptions = {
+    mode: {
+        type: '429_preemptively'
+    },
+    minimum_time_between_fetch: 200, // Sometimes it's clogging pending in network requests, and not sure why. 200 seems to fix it.
+    hail_mary_after_many_failures: true,
+    storage: {
+        type: 'memory'
+    }
+}
 
 /**
- * Pre-emptively rate limit and handle 429 back offs for a resource. 
+ * Proactively rate-limit and retry on server 429s, for smooth request handling. 
+ * 
+ * Protect the server health
+ * - Avoid 429s by applying points to each request, and blocking it if it has exceeded a maximum points/second rate. 
+ * 
+ * Simplify retry handling 
+ * - Optionally automatically retry blocked requests for a time period. 
  */
 export default class FetchPacer {
     #queue:IQueue;
@@ -18,17 +34,13 @@ export default class FetchPacer {
 
     /**
      * 
-     * @param id Unique key for storage. Provide a unique one for each resource (+ user of that resource) you wish to rate-limit. 
+     * @param id Key for tracking the pace in durable storage. Provide a unique one for each resource (+ user of that resource) you wish to rate-limit. 
      * @param options 
      */
     constructor(id: string, options?:FetchPacerOptions) {
         this.#queue = new QueueMemory(id);
         this.#options = {
-            mode: {
-                type: '429_preemptively'
-            },
-            minimum_time_between_fetch: 200, // Sometimes it's clogging pending in network requests, and not sure why. 200 seems to fix it.
-            hail_mary_after_many_failures: true,
+            ...fetchPacerOptionsDefault,
             ...options
         }
 

@@ -1,6 +1,6 @@
 import FetchPacer from "./FetchPacer";
 import FetchPacerMultiClient from "./FetchPacerMultiClient";
-import type { IActivityTracker } from "./types";
+import type { FetchPacerOptions, IActivityTracker } from "./types";
 
 export { 
     FetchPacer,
@@ -8,5 +8,6 @@ export {
 }
 
 export type {
-    IActivityTracker
+    IActivityTracker,
+    FetchPacerOptions
 }
