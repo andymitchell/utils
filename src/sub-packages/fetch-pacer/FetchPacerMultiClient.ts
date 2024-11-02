@@ -54,6 +54,17 @@ export default class FetchPacerMultiClient {
         return fetchPacer.fetch(url, options, points);
         
     }
+
+
+    checkPace(points = 0, trackingID?: string, clientId?:string) {
+        const fetchPacer = this.#getFetchPacer(clientId);
+        return fetchPacer.checkPace(points, trackingID);
+    }
+
+    logPointsManually(points:number, clientId?:string) {
+        const fetchPacer = this.#getFetchPacer(clientId);
+        return fetchPacer.logPointsManually(points);
+    }
     
 
     async dispose():Promise<void> {

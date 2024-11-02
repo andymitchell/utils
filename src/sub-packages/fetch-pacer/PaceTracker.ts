@@ -50,7 +50,16 @@ export default class PaceTracker {
 
 
 
-    async checkPace(points: number, trackingID?: string): Promise<CheckPaceResponse> {
+    /**
+     * Check the pace of recorded points against the maximum points/second. 
+     * 
+     * Optionally provide points to anticipate if they'll exceed the pace. 
+     * 
+     * @param points Would the pace be too_fast if these points are applied? Use to pre-empt if a fetch will trigger a 429. 
+     * @param trackingID Used for hail mary's. Probably the queue job's id; so if it's been blocked too many times it'll risk running it. 
+     * @returns 
+     */
+    async checkPace(points: number = 0, trackingID?: string): Promise<CheckPaceResponse> {
         const maxPointsPerSecond = this.#options?.max_points_per_second;
         
 

@@ -61,7 +61,6 @@ export default class FetchPacer {
             console.debug("FetchPacer request ought to have point stated, as tracking max points / second.", url);
         }
         
-        const id = uuidv4();
 
         // Let it know things are actively tracked (in case it wishes to optimise / be lazy when its inactive)
         this.#paceTracker.setActive(true);
@@ -71,7 +70,7 @@ export default class FetchPacer {
 
             const pauseExceedsMaxTimeout = (pauseForMs:number) => (this.#options.mode.type==='attempt_recovery' && this.#options.mode.timeout_ms && (Date.now()+pauseForMs)>(job.created_at+this.#options.mode.timeout_ms)) as boolean;
 
-            const pace = await this.#paceTracker.checkPace(points ?? 0, id);
+            const pace = await this.#paceTracker.checkPace(points ?? 0, job.id);
             if( pace.too_fast ) {
                 if( this.#options.mode.type==='attempt_recovery' && !pauseExceedsMaxTimeout(pace.pause_for) ) {
                     // Tell it to retry 
@@ -87,7 +86,7 @@ export default class FetchPacer {
                 // Update the pacer to know a 429 was issued 
                 await this.#paceTracker.logBackOffResponse();
                 
-                const pace = await this.#paceTracker.checkPace(points ?? 0, id);
+                const pace = await this.#paceTracker.checkPace(points ?? 0, job.id);
                 attachBackOffTimeToResponse429(response, pace.pause_for);
 
                 // If want to attempt recovery, tell the queue to try again 
@@ -114,6 +113,13 @@ export default class FetchPacer {
 
         return response;
 
+    }
+
+    checkPace(points = 0, trackingID?: string) {
+        return this.#paceTracker.checkPace(points, trackingID);
+    }
+    logPointsManually(points:number) {
+        return this.#paceTracker.logPoints(points);
     }
     
     async dispose():Promise<void> {
