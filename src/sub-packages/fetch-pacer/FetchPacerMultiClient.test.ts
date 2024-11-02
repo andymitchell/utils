@@ -15,7 +15,7 @@ function makeMultiClientForTest():FetchPacerMultiClient {
         back_off_calculation: {type: 'exponential'}
     }
 
-    const fetchPacerMultiClient = new FetchPacerMultiClient({
+    const fetchPacerMultiClient = new FetchPacerMultiClient('resource', {
         ...baseConfig,
         storage: {
             type: 'custom', 
