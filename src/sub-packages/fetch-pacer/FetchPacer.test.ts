@@ -6,6 +6,8 @@ import { sleep } from '../../main';
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal';
 import { MockChromeStorageArea } from '../kv-storage';
 
+const mockFetch = vi.fn(() => Promise.resolve({ status: 200 }));
+global.fetch = mockFetch as unknown as typeof fetch;
 
 // Factory function to create FetchPacer with custom config
 function makeTest(optionalTestConfig: Partial<FetchPacerOptions> = {}): FetchPacer {
@@ -17,6 +19,7 @@ function makeTest(optionalTestConfig: Partial<FetchPacerOptions> = {}): FetchPac
         mode: {
             type: '429_preemptively'
         },
+        custom_fetch_function: mockFetch as unknown as typeof fetch,
         minimum_time_between_fetch: 0,
         hail_mary_after_many_failures: false,
         ...optionalTestConfig,
@@ -36,8 +39,8 @@ function makeTestRecoveryMode(optionalTestConfig: Partial<FetchPacerOptions> = {
     return makeTest(optionalTestConfig);
 }
 
-const mockFetch = vi.fn(() => Promise.resolve({ status: 200 }));
-global.fetch = mockFetch as unknown as typeof fetch;
+
+
 
 // Helper function to reset mocks
 
