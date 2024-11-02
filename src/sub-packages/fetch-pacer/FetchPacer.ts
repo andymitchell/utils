@@ -1,7 +1,7 @@
 import { BackOffResponse,  Fetch, FetchOptions, FetchPacerOptions, FetchURL } from './types';
 
 import { IQueue, QueueMemory } from '../queue';
-import {v4 as uuidv4} from 'uuid';
+
 import { sleep } from '../../main';
 import PaceTracker from './PaceTracker';
 
@@ -46,7 +46,7 @@ export default class FetchPacer {
 
         this.#paceTracker = new PaceTracker(id, options);
 
-        this.#fetchFunction = options?.custom_fetch_function ?? fetch;        
+        this.#fetchFunction = options?.custom_fetch_function ?? inbuiltFetch;        
     }
 
     /**
@@ -80,7 +80,8 @@ export default class FetchPacer {
             }
 
             if( this.#options?.verbose ) console.log(`Fetching ${url} [ts: ${Date.now()}]`);
-            const response = await this.#fetchFunction(url, options);
+            const ff = this.#fetchFunction;
+            const response = await ff(url, options);
 
             if( this.#options?.back_off_calculation && response.status===429 ) {
                 // Update the pacer to know a 429 was issued 
@@ -148,3 +149,5 @@ function attachBackOffTimeToResponse429(response:Response, backOffMs: number):Re
     }
     return response;
 }
+
+const inbuiltFetch:Fetch = typeof self!=='undefined'? self.fetch.bind(self) : (typeof window!=='undefined'? window.fetch.bind(window) : (typeof globalThis!=='undefined'? globalThis.fetch.bind(globalThis) : fetch));
