@@ -30,6 +30,13 @@ describe('stripCircularReferences', () => {
 
     })
 
+    test('verify it is cloned', () => {
+        const obj = {hello: "world", child: {goodbye: "to you"}};
+        expect(stripCircularReferences(obj)===obj).toBe(false);
+        expect(stripCircularReferences(obj.child)===obj.child).toBe(false);
+        expect(obj.child===obj.child).toBe(true);
+
+    })
 
     test('the same item seen twice is fine', () => {
         const subObj = {hello: "world"};
