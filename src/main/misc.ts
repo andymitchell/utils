@@ -1,3 +1,5 @@
+import decircular from "decircular";
+
 
 
 
@@ -75,7 +77,14 @@ export function dLogWarn(area: string, message: string, meta?: any):void {
     dLog(area, message, meta, 'warn');
 }
 
-
+/**
+ * Remove circular references from an object, and return its clone.
+ * @param obj 
+ * @returns obj with any circular references removed 
+ */
+export function stripCircularReferences<T>(obj: T):T {
+    return decircular(obj as Object) as T;
+}
 
 /**
  * Get the environment's global.
