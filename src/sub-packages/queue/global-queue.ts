@@ -8,7 +8,7 @@ This is fixed if your test runner isolates global variables per test file (as Je
 
 */
 
-import { QueueIDB } from "./QueueIDB";
+import { QueueIDB } from "./idb/QueueIDB";
 import { QueueMemory } from "./QueueMemory";
 import { HaltPromise, QueueFunction, Testing } from "./types";
 

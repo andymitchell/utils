@@ -1,9 +1,9 @@
 import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
-import { promiseWithTrigger, sleep } from "../../main";
-import { fakeIdb } from "../fake-idb";
+import { promiseWithTrigger, sleep } from "../../../main";
+import { fakeIdb } from "../../fake-idb";
 import { QueueIDB } from "./QueueIDB";
-import { standardQueueTests } from "./standardQueueTests";
-import { HaltPromise,  Testing } from "./types";
+import { standardQueueTests } from "../standardQueueTests";
+import { HaltPromise,  Testing } from "../types";
 import {v4 as uuidV4} from 'uuid';
 
 let queueIDBs:Record<string, QueueIDB> = {};

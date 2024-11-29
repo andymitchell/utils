@@ -1,6 +1,6 @@
 
-import { QueueIDB } from "./QueueIDB";
-import { QueueMemory } from "./QueueMemory";
+import { QueueIDB } from "./idb/QueueIDB";
+import { QueueMemory } from "./memory/QueueMemory";
 import { QueueWorkspace } from "./QueueWorkspace";
 import { disposeAllGlobalQueues, queue, queueIDB, registerTestFileUsingGlobalQueues } from "./global-queue";
 

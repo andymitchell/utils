@@ -10,10 +10,10 @@
  */
 
 import Dexie, { Subscription, liveQuery } from "dexie";
-import { HaltPromise, IQueue, OnRun, QueueFunction, Testing } from "./types";
+import { HaltPromise, IQueue, OnRun, QueueFunction, Testing } from "../types";
 
-import { promiseWithTrigger, sleep, uid } from "../../main";
-import preventCompletionFactory from "./preventCompletionFactory";
+import { promiseWithTrigger, sleep, uid } from "../../../main";
+import preventCompletionFactory from "../preventCompletionFactory";
 
 
 

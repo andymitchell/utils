@@ -2,9 +2,9 @@
  * Works in memory (e.g. in one tab). 
  */
 
-import { uid } from "../../main";
-import preventCompletionFactory from "./preventCompletionFactory";
-import type { HaltPromise, IQueue, OnRun } from "./types";
+import { uid } from "../../../main";
+import preventCompletionFactory from "./../preventCompletionFactory";
+import type { HaltPromise, IQueue, OnRun } from "./../types";
 
 type QueueItem = {
     job_id: string,
