@@ -1,4 +1,6 @@
 import { FakeIdb } from "../fake-idb/types";
+import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter";
+
 
 export type HaltPromise = Promise<void>;
 export type Testing = {idb?:FakeIdb, idb_with_multiple_clients?: boolean, suppress_long_running_warning?: boolean};
@@ -31,3 +33,15 @@ export interface IQueue {
     count():Promise<number>;
     dispose():Promise<void>
 }
+
+
+
+export type JobItem = {
+    job_id: string,
+    created_at: number,
+	resolve: Function,
+	reject: Function,
+    onRun: OnRun,
+    running?: boolean,
+    descriptor?: string
+};

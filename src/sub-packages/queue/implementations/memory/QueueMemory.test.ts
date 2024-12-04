@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
 
-import { standardQueueTests } from "./../standardQueueTests";
-import { HaltPromise, Testing } from "./../types";
+import { standardQueueTests } from "../../standardQueueTests";
+import { HaltPromise, Testing } from "../../types";
 import { QueueMemory } from "./QueueMemory";
 import {v4 as uuidV4} from 'uuid';
 
@@ -35,7 +35,7 @@ describe('QueueMemory class test', () => {
                 return await queueMemory.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
             })
         },
-        () => {
+        async () => {
             return newQueue(uuidV4());
         }
     );

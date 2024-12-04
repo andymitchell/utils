@@ -28,7 +28,7 @@ describe('queueMemory global test', () => {
                 return queue(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
             }) as QueueFunction
         },
-        () => {
+        async () => {
             return new QueueMemory('');
         }
     );
@@ -50,7 +50,7 @@ describe('queueIDB global test', () => {
                 return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
             }) as QueueFunction
         },
-        () => {
+        async () => {
             const testing:Testing = {};
             testing.idb = fakeIdb();
             return new QueueIDB('', testing)

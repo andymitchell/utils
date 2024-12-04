@@ -2,19 +2,15 @@
  * Works in memory (e.g. in one tab). 
  */
 
-import { uid } from "../../../main";
-import preventCompletionFactory from "./../preventCompletionFactory";
-import type { HaltPromise, IQueue, OnRun } from "./../types";
+import { uid } from "../../../../main";
+import preventCompletionFactory from "../../preventCompletionFactory";
+import type { HaltPromise, IQueue, JobItem, OnRun } from "../../types";
 
-type QueueItem = {
-    job_id: string,
+
+
+type QueueItem = JobItem & {
 	running: boolean,
-	resolve: Function,
-	reject: Function,
-    onRun: OnRun,
     halted?: boolean,
-    descriptor?: string,
-    created_at: number,
     start_after_ts?: number
 };
 

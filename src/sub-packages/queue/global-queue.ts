@@ -8,8 +8,8 @@ This is fixed if your test runner isolates global variables per test file (as Je
 
 */
 
-import { QueueIDB } from "./idb/QueueIDB";
-import { QueueMemory } from "./QueueMemory";
+import { QueueIDB } from "./implementations/idb/QueueIDB";
+import { QueueMemory } from "./implementations/memory/QueueMemory";
 import { HaltPromise, QueueFunction, Testing } from "./types";
 
 const queueTestFiles:string[] = [];
