@@ -24,7 +24,7 @@ export type QueueTable = {
 }
 typeHasKeys<QueueTable, CommonDatabases>(true);
 
-export type ObjectsSelect = QueueTableSelectPg; 
-export type ObjectsInsert = QueueTableInsertPg;
+export type QueueTableSelect = QueueTableSelectPg; 
+export type QueueTableInsert = QueueTableInsertPg;
 
   
