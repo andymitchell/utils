@@ -23,9 +23,6 @@ import { QueueTable } from "./table-creators/types";
 
 
 
-
-
-
 export class QueueSql<D extends CommonDatabases = CommonDatabases> extends BaseItemQueue implements IQueue {
 
     constructor(id: string, db: GenericDatabase | PromiseLike<GenericDatabase>, queueSchema: QueueTable[D]) {
