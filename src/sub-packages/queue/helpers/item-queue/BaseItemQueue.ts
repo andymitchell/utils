@@ -61,10 +61,13 @@ export class BaseItemQueue implements IQueue {
                 start_after_ts: 0,
                 completed_at: 0
             }
+            console.log("Askm to add item", item)
             item = await this.queueIo.addItem(item);
+            console.log("Added item", item)
 
             clearRequest();
             if( enqueuedCallback ) enqueuedCallback();
+            
             if( halt ) {
                 halt.then(async () => {
                     await this.completeItem(item, undefined, "Externally halted.", true);
@@ -105,18 +108,22 @@ export class BaseItemQueue implements IQueue {
         
         
         const nextItem = await this.queueIo.nextItem(this.clientId);
+        console.log("Got next item", nextItem)
         
         if( nextItem ) {
             const {item, run_id} = nextItem;
             
 
             const result = await this.runItem(item);
+            
             if( result && result.delayed_until_ts ) {
 
                 await this.queueIo.updateItem(item.id, {run_id, started_at: undefined, start_after_ts: result.delayed_until_ts});
 
                 setTimeout(() => this.next(true), (result.delayed_until_ts-Date.now())+1);
             }
+
+            console.log("Finished next item")
 
         }
 
@@ -175,7 +182,9 @@ export class BaseItemQueue implements IQueue {
             delete this.jobs[item.job_id];
 
             // Mark it complete 
+            
             await this.queueIo.completeItem(item, force);
+            
         } catch(e) {
             const originalErrorText =  error? `[Original Error: ${error instanceof Error? error.message : error}]` : '';
             if( e instanceof Error ) {
@@ -186,6 +195,7 @@ export class BaseItemQueue implements IQueue {
             }
         }
 
+        console.log("Complete item", job, item, error)
         if( job ) {
             if( error ) {
                 job.reject(error);

@@ -12,7 +12,11 @@ export default defineConfig({
   clean: true,
   target: ['esnext'],
   minify: false,
-  external: ['dexie'],
+  external: [
+    'dexie',
+    '@andyrmitchell/drizzle-robust-transaction',
+    'drizzle-orm'
+  ],
   dts: true,
   format: ['esm'], // When this changes, update 'type' in package.json 
 });

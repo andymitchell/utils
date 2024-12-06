@@ -13,7 +13,7 @@ export function queueTableCreatorPg(id:string, schema?:string) {
         updated_at_ts: pg.timestamp().notNull().defaultNow(),//.default(sql`(strftime('%s', 'now'))`),
     }, (table) => {
         return [
-            pg.index(`objects_${id}_updated_at_idx`).on(table.updated_at_ts)
+            pg.index(`queue_${id}_updated_at_idx`).on(table.updated_at_ts)
         ]
     });
 }

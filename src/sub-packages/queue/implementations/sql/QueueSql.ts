@@ -12,21 +12,24 @@
 
 import { uid } from "../../../../main";
 import { eq, and, SQL, gte } from "drizzle-orm";
-import { CommonDatabases, GenericDatabase, QueueItemDB } from "./types";
+import { CommonDatabases, GenericDatabase, QueueItemDB, SupportedDatabaseClients } from "./types";
 import {  IQueue } from "../../types";
 import { BaseItemQueue } from "../../helpers/item-queue/BaseItemQueue";
 import { IQueueIo, QueueIoEvents } from "../../helpers/item-queue/types";
 import { TypedCancelableEventEmitter } from "../../../typed-cancelable-event-emitter";
 import { mergeWith } from "lodash-es";
 import { QueueTable } from "./table-creators/types";
+import { robustTransaction } from "@andyrmitchell/drizzle-robust-transaction";
+import { SqliteDriverOptions } from "@andyrmitchell/drizzle-fast-bulk-test";
+import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 
 
 
 export class QueueSql<D extends CommonDatabases = CommonDatabases> extends BaseItemQueue implements IQueue {
 
-    constructor(id: string, db: GenericDatabase | PromiseLike<GenericDatabase>, queueSchema: QueueTable[D]) {
-        super(id, new QueueIoSql(id, db, queueSchema));
+    constructor(id: string, dialect: D, db: SupportedDatabaseClients[D] | PromiseLike<SupportedDatabaseClients[D]>, queueSchema: QueueTable[D]) {
+        super(id, new QueueIoSql(id, dialect, db, queueSchema));
 
 
     }
@@ -44,13 +47,17 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
     #nextPoll?: NodeJS.Timeout | number;
     #lastPolledAt = new Date();
 
+
+    #dialect: D;
+
     #disposed = false;
 
-    constructor(id: string, db: GenericDatabase | PromiseLike<GenericDatabase>, queueSchema: QueueTable[D]) {
-        this.#db = db;
+    constructor(id: string, dialect: D, db: SupportedDatabaseClients[D] | PromiseLike<SupportedDatabaseClients[D]>, queueSchema: QueueTable[D]) {
+        this.#db = db as GenericDatabase | PromiseLike<GenericDatabase>;
         this.#queueSchema = queueSchema as QueueTable['pg'];
 
         this.#id = id;
+        this.#dialect = dialect;
         this.#pollForChanges(true);
 
     }
@@ -136,12 +143,14 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
     }
 
     async nextItem(clientId: string) {
+        const db = await this.#db;
         const run_id = uid();
         let firstIncompleteItem: QueueItemDB | undefined;
         let markedStarted: boolean = false;
 
-        const db = await this.#db;
-        await db.transaction(async tx => {
+        
+        await robustTransaction(this.#dialect, db, async tx => {
+          
 
             const rows = await tx
                 .select({
@@ -158,6 +167,7 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
             const somethingRunning = items.some(x => x.started_at && !x.completed_at);
             firstIncompleteItem = items.find(x => !x.completed_at);
 
+            
 
 
             if (!somethingRunning && firstIncompleteItem && firstIncompleteItem.client_id === clientId && (firstIncompleteItem.start_after_ts < Date.now())) {
@@ -166,10 +176,16 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
                 firstIncompleteItem.started_at = now;
                 if (this.#disposed) return;
 
-                markedStarted = await this.updateItem(firstIncompleteItem.id, { run_id, started_at: now }, tx);
+                
+                markedStarted = await this.updateItem(firstIncompleteItem.id, { run_id, started_at: now }, tx as PostgresJsDatabase);
+
+                
 
 
             }
+
+        }, {
+            behavior: 'exclusive'
         })
 
         if (firstIncompleteItem && markedStarted) {
@@ -182,14 +198,15 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
 
     }
 
-    async #getItem(itemId: number, db?: GenericDatabase) {
-        db = db ?? await this.#db;
+    async #getItem(itemId: number, tx?: GenericDatabase) {
+        const db = tx ?? await this.#db;
 
-        const result = await db
+        const query = db
             .select()
             .from(this.#queueSchema)
             .where(this.#whereItem(itemId))
 
+        const result = await query;
         return result[0]?.item as QueueItemDB;
 
     }
@@ -205,6 +222,7 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
         db = db ?? await this.#db;
 
         let item = await this.#getItem(itemId, db);
+        console.log("Got item");
         if (item) {
             const customMerge = (objValue: any, srcValue: any) => {
                 if (srcValue === undefined) {
@@ -247,8 +265,15 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
         let latestItem: QueueItemDB | undefined;
         let markedComplete: boolean = false;
 
-        await db.transaction(async tx => {
-            latestItem = await this.#getItem(item.id, tx);
+        
+        latestItem = await this.#getItem(item.id);
+        
+
+        await robustTransaction(this.#dialect, db, async tx => {
+        //await db.transaction(async tx => {
+            
+            latestItem = await this.#getItem(item.id, tx as GenericDatabase);
+            
 
             if (!latestItem || (!force && latestItem.run_id !== item.run_id)) {
                 console.warn(`QueueIDB [${this.#id}] The job running in memory did not match the job instance ID it was started with in the db.`, { latestItem, item });
@@ -256,8 +281,14 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
             }
             if (this.#disposed) return;
 
-            markedComplete = await this.updateItem(item.id, { completed_at: Date.now() }, tx);
+            
+            markedComplete = await this.updateItem(item.id, { completed_at: Date.now() }, tx as GenericDatabase);
+            
+        }, {
+            behavior: 'exclusive'
         });
+
+        
 
         if (!markedComplete) {
             throw new Error(`QueueIDB [${this.#id}] Could not mark the item as complete.\n\n${JSON.stringify({ item, latestItem })}`);
@@ -275,6 +306,7 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
 
 
     async dispose(clientId: string) {
+        console.log("DISPOSE");
         this.#disposed = true;
 
         if (this.#nextPoll) {

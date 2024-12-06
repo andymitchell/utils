@@ -9,10 +9,13 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
         const state = {run1: false};
         const st = Date.now();
+        console.log("START TEST RUN");
         await queue('TEST_RUN', async () => {
-            //console.log("Queue run time: "+(Date.now()-st));
+            console.log("Queue run time: "+(Date.now()-st));
             state.run1 = true;
         });
+
+        console.log("Queue test run", state);
 
 
         expect(state.run1).toBe(true);

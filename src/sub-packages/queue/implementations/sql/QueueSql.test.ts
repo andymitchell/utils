@@ -8,6 +8,7 @@ import { standardQueueTests } from "../../standardQueueTests";
 import {v4 as uuidV4} from 'uuid';
 import { HaltPromise, Testing } from "../../types";
 import { QueueTable } from "./table-creators/types";
+import { PgDatabase } from "drizzle-orm/pg-core";
 
 const TESTDIR = getRelativeTestDir(import.meta.url);
 
@@ -16,22 +17,52 @@ beforeAll(() => {
 })
 
 
-const tdbg = new RawStoreTestSqlDbGenerator<'pg'>(TESTDIR, 'pg', 50);
-let queueSqls:Record<string, Promise<QueueSql>> = {};
-async function newQueueSql(queueName:string):Promise<QueueSql> {
-    if( !queueSqls[queueName] ) {
+const tdbgPg = new RawStoreTestSqlDbGenerator<'pg'>(
+    TESTDIR, 
+    {
+        dialect: 'pg', 
+        batch_size: 50
+    });
+let queueSqlsPg:Record<string, Promise<QueueSql>> = {};
+async function newQueueSqlPg(queueName:string):Promise<QueueSql> {
+    if( !queueSqlsPg[queueName] ) {
 
         
-        queueSqls[queueName] = new Promise(async accept => {
-            console.log("GENERATE NEW TEST DB: "+queueName);
-            const {db, schemas} = await tdbg.nextTest();
-            const queueSql = new QueueSql(queueName, Promise.resolve(db), schemas);
+        queueSqlsPg[queueName] = new Promise(async accept => {
+            const {db, schemas} = await tdbgPg.nextTest();
+            const queueSql = new QueueSql(queueName, 'pg', Promise.resolve(db), schemas);
 
             accept(queueSql);
         })
     }
-    return queueSqls[queueName]!
-    
+    return queueSqlsPg[queueName]!
+}
+
+
+const tdbgSqlite = new RawStoreTestSqlDbGenerator<'sqlite'>(
+    TESTDIR, 
+    {
+        dialect: 'sqlite', 
+        batch_size: 50
+    });
+let queueSqlsSqlite:Record<string, Promise<QueueSql>> = {};
+async function newQueueSqlSqlite(queueName:string):Promise<QueueSql> {
+    if( !queueSqlsSqlite[queueName] ) {
+
+        
+        queueSqlsSqlite[queueName] = new Promise(async accept => {
+            const {db, schemas} = await tdbgSqlite.nextTest();
+            console.log("CREATED DB FOR SQLITE");
+
+            const rows = await db.select().from(schemas);
+            console.log("GOT ROWS FOR SQLITE: ", rows);
+
+            const queueSql = new QueueSql(queueName, 'sqlite', Promise.resolve(db), schemas);
+
+            accept(queueSql);
+        })
+    }
+    return queueSqlsSqlite[queueName]!
 }
 
 function getRelativeTestDir(testScriptMetaUrl:string):string {
@@ -47,25 +78,48 @@ function clearDir(testDir:string):void {
 }
 
 
+// Do for Pg
+
 standardQueueTests(
     test, 
     expect, 
     () => {
         return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void) => {
-            const queueIDB = await newQueueSql(queueName);
+            const queueIDB = await newQueueSqlPg(queueName);
             return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
         })
     },
     async () => {
-        return newQueueSql(uuidV4());
+        return newQueueSqlPg(uuidV4());
+    }
+);
+
+
+// Do for sqlite
+standardQueueTests(
+    test, 
+    expect, 
+    () => {
+        return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void) => {
+            const queueIDB = await newQueueSqlSqlite(queueName);
+            return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
+        })
+    },
+    async () => {
+        return newQueueSqlSqlite(uuidV4());
     }
 );
 
 test('postgres-rmw works', async () => {
     const testDir = getRelativeTestDir(import.meta.url);
 
-    const tdbg = new RawStoreTestSqlDbGenerator<'pg'>(testDir, 'pg');
-    const {db, schemas} = await tdbg.nextTest();
+    const tdbgPg = new RawStoreTestSqlDbGenerator<'pg'>(
+        TESTDIR, 
+        {
+            dialect: 'pg', 
+            batch_size: 50
+        })
+    const {db, schemas} = await tdbgPg.nextTest();
     
     
     await db.insert(schemas).values({ 'item': {}, 'queue_id': '1' });
@@ -79,10 +133,15 @@ test('postgres-rmw works', async () => {
 test('basic queue operation', async () => {
     const testDir = getRelativeTestDir(import.meta.url);
 
-    const tdbg = new RawStoreTestSqlDbGenerator(testDir, 'pg');
-    const {db, schemas} = await tdbg.nextTest();
+    const tdbgPg = new RawStoreTestSqlDbGenerator(
+        TESTDIR, 
+        {
+            dialect: 'pg', 
+            batch_size: 50
+        })
+    const {db, schemas} = await tdbgPg.nextTest();
     
-    const q = new QueueSql('test', Promise.resolve(db), schemas);
+    const q = new QueueSql('test', 'pg', db, schemas);
 
     const state = {ran: false};
     await q.enqueue(() => {
