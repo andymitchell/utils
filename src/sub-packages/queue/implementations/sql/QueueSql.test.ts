@@ -7,8 +7,6 @@ import { QueueSql } from "./QueueSql";
 import { standardQueueTests } from "../../standardQueueTests";
 import {v4 as uuidV4} from 'uuid';
 import { HaltPromise, Testing } from "../../types";
-import { QueueTable } from "./table-creators/types";
-import { PgDatabase } from "drizzle-orm/pg-core";
 
 const TESTDIR = getRelativeTestDir(import.meta.url);
 
@@ -30,7 +28,7 @@ async function newQueueSqlPg(queueName:string):Promise<QueueSql> {
         
         queueSqlsPg[queueName] = new Promise(async accept => {
             const {db, schemas} = await tdbgPg.nextTest();
-            const queueSql = new QueueSql(queueName, 'pg', Promise.resolve(db), schemas);
+            const queueSql = new QueueSql(queueName, Promise.resolve(db), schemas);
 
             accept(queueSql);
         })
@@ -57,7 +55,7 @@ async function newQueueSqlSqlite(queueName:string):Promise<QueueSql> {
             const rows = await db.select().from(schemas);
             console.log("GOT ROWS FOR SQLITE: ", rows);
 
-            const queueSql = new QueueSql(queueName, 'sqlite', Promise.resolve(db), schemas);
+            const queueSql = new QueueSql(queueName, Promise.resolve(db), schemas);
 
             accept(queueSql);
         })
@@ -141,7 +139,7 @@ test('basic queue operation', async () => {
         })
     const {db, schemas} = await tdbgPg.nextTest();
     
-    const q = new QueueSql('test', 'pg', db, schemas);
+    const q = new QueueSql('test', db, schemas);
 
     const state = {ran: false};
     await q.enqueue(() => {

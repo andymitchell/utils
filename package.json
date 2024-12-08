@@ -73,7 +73,8 @@
     "vitest": "^1.6.0"
   },
   "dependencies": {
-    "@andyrmitchell/drizzle-robust-transaction": "^0.0.3",
+    "@andyrmitchell/drizzle-dialect-types": "^0.0.7",
+    "@andyrmitchell/drizzle-robust-transaction": "^0.0.4",
     "dexie": "^4.0.7",
     "drizzle-orm": "^0.36.4",
     "events": "^3.3.0",

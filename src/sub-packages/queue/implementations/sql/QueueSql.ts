@@ -12,7 +12,7 @@
 
 import { uid } from "../../../../main";
 import { eq, and, SQL, gte } from "drizzle-orm";
-import { CommonDatabases, GenericDatabase, QueueItemDB, SupportedDatabaseClients } from "./types";
+import { GenericDatabase, QueueItemDB } from "./types";
 import {  IQueue } from "../../types";
 import { BaseItemQueue } from "../../helpers/item-queue/BaseItemQueue";
 import { IQueueIo, QueueIoEvents } from "../../helpers/item-queue/types";
@@ -20,16 +20,16 @@ import { TypedCancelableEventEmitter } from "../../../typed-cancelable-event-emi
 import { mergeWith } from "lodash-es";
 import { QueueTable } from "./table-creators/types";
 import { robustTransaction } from "@andyrmitchell/drizzle-robust-transaction";
-import { SqliteDriverOptions } from "@andyrmitchell/drizzle-fast-bulk-test";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { DdtDialect, DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-dialect-types";
 
 
 
 
-export class QueueSql<D extends CommonDatabases = CommonDatabases> extends BaseItemQueue implements IQueue {
+export class QueueSql<D extends DdtDialect = DdtDialect> extends BaseItemQueue implements IQueue {
 
-    constructor(id: string, dialect: D, db: SupportedDatabaseClients[D] | PromiseLike<SupportedDatabaseClients[D]>, queueSchema: QueueTable[D]) {
-        super(id, new QueueIoSql(id, dialect, db, queueSchema));
+    constructor(id: string, db: DdtDialectDatabaseMap[D] | PromiseLike<DdtDialectDatabaseMap[D]>, queueSchema: QueueTable[D]) {
+        super(id, new QueueIoSql(id, db, queueSchema));
 
 
     }
@@ -37,7 +37,7 @@ export class QueueSql<D extends CommonDatabases = CommonDatabases> extends BaseI
 }
 
 
-class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
+class QueueIoSql<D extends DdtDialect> implements IQueueIo {
     emitter: TypedCancelableEventEmitter<QueueIoEvents> = new TypedCancelableEventEmitter();
     #id: string;
 
@@ -48,16 +48,13 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
     #lastPolledAt = new Date();
 
 
-    #dialect: D;
-
     #disposed = false;
 
-    constructor(id: string, dialect: D, db: SupportedDatabaseClients[D] | PromiseLike<SupportedDatabaseClients[D]>, queueSchema: QueueTable[D]) {
+    constructor(id: string,db: DdtDialectDatabaseMap[D] | PromiseLike<DdtDialectDatabaseMap[D]>, queueSchema: QueueTable[D]) {
         this.#db = db as GenericDatabase | PromiseLike<GenericDatabase>;
         this.#queueSchema = queueSchema as QueueTable['pg'];
 
         this.#id = id;
-        this.#dialect = dialect;
         this.#pollForChanges(true);
 
     }
@@ -149,7 +146,7 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
         let markedStarted: boolean = false;
 
         
-        await robustTransaction(this.#dialect, db, async tx => {
+        await robustTransaction(db, async tx => {
           
 
             const rows = await tx
@@ -222,7 +219,6 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
         db = db ?? await this.#db;
 
         let item = await this.#getItem(itemId, db);
-        console.log("Got item");
         if (item) {
             const customMerge = (objValue: any, srcValue: any) => {
                 if (srcValue === undefined) {
@@ -269,7 +265,7 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
         latestItem = await this.#getItem(item.id);
         
 
-        await robustTransaction(this.#dialect, db, async tx => {
+        await robustTransaction(db, async tx => {
         //await db.transaction(async tx => {
             
             latestItem = await this.#getItem(item.id, tx as GenericDatabase);
@@ -306,7 +302,6 @@ class QueueIoSql<D extends CommonDatabases> implements IQueueIo {
 
 
     async dispose(clientId: string) {
-        console.log("DISPOSE");
         this.#disposed = true;
 
         if (this.#nextPoll) {

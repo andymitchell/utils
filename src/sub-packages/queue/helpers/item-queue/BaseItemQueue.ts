@@ -61,9 +61,9 @@ export class BaseItemQueue implements IQueue {
                 start_after_ts: 0,
                 completed_at: 0
             }
-            console.log("Askm to add item", item)
+            
             item = await this.queueIo.addItem(item);
-            console.log("Added item", item)
+            
 
             clearRequest();
             if( enqueuedCallback ) enqueuedCallback();
@@ -108,7 +108,7 @@ export class BaseItemQueue implements IQueue {
         
         
         const nextItem = await this.queueIo.nextItem(this.clientId);
-        console.log("Got next item", nextItem)
+        
         
         if( nextItem ) {
             const {item, run_id} = nextItem;
@@ -123,7 +123,7 @@ export class BaseItemQueue implements IQueue {
                 setTimeout(() => this.next(true), (result.delayed_until_ts-Date.now())+1);
             }
 
-            console.log("Finished next item")
+            
 
         }
 
@@ -195,7 +195,7 @@ export class BaseItemQueue implements IQueue {
             }
         }
 
-        console.log("Complete item", job, item, error)
+        
         if( job ) {
             if( error ) {
                 job.reject(error);

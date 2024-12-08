@@ -1,21 +1,21 @@
 import { TestSqlDbGenerator, type TestDatabases, createSchemaDefinitionFile, SqliteDriverOptions } from "@andyrmitchell/drizzle-fast-bulk-test";
 import { QueueTable } from "./table-creators/types";
 import { queueTableCreatorPg } from "./table-creators/queue.pg";
-import { CommonDatabases } from "./types";
 import { queueTableCreatorSqlite } from "./table-creators/queue.sqlite";
+import {  DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
 
 
 
 
-type RawStoreTestSqlDb<D extends CommonDatabases = CommonDatabases> = {instance_id: number, db:TestDatabases[D], schemas: QueueTable[D], used?: boolean};
+type RawStoreTestSqlDb<D extends DdtDialect = DdtDialect> = {instance_id: number, db:TestDatabases[D], schemas: QueueTable[D], used?: boolean};
 
 type RawStoreTestSqlDbGeneratorOptions = {
-    dialect?: CommonDatabases,
+    dialect?: DdtDialect,
     batch_size?: number, 
     sqlite_driver?: SqliteDriverOptions | null
 }
 
-export class RawStoreTestSqlDbGenerator<D extends CommonDatabases = CommonDatabases> {
+export class RawStoreTestSqlDbGenerator<D extends DdtDialect = DdtDialect> {
 
     #options:Required<RawStoreTestSqlDbGeneratorOptions>;
     #testSqlDbGenerator:TestSqlDbGenerator<D, QueueTable[D]>;

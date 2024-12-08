@@ -4,8 +4,9 @@ import { type QueueTableSelectPg, type QueueTablePg, type QueueTableCreatorPg, t
 
 
 import { isTypeEqual, typeHasKeys } from "../../../../../main";
-import { CommonDatabases } from "../types";
+
 import { QueueTableCreatorSqlite, QueueTableSelectSqlite, QueueTableSqlite } from "./queue.sqlite";
+import { DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
 
 
 
@@ -15,19 +16,15 @@ isTypeEqual<QueueTableSelectPg, QueueTableSelectSqlite>(true); // Verify the typ
 
 export type QueueTableCreator = {
     'pg': QueueTableCreatorPg,
-    'sqlite': QueueTableCreatorSqlite,
-    'sqlite-libsql': QueueTableCreatorSqlite,
-    'sqlite-bettersqlite3': QueueTableCreatorSqlite
+    'sqlite': QueueTableCreatorSqlite
 }
-typeHasKeys<QueueTableCreator, CommonDatabases>(true);
+typeHasKeys<QueueTableCreator, DdtDialect>(true);
 
 export type QueueTable = {
     'pg': QueueTablePg,
-    'sqlite': QueueTableSqlite,
-    'sqlite-libsql': QueueTableSqlite,
-    'sqlite-bettersqlite3': QueueTableSqlite
+    'sqlite': QueueTableSqlite
 }
-typeHasKeys<QueueTable, CommonDatabases>(true);
+typeHasKeys<QueueTable, DdtDialect>(true);
 
 export type QueueTableSelect = QueueTableSelectPg; 
 export type QueueTableInsert = QueueTableInsertPg;
