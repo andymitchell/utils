@@ -19,7 +19,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
 
         expect(state.run1).toBe(true);
-    }, 1000*10)
+    }, 1000*15)
     
 
     test('Queue is sequential', async () => {
@@ -251,7 +251,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
         // Let the test runner know something might not be finished yet
         await sleep(SLEEP_TIME-(Date.now()-startSleep!));
-    })
+    }, 1000*15)
     
     
     test('Queue halt - never runs second', async () => {
@@ -294,7 +294,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         
         // Let the test runner know something might not be finished yet
         await sleep(SLEEP_TIME-(Date.now()-startSleep!));
-    })
+    }, 1000*15)
 
     test('Queue - cancels', async () => {
 

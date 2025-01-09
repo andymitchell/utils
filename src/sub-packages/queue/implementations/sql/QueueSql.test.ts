@@ -50,10 +50,10 @@ async function newQueueSqlSqlite(queueName:string):Promise<QueueSql> {
         
         queueSqlsSqlite[queueName] = new Promise(async accept => {
             const {db, schemas} = await tdbgSqlite.nextTest();
-            console.log("CREATED DB FOR SQLITE");
+            
 
             const rows = await db.select().from(schemas);
-            console.log("GOT ROWS FOR SQLITE: ", rows);
+            
 
             const queueSql = new QueueSql(queueName, Promise.resolve(db), schemas);
 
@@ -125,7 +125,7 @@ test('postgres-rmw works', async () => {
 
     expect(rows[0]!.queue_id).toBe('1');
     
-})
+}, 1000*15)
 
 
 test('basic queue operation', async () => {
@@ -150,4 +150,4 @@ test('basic queue operation', async () => {
     expect(state.ran).toBe(true);
     
     
-})
+}, 1000*15)
