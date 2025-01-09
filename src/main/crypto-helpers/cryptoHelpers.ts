@@ -21,6 +21,9 @@ export function getCrypto(): Crypto {
 
 
 export async function getCryptoAsync():Promise<Crypto> {
+    // As of Node 19, crypto is available with the same interface as browsers.
+    return getGlobal().crypto;
+    /*
     
     if (typeof process !== 'undefined' && process.versions && process.versions.node) {
         // We're in a Node.js environment
@@ -35,6 +38,7 @@ export async function getCryptoAsync():Promise<Crypto> {
             throw new Error('Crypto not available');
         }
     }
+    */
 }
 
 export function uuid():string {
