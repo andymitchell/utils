@@ -29,7 +29,7 @@ export default defineConfig({
   clean: true,
   target: ['esnext'],
   minify: false,
-  splitting: false,
+  splitting: true,
   external: [
     'dexie',
     'zod',
