@@ -1,5 +1,5 @@
-import { ChromeStorage } from "./ChromeStorage"
-import { MockChromeStorageArea } from "./testing-helpers/MockChromeStorageArea"
+import { ChromeStorage } from "./ChromeStorage.ts"
+import { MockChromeStorageArea } from "./testing-helpers/MockChromeStorageArea.ts"
 
 
 

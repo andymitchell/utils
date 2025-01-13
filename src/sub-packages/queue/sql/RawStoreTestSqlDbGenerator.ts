@@ -1,18 +1,18 @@
-import { TestSqlDbGenerator, type TestDatabases, createSchemaDefinitionFile, SqliteDriverOptions } from "@andyrmitchell/drizzle-fast-bulk-test";
-import { QueueTable } from "./table-creators/types";
-import { queueTableCreatorPg } from "./table-creators/queue.pg";
-import { queueTableCreatorSqlite } from "./table-creators/queue.sqlite";
-import {  DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
+import { TestSqlDbGenerator, createSchemaDefinitionFile, DdtSqliteDriver, DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-fast-bulk-test";
+import { QueueTable } from "./table-creators/types.ts";
+import { queueTableCreatorPg } from "./table-creators/queue.pg.ts";
+import { queueTableCreatorSqlite } from "./table-creators/queue.sqlite.ts";
+import { DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
 
 
 
 
-type RawStoreTestSqlDb<D extends DdtDialect = DdtDialect> = {instance_id: number, db:TestDatabases[D], schemas: QueueTable[D], used?: boolean};
+type RawStoreTestSqlDb<D extends DdtDialect = DdtDialect> = {instance_id: number, db:DdtDialectDatabaseMap[D], schemas: QueueTable[D], used?: boolean};
 
 type RawStoreTestSqlDbGeneratorOptions = {
     dialect?: DdtDialect,
     batch_size?: number, 
-    sqlite_driver?: SqliteDriverOptions | null
+    sqlite_driver?: DdtSqliteDriver | null
 }
 
 export class RawStoreTestSqlDbGenerator<D extends DdtDialect = DdtDialect> {
@@ -71,7 +71,8 @@ export class RawStoreTestSqlDbGenerator<D extends DdtDialect = DdtDialect> {
                         },
                         'table_creator_invocation': (storeIds) => storeIds.map(storeId => `export const store_${storeId} = ${creatorFn}('${storeId}');`).join("\n")
                      },
-                    partitioned_schemas.map(x => x.store_id));
+                    partitioned_schemas.map(x => x.store_id),
+                    '.ts');
 
                     return {
                         partitioned_schemas,

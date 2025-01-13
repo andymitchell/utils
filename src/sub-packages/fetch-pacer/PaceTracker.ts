@@ -1,6 +1,6 @@
-import { ActivityTrackerOptions, CheckPaceResponse, IActivityTracker, PaceTrackerOptions, StoredActivityItem } from './types';
-import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory';
-import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal';
+import { ActivityTrackerOptions, CheckPaceResponse, IActivityTracker, PaceTrackerOptions, StoredActivityItem } from './types.js';
+import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.js';
+import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.js';
 
 
 

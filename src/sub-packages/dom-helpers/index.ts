@@ -1,5 +1,5 @@
 
-import { convertNodeToElement, createIconElement, emptyEl, make } from "./DOMHelpers";
+import { convertNodeToElement, createIconElement, emptyEl, make } from "./DOMHelpers.ts";
 
 
 export {

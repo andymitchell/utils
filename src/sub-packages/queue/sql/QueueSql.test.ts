@@ -2,11 +2,11 @@
 
 import { fileIoSyncNode } from "@andyrmitchell/file-io";
 import { fileURLToPath } from 'url';
-import { RawStoreTestSqlDbGenerator } from "./RawStoreTestSqlDbGenerator";
-import { QueueSql } from "./QueueSql";
-import { standardQueueTests } from "../common/standardQueueTests";
+import { RawStoreTestSqlDbGenerator } from "./RawStoreTestSqlDbGenerator.ts";
+import { QueueSql } from "./QueueSql.ts";
+import { standardQueueTests } from "../common/standardQueueTests.ts";
 import {v4 as uuidV4} from 'uuid';
-import { HaltPromise } from "../types";
+import { HaltPromise } from "../types.ts";
 
 const TESTDIR = getRelativeTestDir(import.meta.url);
 
@@ -108,6 +108,7 @@ standardQueueTests(
     }
 );
 
+
 test('postgres-rmw works', async () => {
     const testDir = getRelativeTestDir(import.meta.url);
 
@@ -150,4 +151,4 @@ test('basic queue operation', async () => {
     expect(state.ran).toBe(true);
     
     
-}, 1000*15)
+}, 1000*5)

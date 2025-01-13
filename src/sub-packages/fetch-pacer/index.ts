@@ -1,6 +1,6 @@
-import FetchPacer, { fetchPacerOptionsDefault } from "./FetchPacer";
-import FetchPacerMultiClient from "./FetchPacerMultiClient";
-import type { FetchPacerOptions, IActivityTracker } from "./types";
+import FetchPacer, { fetchPacerOptionsDefault } from "./FetchPacer.ts";
+import FetchPacerMultiClient from "./FetchPacerMultiClient.ts";
+import type { FetchPacerOptions, IActivityTracker } from "./types.ts";
 
 export { 
     FetchPacer,

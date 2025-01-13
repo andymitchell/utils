@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
-import { QueueWorkspaceIDB } from "./QueueWorkspaceIDB";
-import { fakeIdb } from "../../fake-idb";
+import { QueueWorkspaceIDB } from "./QueueWorkspaceIDB.ts";
+import { fakeIdb } from "../../fake-idb/index.ts";
 
 describe('QueueWorkspace', () => {
 

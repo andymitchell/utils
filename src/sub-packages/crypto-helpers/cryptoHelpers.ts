@@ -1,4 +1,4 @@
-import { getGlobal } from "../../main/misc";
+import { getGlobal } from "../../main/misc.ts";
 
 
 type Sha256HexOutput = {

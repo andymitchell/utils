@@ -1,1 +1,1 @@
-export * from './emailHelpers';
+export * from './emailHelpers.js';

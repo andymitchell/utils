@@ -1,7 +1,7 @@
-import { sleep } from "../../main";
-import { ChromeStorage } from "./ChromeStorage"
-import { SecureStorage } from "./SecureStorage"
-import { MockChromeStorageArea } from "./testing-helpers/MockChromeStorageArea"
+import { sleep } from "../../main/index.ts";
+import { ChromeStorage } from "./ChromeStorage.ts"
+import { SecureStorage } from "./SecureStorage.ts"
+import { MockChromeStorageArea } from "./testing-helpers/MockChromeStorageArea.ts"
 import * as z from 'zod';
 
 

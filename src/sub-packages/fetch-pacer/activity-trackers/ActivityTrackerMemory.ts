@@ -1,8 +1,8 @@
 
-import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types';
+import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
 
-import { BaseActivityTracker } from '../BaseActivityTracker';
-import { uuidV4 } from '../../uid/uid';
+import { BaseActivityTracker } from '../BaseActivityTracker.js';
+import { uuidV4 } from '../../uid/uid.js';
 
 export class ActivityTrackerMemory extends BaseActivityTracker implements IActivityTracker {
     

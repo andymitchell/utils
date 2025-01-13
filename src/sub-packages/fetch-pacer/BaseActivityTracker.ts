@@ -1,5 +1,5 @@
 
-import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from './types';
+import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from './types.js';
 
 
 export class BaseActivityTracker implements IActivityTracker {

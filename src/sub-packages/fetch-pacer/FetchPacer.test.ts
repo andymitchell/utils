@@ -1,11 +1,11 @@
 import { describe, test, expect, vi } from 'vitest';
-import FetchPacer from './FetchPacer';
-import { BackOffResponse, FetchPacerOptions } from './types';
-import closeTo from './testing-utils/closeTo';
+import FetchPacer from './FetchPacer.js';
+import { BackOffResponse, FetchPacerOptions } from './types.js';
+import closeTo from './testing-utils/closeTo.js';
 
-import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal';
-import { MockChromeStorageArea } from '../kv-storage';
-import { sleep } from '../../main/misc';
+import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.js';
+import { MockChromeStorageArea } from '../kv-storage/index.js';
+import { sleep } from '../../main/misc.js';
 
 const mockFetch = vi.fn(() => Promise.resolve({ status: 200 }));
 global.fetch = mockFetch as unknown as typeof fetch;

@@ -1,7 +1,7 @@
-import { QueueWorkspace } from "./common/QueueWorkspace"
-import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from "./memory/global-queue"
-import { QueueMemory } from "./memory/QueueMemory"
-import { IQueue, QueueFunction } from "./types"
+import { QueueWorkspace } from "./common/QueueWorkspace.ts"
+import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from "./memory/global-queue.ts"
+import { QueueMemory } from "./memory/QueueMemory.ts"
+import { IQueue, QueueFunction } from "./types.ts"
 
 
 export {

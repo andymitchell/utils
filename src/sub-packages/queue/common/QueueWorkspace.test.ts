@@ -1,5 +1,5 @@
 
-import { QueueWorkspace } from "./QueueWorkspace";
+import { QueueWorkspace } from "./QueueWorkspace.ts";
 
 
 describe('QueueWorkspace', () => {

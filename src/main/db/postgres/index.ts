@@ -1,5 +1,5 @@
-import { escapeIdentifier, isEscapedIdentifier } from "./escapeIdentifier";
-import { appendSqlParameters, concatSqlParameters, rebaseSqlParameters } from "./rebaseSqlParameters";
+import { escapeIdentifier, isEscapedIdentifier } from "./escapeIdentifier.ts";
+import { appendSqlParameters, concatSqlParameters, rebaseSqlParameters } from "./rebaseSqlParameters.ts";
 
 export {
     isEscapedIdentifier,

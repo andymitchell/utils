@@ -1,6 +1,6 @@
-import { ChromeStorage } from "./ChromeStorage"
-import { TypedStorage } from "./TypedStorage"
-import { MockChromeStorageArea } from "./testing-helpers/MockChromeStorageArea"
+import { ChromeStorage } from "./ChromeStorage.ts"
+import { TypedStorage } from "./TypedStorage.ts"
+import { MockChromeStorageArea } from "./testing-helpers/MockChromeStorageArea.ts"
 import * as z from 'zod';
 
 

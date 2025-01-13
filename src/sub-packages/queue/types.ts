@@ -1,4 +1,4 @@
-import { FakeIdb } from "../fake-idb/types";
+import { FakeIdb } from "../fake-idb/types.ts";
 
 export type Testing = { suppress_long_running_warning?: boolean};
 

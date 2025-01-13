@@ -1,4 +1,4 @@
-import { isReactElement, makeReact } from "./ReactHelpers";
+import { isReactElement, makeReact } from "./ReactHelpers.ts";
 
 
 export {

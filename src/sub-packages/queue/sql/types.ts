@@ -1,5 +1,5 @@
 
-import { OnRun } from "../types";
+import { OnRun } from "../types.ts";
 import { DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-dialect-types";
 
 

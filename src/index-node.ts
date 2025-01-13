@@ -1,10 +1,10 @@
-export * from './main';
+export * from './main/index.js';
 
 // TODO Make these seperate
-export * from './sub-packages/fake-idb';
-export * from './sub-packages/queue/index-node';
-export * from './sub-packages/uid';
-export * from './sub-packages/crypto-helpers';
-export * from './sub-packages/fetch-pacer';
-export * from './sub-packages/kv-storage/index-node';
-export * from './sub-packages/typed-cancelable-event-emitter';
+export * from './sub-packages/fake-idb/index.js';
+export * from './sub-packages/queue/index-node.js';
+export * from './sub-packages/uid/index.js';
+export * from './sub-packages/crypto-helpers/index.js';
+export * from './sub-packages/fetch-pacer/index.js';
+export * from './sub-packages/kv-storage/index-node.js';
+export * from './sub-packages/typed-cancelable-event-emitter/index.js';

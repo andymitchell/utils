@@ -1,7 +1,7 @@
 
-import { standardQueueTests } from "../common/standardQueueTests";
-import { HaltPromise, Testing } from "../types";
-import { QueueMemory } from "./QueueMemory";
+import { standardQueueTests } from "../common/standardQueueTests.ts";
+import { HaltPromise, Testing } from "../types.ts";
+import { QueueMemory } from "./QueueMemory.ts";
 import {v4 as uuidV4} from 'uuid';
 
 

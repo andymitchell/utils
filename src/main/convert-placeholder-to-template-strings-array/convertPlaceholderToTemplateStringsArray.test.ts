@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import convertPlaceholderToTemplateStringsArray from './convertPlaceholderToTemplateStringsArray';
+import convertPlaceholderToTemplateStringsArray from './convertPlaceholderToTemplateStringsArray.js';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import * as util from 'util';
-import applyPlaceholderToTemplateStringFunction from './applyPlaceholderToTemplateStringFunction';
+import applyPlaceholderToTemplateStringFunction from './applyPlaceholderToTemplateStringFunction.js';
 
 describe('convertPlaceholderToTemplateStringsArray', () => {
     

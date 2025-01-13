@@ -1,5 +1,5 @@
 import { indexedDB, IDBKeyRange, IDBFactory } from "fake-indexeddb";
-import { FakeIdb } from "./types";
+import { FakeIdb } from "./types.ts";
 
 
 export function fakeIdb(shared?:boolean):FakeIdb {

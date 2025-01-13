@@ -9,8 +9,8 @@ This is fixed if your test runner isolates global variables per test file (as Je
 */
 
 
-import { QueueMemory } from "./QueueMemory";
-import { HaltPromise, QueueFunction, Testing } from "../types";
+import { QueueMemory } from "./QueueMemory.ts";
+import { HaltPromise, QueueFunction, Testing } from "../types.ts";
 
 const queueTestFiles:string[] = [];
 let queuesMemorys:{[queueName:string]: QueueMemory} = {};

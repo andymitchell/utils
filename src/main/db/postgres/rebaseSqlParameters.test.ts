@@ -1,4 +1,4 @@
-import { appendSqlParameters, concatSqlParameters, rebaseSqlParameters } from "./rebaseSqlParameters";
+import { appendSqlParameters, concatSqlParameters, rebaseSqlParameters } from "./rebaseSqlParameters.ts";
 
 describe('rebaseSqlParameters', () => {
 

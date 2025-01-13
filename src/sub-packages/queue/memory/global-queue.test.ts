@@ -1,12 +1,12 @@
 
-import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from "./global-queue";
+import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from "./global-queue.ts";
 
 
 
-import { HaltPromise, QueueFunction, Testing } from "../types";
-import { standardQueueTests } from "../common/standardQueueTests";
-import { QueueMemory } from "./QueueMemory";
-import { uid } from "../../uid/uid";
+import { HaltPromise, QueueFunction, Testing } from "../types.ts";
+import { standardQueueTests } from "../common/standardQueueTests.ts";
+import { QueueMemory } from "./QueueMemory.ts";
+import { uid } from "../../uid/uid.ts";
 
 const TEST_FILE = 'global.test.ts';
 beforeAll(async () => {

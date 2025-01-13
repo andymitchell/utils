@@ -1,4 +1,4 @@
-import { isEscapedIdentifier } from "./escapeIdentifier";
+import { isEscapedIdentifier } from "./escapeIdentifier.ts";
 
 describe("isEscapedIdentifier", () => {
     test("basic", () => {

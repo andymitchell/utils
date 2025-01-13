@@ -1,4 +1,4 @@
-import { TypedCancelableEventEmitter } from "../../../../typed-cancelable-event-emitter";
+import { TypedCancelableEventEmitter } from "../../../../typed-cancelable-event-emitter/index.ts";
 
 
 export type QueueItemDB = {

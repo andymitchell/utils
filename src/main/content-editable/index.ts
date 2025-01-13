@@ -1,7 +1,7 @@
-import { KeyRemapping } from "./KeyRemapping";
-import { applyInheritedStyles, getInheritedStyles } from "./applyInheritedStyles";
-import { getCursorPosition, setCursorPosition } from "./cursorPosition";
-import insertHTMLatCursor from "./insertHTMLatCursor";
+import { KeyRemapping } from "./KeyRemapping.ts";
+import { applyInheritedStyles, getInheritedStyles } from "./applyInheritedStyles.ts";
+import { getCursorPosition, setCursorPosition } from "./cursorPosition.ts";
+import insertHTMLatCursor from "./insertHTMLatCursor.ts";
 
 export const ContentEditable = {
     applyInheritedStyles,

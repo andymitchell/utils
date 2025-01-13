@@ -1,1 +1,1 @@
-export {uid, uuidV4, uidFastAndSimple} from './uid';
+export {uid, uuidV4, uidFastAndSimple} from './uid.js';

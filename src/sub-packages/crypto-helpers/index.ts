@@ -13,7 +13,7 @@ import {
     sha256raw, 
     vernomDecrypt, 
     vernomEncrypt, 
-    getCryptoAsync} from "./cryptoHelpers";
+    getCryptoAsync} from "./cryptoHelpers.ts";
 
 export {
     uuid,

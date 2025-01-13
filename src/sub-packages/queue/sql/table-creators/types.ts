@@ -1,13 +1,13 @@
 
 
-import isTypeEqual from "../../../../main/types/isTypeEqual";
-import typeHasKeys from "../../../../main/types/typeHasKeys";
-import { type QueueTableSelectPg, type QueueTablePg, type QueueTableCreatorPg, type QueueTableInsertPg } from "./queue.pg";
+import isTypeEqual from "../../../../main/types/isTypeEqual.ts";
+import typeHasKeys from "../../../../main/types/typeHasKeys.ts";
+import { type QueueTableSelectPg, type QueueTablePg, type QueueTableCreatorPg, type QueueTableInsertPg } from "./queue.pg.ts";
 
 
 
 
-import { QueueTableCreatorSqlite, QueueTableSelectSqlite, QueueTableSqlite } from "./queue.sqlite";
+import { QueueTableCreatorSqlite, QueueTableSelectSqlite, QueueTableSqlite } from "./queue.sqlite.ts";
 import { DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
 
 

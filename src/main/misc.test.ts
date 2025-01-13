@@ -1,4 +1,4 @@
-import { getGlobal, promiseWithTrigger } from "./misc"
+import { getGlobal, promiseWithTrigger } from "./misc.ts"
 
 test('getGlobal', () => {
     const glob = getGlobal();

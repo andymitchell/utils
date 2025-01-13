@@ -1,4 +1,4 @@
-import * as CryptoHelpers from "./"
+import * as CryptoHelpers from "./index.ts"
 
 describe("CryptoHelpers", () => {
     test("Crypto loads in node", async () => {

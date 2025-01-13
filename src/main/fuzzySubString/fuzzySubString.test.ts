@@ -1,5 +1,5 @@
 
-import fuzzySubString from ".";
+import fuzzySubString from "./index.ts";
 
 
 describe('fuzzySubString', () => {

@@ -1,4 +1,4 @@
-export {fakeIdb} from './fakeIdb';
+export {fakeIdb} from './fakeIdb.js';
 
-export { FakeIdb } from './types';
+export { FakeIdb } from './types.js';
 

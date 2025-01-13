@@ -1,6 +1,10 @@
 import { EventEmitter } from 'events'; // events is installed as a dependency, not just relying on node. 
 
-import TypedEmitter, { EventMap } from "typed-emitter";
+
+import type { EventMap } from "typed-emitter";
+
+
+type TypedEventEmitter<Events extends EventMap> = import("typed-emitter").default<Events>;
 
 // FYI could use eventemitter3 as isomorphic option, but its EventEmitter lacks setMaxListeners (because it has no limit), so would need TypedCancelableEventEmitter to implmenet the function as a placeholder, to satisfy TypedEmitter. 
 
@@ -13,7 +17,7 @@ type MergedEventMap<T extends EventMap> = T & BaseEventMap<T>;
 
 
 export type TypedCancel = () => void;
-export class TypedCancelableEventEmitter<T extends EventMap> extends (EventEmitter as { new <U extends EventMap>(): TypedEmitter<U> })<MergedEventMap<T>> {
+export class TypedCancelableEventEmitter<T extends EventMap> extends (EventEmitter as { new <U extends EventMap>(): TypedEventEmitter<U> })<MergedEventMap<T>> {
     onCancelable<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): TypedCancel {
         this.on(event, listener);
         return () => this.off(event, listener);

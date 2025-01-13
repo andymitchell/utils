@@ -1,9 +1,9 @@
 
-import preventCompletionFactory from "../../preventCompletionFactory";
-import { HaltPromise, IQueue, JobItem, OnRun } from "../../../types";
-import { IQueueIo, QueueItemDB } from "./types";
-import { uid } from "../../../../uid/uid";
-import { promiseWithTrigger } from "../../../../../main/misc";
+import preventCompletionFactory from "../../preventCompletionFactory.ts";
+import { HaltPromise, IQueue, JobItem, OnRun } from "../../../types.ts";
+import { IQueueIo, QueueItemDB } from "./types.ts";
+import { uid } from "../../../../uid/uid.ts";
+import { promiseWithTrigger } from "../../../../../main/misc.ts";
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
 export class BaseItemQueue implements IQueue {

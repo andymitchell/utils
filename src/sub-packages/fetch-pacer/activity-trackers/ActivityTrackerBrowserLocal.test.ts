@@ -1,6 +1,6 @@
-import { MockChromeStorageArea } from "../../kv-storage"
-import { ActivityItem } from "../types";
-import { ActivityTrackerBrowserLocal } from "./ActivityTrackerBrowserLocal";
+import { MockChromeStorageArea } from "../../kv-storage/index.ts"
+import { ActivityItem } from "../types.ts";
+import { ActivityTrackerBrowserLocal } from "./ActivityTrackerBrowserLocal.ts";
 
 describe('shared db', () => {
 

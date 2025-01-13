@@ -1,7 +1,7 @@
-import { MockChromeStorageArea } from "../kv-storage";
-import { ActivityTrackerBrowserLocal } from "./activity-trackers/ActivityTrackerBrowserLocal";
-import FetchPacerMultiClient from "./FetchPacerMultiClient";
-import { BackOffResponse, FetchPacerOptions } from "./types";
+import { MockChromeStorageArea } from "../kv-storage/index.ts";
+import { ActivityTrackerBrowserLocal } from "./activity-trackers/ActivityTrackerBrowserLocal.ts";
+import FetchPacerMultiClient from "./FetchPacerMultiClient.ts";
+import { BackOffResponse, FetchPacerOptions } from "./types.ts";
 
 
 function makeMultiClientForTest():FetchPacerMultiClient {

@@ -1,4 +1,4 @@
-import convertPlaceholderToTemplateStringsArray from "./convertPlaceholderToTemplateStringsArray";
+import convertPlaceholderToTemplateStringsArray from "./convertPlaceholderToTemplateStringsArray.ts";
 
 /**
  * Apply a placeholder string and its parameters to a template string function. 

@@ -1,7 +1,7 @@
 
 import { type InferInsertModel, type InferSelectModel } from "drizzle-orm";
 import * as pg from "drizzle-orm/pg-core";
-import pgTableCreatorWithSchema from "./pgTableCreatorWithSchema";
+import pgTableCreatorWithSchema from "./pgTableCreatorWithSchema.ts";
 
 
 export function queueTableCreatorPg(id:string, schema?:string) {

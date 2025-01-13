@@ -1,9 +1,9 @@
-import { BackOffResponse,  Fetch, FetchOptions, FetchPacerOptions, FetchURL } from './types';
+import { BackOffResponse,  Fetch, FetchOptions, FetchPacerOptions, FetchURL } from './types.js';
 
-import { IQueue, QueueMemory } from '../queue/index-memory';
+import { IQueue, QueueMemory } from '../queue/index-memory.js';
 
-import { sleep } from '../../main';
-import PaceTracker from './PaceTracker';
+import { sleep } from '../../main/index.js';
+import PaceTracker from './PaceTracker.js';
 
 export const fetchPacerOptionsDefault:FetchPacerOptions = {
     mode: {

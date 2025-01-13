@@ -1,6 +1,6 @@
 
-import { promiseWithTrigger, sleep } from "../../../main/misc";
-import { IQueue, QueueFunction } from "../types";
+import { promiseWithTrigger, sleep } from "../../../main/misc.ts";
+import { IQueue, QueueFunction } from "../types.ts";
 
 export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueueFunction: () => QueueFunction, createQueue: () => Promise<IQueue>) {
     

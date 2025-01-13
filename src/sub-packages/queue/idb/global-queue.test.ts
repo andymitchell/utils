@@ -1,15 +1,15 @@
 import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
 
-import { disposeAllGlobalQueuesIDB, queueIDB, registerTestFileUsingGlobalQueuesIDB } from "./global-queue";
+import { disposeAllGlobalQueuesIDB, queueIDB, registerTestFileUsingGlobalQueuesIDB } from "./global-queue.ts";
 
-import { fakeIdb } from "../../fake-idb";
+import { fakeIdb } from "../../fake-idb/index.ts";
 
 
 
-import { HaltPromise, QueueFunction, Testing } from "../types";
-import { standardQueueTests } from "../common/standardQueueTests";
-import { QueueIDB, TestingIDB } from "./QueueIDB";
-import { uid } from "../../uid/uid";
+import { HaltPromise, QueueFunction, Testing } from "../types.ts";
+import { standardQueueTests } from "../common/standardQueueTests.ts";
+import { QueueIDB, TestingIDB } from "./QueueIDB.ts";
+import { uid } from "../../uid/uid.ts";
 
 const TEST_FILE = 'global.test.ts';
 beforeAll(async () => {

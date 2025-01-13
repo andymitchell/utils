@@ -4,6 +4,7 @@ import * as sqlite from "drizzle-orm/sqlite-core";
 
 
 export function queueTableCreatorSqlite(id:string, schema?:string) {
+    if( schema ) throw new Error("Schema not supported in sqlite");
 
     return sqlite.sqliteTable("queue_"+id, {
         id: sqlite.integer("id").primaryKey({ autoIncrement: true }),

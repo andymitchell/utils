@@ -3,9 +3,9 @@
  */
 
 
-import { uid } from "../../uid/uid";
-import preventCompletionFactory from "../common/preventCompletionFactory";
-import type { HaltPromise, IQueue, JobItem, OnRun } from "../types";
+import { uid } from "../../uid/uid.ts";
+import preventCompletionFactory from "../common/preventCompletionFactory.ts";
+import type { HaltPromise, IQueue, JobItem, OnRun } from "../types.ts";
 
 
 

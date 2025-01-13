@@ -1,6 +1,6 @@
-import { TypedCancel } from './TypedCancelableEventEmitter';
+import { TypedCancel } from './TypedCancelableEventEmitter.js';
 
-export {TypedCancelableEventEmitter} from './TypedCancelableEventEmitter';
+export {TypedCancelableEventEmitter} from './TypedCancelableEventEmitter.js';
 export type {
     TypedCancel
 }

@@ -1,7 +1,7 @@
 
 import {type ZodSchema} from "zod"
-import type { RawStorage, RawStorageEventMap } from "./types";
-import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter";
+import type { RawStorage, RawStorageEventMap } from "./types.ts";
+import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
 
 
