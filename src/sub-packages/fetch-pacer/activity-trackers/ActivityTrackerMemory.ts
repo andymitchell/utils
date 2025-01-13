@@ -1,7 +1,8 @@
 
 import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+
 import { BaseActivityTracker } from '../BaseActivityTracker';
+import { uuidV4 } from '../../uid/uid';
 
 export class ActivityTrackerMemory extends BaseActivityTracker implements IActivityTracker {
     
@@ -16,7 +17,7 @@ export class ActivityTrackerMemory extends BaseActivityTracker implements IActiv
 
     override async add(activity: ActivityItem): Promise<void> {
 
-        this.activities.push({...activity, id: uuidv4()});
+        this.activities.push({...activity, id: uuidV4()});
         this.activities = super.discardOldActivities(this.activities);
 
     }

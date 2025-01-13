@@ -1,10 +1,11 @@
 import { describe, test, expect} from 'vitest';
 import { PaceTrackerOptions } from './types';
-import { sleep } from '../../main';
+
 import PaceTracker from './PaceTracker';
 import closeTo from './testing-utils/closeTo';
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal';
 import { MockChromeStorageArea } from '../kv-storage';
+import { sleep } from '../../main/misc';
 
 
 standardPaceTrackerTests(

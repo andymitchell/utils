@@ -5,13 +5,11 @@
  *
  */
 
-import {z, type ZodSchema} from "zod"
+import {type ZodSchema} from "zod"
 import type { RawStorage, RawStorageEventMap } from "./types";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter";
 
 
-export {z};
-export type {ZodSchema};
 
 
 const { crypto } = globalThis
@@ -207,7 +205,8 @@ export class SecureStorage<T> implements RawStorage<T> {
         boxBuffer.set(iv, DEFAULT_SALT_SIZE)
         boxBuffer.set(encryptedDataBuffer, this.#prefixSize)
 
-        const boxBase64 = u8ToBase64(boxBuffer)
+        
+        const boxBase64 = u8ToBase64(boxBuffer.buffer)
         return boxBase64
     }
 

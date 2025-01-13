@@ -1,10 +1,11 @@
 /// <reference types="chrome" />
 
 import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+
 import { BaseActivityTracker } from '../BaseActivityTracker';
 import { ChromeStorage, RawStorage } from '../../kv-storage';
-import { IQueue, QueueMemory } from '../../queue';
+import { IQueue, QueueMemory } from '../../queue/index-memory';
+import { uuidV4 } from '../../uid/uid';
 
 type ActivityTrackerBrowserLocalOptions = ActivityTrackerOptions & {
     failsafe_active_sync_poll_ms?: number
@@ -37,7 +38,7 @@ export class ActivityTrackerBrowserLocal extends BaseActivityTracker implements 
     }
 
     override async add(activity: ActivityItem): Promise<void> {
-        const storedActivity = {...activity, id: uuidv4()};
+        const storedActivity = {...activity, id: uuidV4()};
 
         await this.#transaction.enqueue(async () => {
             await this.#loadActivitiesFromStorage();

@@ -1,6 +1,6 @@
 import { BackOffResponse,  Fetch, FetchOptions, FetchPacerOptions, FetchURL } from './types';
 
-import { IQueue, QueueMemory } from '../queue';
+import { IQueue, QueueMemory } from '../queue/index-memory';
 
 import { sleep } from '../../main';
 import PaceTracker from './PaceTracker';

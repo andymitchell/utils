@@ -1,1 +1,0 @@
-export {uid, uidFastAndSimple} from './uid';

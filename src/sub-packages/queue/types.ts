@@ -1,9 +1,9 @@
 import { FakeIdb } from "../fake-idb/types";
-import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter";
 
+export type Testing = { suppress_long_running_warning?: boolean};
 
 export type HaltPromise = Promise<void>;
-export type Testing = {idb?:FakeIdb, idb_with_multiple_clients?: boolean, suppress_long_running_warning?: boolean};
+
 
 
 type PublicQueueItem = {

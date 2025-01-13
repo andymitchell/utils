@@ -1,11 +1,9 @@
 import { QueueWorkspace } from "./common/QueueWorkspace"
 import { disposeAllGlobalQueuesIDB, queueIDB, registerTestFileUsingGlobalQueuesIDB } from "./idb/global-queue"
 import { QueueIDB } from "./idb/QueueIDB"
+import { QueueWorkspaceIDB } from "./idb/QueueWorkspaceIDB"
 import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from "./memory/global-queue"
 import { QueueMemory } from "./memory/QueueMemory"
-import { QueueSql } from "./sql/QueueSql"
-import { queueTableCreatorPg } from "./sql/table-creators/queue.pg"
-import { QueueTable, QueueTableCreator } from "./sql/table-creators/types"
 import { IQueue, QueueFunction } from "./types"
 
 
@@ -15,6 +13,7 @@ export {
     QueueMemory,
     QueueIDB,
     QueueWorkspace,
+    QueueWorkspaceIDB,
     registerTestFileUsingGlobalQueues,
     disposeAllGlobalQueues,
     registerTestFileUsingGlobalQueuesIDB,
@@ -27,13 +26,3 @@ export type {
     QueueFunction
 }
 
-
-
-export {
-    QueueSql,
-    queueTableCreatorPg
-}
-export type {
-    QueueTable,
-    QueueTableCreator
-}

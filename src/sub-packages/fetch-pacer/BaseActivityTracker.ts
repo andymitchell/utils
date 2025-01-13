@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events';
+
 import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from './types';
-import { v4 as uuidv4 } from 'uuid';
+
 
 export class BaseActivityTracker implements IActivityTracker {
     protected activities: StoredActivityItem[] = [];
