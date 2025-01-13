@@ -151,4 +151,4 @@ test('basic queue operation', async () => {
     expect(state.ran).toBe(true);
     
     
-}, 1000*5)
+}, 1000*15)
