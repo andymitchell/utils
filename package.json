@@ -18,8 +18,6 @@
             "types": "./dist/index-node.d.ts",
             "default": "./dist/index-node.js"
         },
-
-
         "./typed-cancelable-event-emitter": {
             "types": "./dist/typed-cancelable-event-emitter.d.ts",
             "default": "./dist/typed-cancelable-event-emitter.js"
@@ -44,7 +42,6 @@
             "types": "./dist/fetch-pacer.d.ts",
             "default": "./dist/fetch-pacer.js"
         },
-
         "./kv-storage": {
             "types": "./dist/kv-storage.d.ts",
             "default": "./dist/kv-storage.js"
@@ -57,7 +54,6 @@
             "types": "./dist/kv-storage-node.d.ts",
             "default": "./dist/kv-storage-node.js"
         },
-
         "./queue": {
             "types": "./dist/queue.d.ts",
             "default": "./dist/queue.js"
@@ -130,7 +126,7 @@
         "fs-extra": "^11.2.0",
         "jest": "^29.7.0",
         "ts-jest": "^29.1.2",
-        "tsup": "^8.0.1",
+        "tsup": "^8.3.5",
         "vitest": "^1.6.0"
     },
     "dependencies": {
