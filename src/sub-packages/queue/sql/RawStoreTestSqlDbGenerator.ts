@@ -72,7 +72,7 @@ export class RawStoreTestSqlDbGenerator<D extends DdtDialect = DdtDialect> {
                         'table_creator_invocation': (storeIds) => storeIds.map(storeId => `export const store_${storeId} = ${creatorFn}('${storeId}');`).join("\n")
                      },
                     partitioned_schemas.map(x => x.store_id),
-                    '.ts');
+                    '');
 
                     return {
                         partitioned_schemas,

@@ -18,7 +18,7 @@ import { BaseItemQueue } from "../common/helpers/item-queue/BaseItemQueue.ts";
 import { IQueueIo, QueueIoEvents, QueueItemDB } from "../common/helpers/item-queue/types.ts";
 import { FakeIdb } from "../../fake-idb/types.ts";
 import { uid } from "../../uid/index.ts";
-import { sleep } from "../../../main/misc.ts";
+import { getGlobal, sleep } from "../../../main/misc.ts";
 
 
 
@@ -31,7 +31,14 @@ export class QueueIDB extends BaseItemQueue implements IQueue {
     
 
     constructor(id:string, testing?: TestingIDB) {
+
+        if( !getGlobal().indexedDB && !testing?.idb ) {
+            throw new Error("QueueIDB cannot find IndexedDB to use. Either use a supporting browser, or if in a Node env provide a custom indexedDb (e.g. fake-indexeddb");
+        }
+
         super(id, new QueueIoIdb(id, testing))
+
+
         
         
     }
