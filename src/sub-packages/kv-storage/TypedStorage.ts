@@ -26,7 +26,7 @@ export class TypedStorage<T> implements RawStorage<T> {
             if( event.key.startsWith(this.#keyNamespace) ) {
                 this.events.emit('CHANGE', {
                     key: this.#removeNamespacedKey(event.key),
-                    newValue: JSON.parse(event.newValue) // TODO type check this
+                    newValue: event.newValue===undefined? undefined : JSON.parse(event.newValue) // TODO type check this
                 })
             }
         }))
