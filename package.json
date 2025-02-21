@@ -4,7 +4,6 @@
     "description": "",
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
             "browser": "./dist/index-browser.js",
             "node": "./dist/index-node.js",
             "require": "./dist/index-node.js",
