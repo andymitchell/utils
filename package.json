@@ -144,7 +144,7 @@
         "postgres": "^3.4.5",
         "ts-jest": "^29.1.2",
         "tsup": "^8.3.5",
-        "vitest": "^1.6.0"
+        "vitest": "^3.0.7"
     },
     "dependencies": {
         "@andyrmitchell/drizzle-dialect-types": "^0.0.7",

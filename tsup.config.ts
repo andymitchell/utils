@@ -39,7 +39,8 @@ export default defineConfig({
   external: [
     'dexie',
     'zod',
-    'drizzle-orm'
+    'drizzle-orm',
+    'postgres'
   ],
   dts: true,
   format: ['esm'], // When this changes, update 'type' in package.json 
