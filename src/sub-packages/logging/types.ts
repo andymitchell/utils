@@ -15,11 +15,7 @@ export interface ILogger<T extends MinimumContext = MinimumContext, RT extends M
 }
 
 
-/**
- * A span represents a unit of work or operation. Spans track specific operations that a request makes, painting a picture of what happened during the time in which that operation was executed.
- * 
- * It forms part of an overall trace, represented as a waterfall. 
- */
+
 export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogger<T, SpanContext<T>> {
 
     /**
