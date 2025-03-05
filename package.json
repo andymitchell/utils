@@ -129,7 +129,7 @@
         "node": ">=19.0.0"
     },
     "devDependencies": {
-        "@andyrmitchell/drizzle-fast-bulk-test": "^0.1.4",
+        "@andyrmitchell/drizzle-fast-bulk-test": "^0.1.5",
         "@andyrmitchell/file-io": "^0.10.12",
         "@babel/core": "^7.23.9",
         "@babel/preset-env": "^7.23.9",
@@ -157,8 +157,8 @@
         "vitest": "^3.0.7"
     },
     "dependencies": {
-        "@andyrmitchell/drizzle-dialect-types": "^0.0.7",
-        "@andyrmitchell/drizzle-robust-transaction": "^0.0.5",
+        "@andyrmitchell/drizzle-dialect-types": "^0.0.8",
+        "@andyrmitchell/drizzle-robust-transaction": "^0.0.6",
         "dexie": "^4.0.10",
         "drizzle-orm": "^0.36.4",
         "events": "^3.3.0",
