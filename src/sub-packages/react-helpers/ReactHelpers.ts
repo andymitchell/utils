@@ -1,7 +1,7 @@
 
 import {render} from 'react-dom';
 import { make } from '../dom-helpers/index.js';
-import { ReactElement } from 'react';
+import type { ReactElement } from 'react';
 
 
 export const makeReact = <ElementType extends HTMLElement>(nodeName: string, parent?: HTMLElement, className?: string, textContent?: string, style?: React.CSSProperties, child?: HTMLElement | ReactElement) => {

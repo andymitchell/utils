@@ -1,4 +1,4 @@
-import { BackOffResponse, FetchOptions, FetchPacerOptions, FetchURL } from './types.js';
+import type { BackOffResponse, FetchOptions, FetchPacerOptions, FetchURL } from './types.js';
 
 
 

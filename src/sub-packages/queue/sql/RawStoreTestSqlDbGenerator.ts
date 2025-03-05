@@ -1,8 +1,8 @@
-import { TestSqlDbGenerator, createSchemaDefinitionFile, DdtSqliteDriver, DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-fast-bulk-test";
-import { QueueTable } from "./table-creators/types.ts";
+import { TestSqlDbGenerator, createSchemaDefinitionFile, type DdtSqliteDriver, type DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-fast-bulk-test";
+import type { QueueTable } from "./table-creators/types.ts";
 import { queueTableCreatorPg } from "./table-creators/queue.pg.ts";
 import { queueTableCreatorSqlite } from "./table-creators/queue.sqlite.ts";
-import { DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
+import type { DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
 
 
 

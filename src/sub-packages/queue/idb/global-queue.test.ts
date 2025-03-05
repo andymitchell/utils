@@ -6,9 +6,9 @@ import { fakeIdb } from "../../fake-idb/index.ts";
 
 
 
-import { HaltPromise, QueueFunction, Testing } from "../types.ts";
+import type { HaltPromise, QueueFunction } from "../types.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
-import { QueueIDB, TestingIDB } from "./QueueIDB.ts";
+import { QueueIDB, type TestingIDB } from "./QueueIDB.ts";
 import { uid } from "../../uid/uid.ts";
 
 const TEST_FILE = 'global.test.ts';

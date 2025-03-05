@@ -1,10 +1,11 @@
 /// <reference types="chrome" />
 
-import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
+
+import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
 
 import { BaseActivityTracker } from '../BaseActivityTracker.js';
-import { ChromeStorage, RawStorage } from '../../kv-storage/index.js';
-import { IQueue, QueueMemory } from '../../queue/index-memory.js';
+import { ChromeStorage, type RawStorage } from '../../kv-storage/index.js';
+import { type IQueue, QueueMemory } from '../../queue/index-memory.js';
 import { uuidV4 } from '../../uid/uid.js';
 
 type ActivityTrackerBrowserLocalOptions = ActivityTrackerOptions & {

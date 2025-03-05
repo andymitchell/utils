@@ -1,7 +1,7 @@
 
 import { QueueWorkspace } from "../common/QueueWorkspace.ts";
-import { QueueFunction, Testing } from "../types.ts";
-import { QueueIDB, TestingIDB } from "./QueueIDB.ts";
+import type { QueueFunction } from "../types.ts";
+import { QueueIDB, type TestingIDB } from "./QueueIDB.ts";
 
 
 export class QueueWorkspaceIDB extends QueueWorkspace {

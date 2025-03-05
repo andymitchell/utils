@@ -1,7 +1,7 @@
 
 import preventCompletionFactory from "../../preventCompletionFactory.ts";
-import { HaltPromise, IQueue, JobItem, OnRun } from "../../../types.ts";
-import { IQueueIo, QueueItemDB } from "./types.ts";
+import type { HaltPromise, IQueue, JobItem, OnRun } from "../../../types.ts";
+import type { IQueueIo, QueueItemDB } from "./types.ts";
 import { uid } from "../../../../uid/uid.ts";
 import { promiseWithTrigger } from "../../../../../main/misc.ts";
 

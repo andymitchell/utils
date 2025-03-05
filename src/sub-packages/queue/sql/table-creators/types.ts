@@ -7,8 +7,8 @@ import { type QueueTableSelectPg, type QueueTablePg, type QueueTableCreatorPg, t
 
 
 
-import { QueueTableCreatorSqlite, QueueTableSelectSqlite, QueueTableSqlite } from "./queue.sqlite.ts";
-import { DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
+import type { QueueTableCreatorSqlite, QueueTableSelectSqlite, QueueTableSqlite } from "./queue.sqlite.ts";
+import type { DdtDialect } from "@andyrmitchell/drizzle-dialect-types";
 
 
 

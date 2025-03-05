@@ -12,16 +12,16 @@
 
 
 import { eq, and, SQL, gte } from "drizzle-orm";
-import { GenericDatabase, QueueItemDB } from "./types.ts";
-import {  IQueue } from "../types.ts";
+import type { GenericDatabase, QueueItemDB } from "./types.ts";
+import type { IQueue } from "../types.ts";
 import { BaseItemQueue } from "../common/helpers/item-queue/BaseItemQueue.ts";
-import { IQueueIo, QueueIoEvents } from "../common/helpers/item-queue/types.ts";
+import type { IQueueIo, QueueIoEvents } from "../common/helpers/item-queue/types.ts";
 import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import { mergeWith } from "lodash-es";
-import { QueueTable } from "./table-creators/types.ts";
+import type { QueueTable } from "./table-creators/types.ts";
 import { robustTransaction } from "@andyrmitchell/drizzle-robust-transaction";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { DdtDialect, DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-dialect-types";
+import type { DdtDialect, DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-dialect-types";
 import { uid } from "../../uid/uid.ts";
 
 

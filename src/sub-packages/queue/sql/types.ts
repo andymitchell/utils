@@ -1,6 +1,6 @@
 
-import { OnRun } from "../types.ts";
-import { DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-dialect-types";
+import type { OnRun } from "../types.ts";
+import type { DdtDialectDatabaseMap } from "@andyrmitchell/drizzle-dialect-types";
 
 
 export type GenericDatabase = DdtDialectDatabaseMap['pg'];

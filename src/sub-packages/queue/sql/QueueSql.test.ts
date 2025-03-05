@@ -6,7 +6,7 @@ import { RawStoreTestSqlDbGenerator } from "./RawStoreTestSqlDbGenerator.ts";
 import { QueueSql } from "./QueueSql.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
 import {v4 as uuidV4} from 'uuid';
-import { HaltPromise } from "../types.ts";
+import type { HaltPromise } from "../types.ts";
 
 const TESTDIR = getRelativeTestDir(import.meta.url);
 

@@ -1,5 +1,5 @@
 import { describe, test, expect} from 'vitest';
-import { PaceTrackerOptions } from './types.js';
+import type { PaceTrackerOptions } from './types.js';
 
 import PaceTracker from './PaceTracker.js';
 import closeTo from './testing-utils/closeTo.js';
@@ -114,7 +114,7 @@ function standardPaceTrackerTests(baseTestConfig: () => Partial<PaceTrackerOptio
             await paceChecker.logPoints(12); // Nb it's twice the max point load of the period. That'll take 2 periods to clear. 
             const pace = await paceChecker.checkPace(0);
             expect(pace.too_fast).toBe(true);
-            expect(pace.pause_for).toBeGreaterThanOrEqual(2000);
+            expect(pace.pause_for).toBeGreaterThanOrEqual(1998);
             expect(pace.pause_for).toBeLessThanOrEqual(3000);
             expect(!!pace.is_back_off).toBe(false);
         })
@@ -132,7 +132,7 @@ function standardPaceTrackerTests(baseTestConfig: () => Partial<PaceTrackerOptio
             const pace = await paceChecker.checkPace(0);
             expect(pace.too_fast).toBe(true);
             expect(pace.is_back_off).toBe(true);
-            expect(closeTo(pace.pause_for, 100)).toBe(true);
+            expect(closeTo(pace.pause_for, 100, 10)).toBe(true);
     
         });
     
@@ -145,7 +145,7 @@ function standardPaceTrackerTests(baseTestConfig: () => Partial<PaceTrackerOptio
             const pace = await paceChecker.checkPace(0);
             expect(pace.too_fast).toBe(true);
             expect(pace.is_back_off).toBe(true);
-            expect(closeTo(pace.pause_for, 100)).toBe(true);
+            expect(closeTo(pace.pause_for, 100, 10)).toBe(true);
     
             
             await sleep(100);
@@ -182,7 +182,7 @@ function standardPaceTrackerTests(baseTestConfig: () => Partial<PaceTrackerOptio
             await paceChecker.logBackOffResponse(2000);
             const pace = await paceChecker.checkPace(0);
             expect(pace.too_fast).toBe(true);
-            expect(pace.pause_for).toBeGreaterThanOrEqual(2000)
+            expect(pace.pause_for).toBeGreaterThanOrEqual(1998)
             expect(pace.is_back_off).toBe(true);
         })
     

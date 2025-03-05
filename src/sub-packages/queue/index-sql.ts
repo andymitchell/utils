@@ -1,7 +1,7 @@
 
 import { QueueSql } from "./sql/QueueSql.ts"
 import { queueTableCreatorPg } from "./sql/table-creators/queue.pg.ts"
-import { QueueTable, QueueTableCreator } from "./sql/table-creators/types.ts"
+import type { QueueTable, QueueTableCreator } from "./sql/table-creators/types.ts"
 
 
 

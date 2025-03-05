@@ -3,7 +3,7 @@ import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from
 
 
 
-import { HaltPromise, QueueFunction, Testing } from "../types.ts";
+import type { HaltPromise, QueueFunction } from "../types.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
 import { QueueMemory } from "./QueueMemory.ts";
 import { uid } from "../../uid/uid.ts";

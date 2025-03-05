@@ -9,14 +9,14 @@
  * (Potentially this can also be implemented with a Broadcast Channel API, if using IndexedDB isn't desirable - e.g. too slow/heavy)
  */
 
-import { Dexie, Subscription, liveQuery } from "dexie";
-import { IQueue,  Testing } from "../types.ts";
+import { Dexie, type Subscription, liveQuery } from "dexie";
+import type { IQueue, Testing } from "../types.ts";
 
 
 import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import { BaseItemQueue } from "../common/helpers/item-queue/BaseItemQueue.ts";
-import { IQueueIo, QueueIoEvents, QueueItemDB } from "../common/helpers/item-queue/types.ts";
-import { FakeIdb } from "../../fake-idb/types.ts";
+import type { IQueueIo, QueueIoEvents, QueueItemDB } from "../common/helpers/item-queue/types.ts";
+import type { FakeIdb } from "../../fake-idb/types.ts";
 import { uid } from "../../uid/index.ts";
 import { getGlobal, sleep } from "../../../main/misc.ts";
 

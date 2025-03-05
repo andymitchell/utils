@@ -1,9 +1,9 @@
 import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery? 
 
 import { fakeIdb } from "../../fake-idb/index.ts";
-import { QueueIDB, TestingIDB } from "./QueueIDB.ts";
+import { QueueIDB, type TestingIDB } from "./QueueIDB.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
-import { HaltPromise,  Testing } from "../types.ts";
+import type { HaltPromise, Testing } from "../types.ts";
 import {v4 as uuidV4} from 'uuid';
 import { promiseWithTrigger, sleep } from "../../../main/misc.ts";
 

@@ -1,5 +1,5 @@
 
-import { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
+import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
 
 import { BaseActivityTracker } from '../BaseActivityTracker.js';
 import { uuidV4 } from '../../uid/uid.js';

@@ -1,6 +1,6 @@
 
 import { QueueMemory } from "../memory/QueueMemory.ts";
-import { QueueFunction, Testing } from "../types.ts";
+import type { QueueFunction, Testing } from "../types.ts";
 
 
 export class QueueWorkspace {

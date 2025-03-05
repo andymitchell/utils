@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import FetchPacer from './FetchPacer.js';
-import { BackOffResponse, FetchPacerOptions } from './types.js';
+import type { BackOffResponse, FetchPacerOptions } from './types.js';
 import closeTo from './testing-utils/closeTo.js';
 
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.js';
