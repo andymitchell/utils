@@ -41,6 +41,10 @@
             "types": "./dist/fetch-pacer.d.ts",
             "default": "./dist/fetch-pacer.js"
         },
+        "./uid": {
+            "types": "./dist/uid.d.ts",
+            "default": "./dist/uid.js"
+        },
         "./deep-clone-scalar-values": {
             "types": "./dist/deep-clone-scalar-values.d.ts",
             "default": "./dist/deep-clone-scalar-values.js"
