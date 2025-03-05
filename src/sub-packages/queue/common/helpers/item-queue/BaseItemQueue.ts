@@ -6,6 +6,10 @@ import { uid } from "../../../../uid/uid.ts";
 import { promiseWithTrigger } from "../../../../../main/misc.ts";
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
+
+/**
+ * The base class for queues that store and execute items 
+ */
 export class BaseItemQueue implements IQueue {
     
     protected id:string;
