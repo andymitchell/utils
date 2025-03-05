@@ -30,8 +30,6 @@ export default defineConfig({
     'queue-memory': "src/sub-packages/queue/index-memory.ts",
     'queue-idb': "src/sub-packages/queue/index-idb.ts",
     'queue-testing': "src/sub-packages/queue/index-testing.ts",
-
-    'queue-sql': "src/sub-packages/queue-sql/index.ts",
   },
   publicDir: false,
   clean: true,
@@ -40,9 +38,9 @@ export default defineConfig({
   splitting: true,
   external: [
     'dexie',
-    'zod',
-    'drizzle-orm',
-    'postgres'
+    'react',
+    'react-dom',
+    'zod'
   ],
   dts: true,
   format: ['esm'], // When this changes, update 'type' in package.json 
