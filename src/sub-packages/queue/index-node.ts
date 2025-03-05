@@ -5,9 +5,6 @@ import { QueueWorkspaceIDB } from "./idb/QueueWorkspaceIDB.ts"
 
 import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from "./memory/global-queue.ts"
 import { QueueMemory } from "./memory/QueueMemory.ts"
-import { QueueSql } from "./sql/QueueSql.ts"
-import { queueTableCreatorPg } from "./sql/table-creators/queue.pg.ts"
-import type { QueueTable, QueueTableCreator } from "./sql/table-creators/types.ts"
 import type { IQueue, QueueFunction } from "./types.ts"
 
 
@@ -31,14 +28,3 @@ export type {
     QueueFunction
 }
 
-
-
-export {
-    QueueSql,
-    queueTableCreatorPg
-}
-export type {
-    QueueTable,
-    QueueTableCreator
-    
-}

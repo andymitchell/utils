@@ -29,7 +29,7 @@ export default defineConfig({
     'queue-node': "src/sub-packages/queue/index-node.ts",
     'queue-memory': "src/sub-packages/queue/index-memory.ts",
     'queue-idb': "src/sub-packages/queue/index-idb.ts",
-    'queue-sql': "src/sub-packages/queue/index-sql.ts",
+    'queue-sql': "src/sub-packages/queue-sql/index.ts",
   },
   publicDir: false,
   clean: true,

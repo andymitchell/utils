@@ -47,6 +47,8 @@
         },
         "./logging": {
             "types": "./dist/logging.d.ts",
+            "browser": "./dist/logging-browser.js",
+            "node": "./dist/logging-node.js",
             "default": "./dist/logging.js"
         },
         "./logging-browser": {
@@ -59,6 +61,8 @@
         },
         "./kv-storage": {
             "types": "./dist/kv-storage.d.ts",
+            "browser": "./dist/kv-storage-browser.js",
+            "node": "./dist/kv-storage-node.js",
             "default": "./dist/kv-storage.js"
         },
         "./kv-storage-browser": {
@@ -71,6 +75,8 @@
         },
         "./queue": {
             "types": "./dist/queue.d.ts",
+            "browser": "./dist/queue-browser.js",
+            "node": "./dist/queue-node.js",
             "default": "./dist/queue.js"
         },
         "./queue-browser": {

@@ -1,7 +1,7 @@
 
 
-import isTypeEqual from "../../../../main/types/isTypeEqual.ts";
-import typeHasKeys from "../../../../main/types/typeHasKeys.ts";
+import isTypeEqual from "../../../main/types/isTypeEqual.ts";
+import typeHasKeys from "../../../main/types/typeHasKeys.ts";
 import { type QueueTableSelectPg, type QueueTablePg, type QueueTableCreatorPg, type QueueTableInsertPg } from "./queue.pg.ts";
 
 
