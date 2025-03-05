@@ -99,6 +99,10 @@
             "types": "./dist/queue-idb.d.ts",
             "default": "./dist/queue-idb.js"
         },
+        "./queue-testing": {
+            "types": "./dist/queue-testing.d.ts",
+            "default": "./dist/queue-testing.js"
+        },
         "./queue-sql": {
             "types": "./dist/queue-sql.d.ts",
             "default": "./dist/queue-sql.js"
