@@ -2,6 +2,7 @@
     "name": "@andyrmitchell/utils",
     "version": "0.13.0",
     "description": "",
+    "sideEffects": false,
     "exports": {
         ".": {
             "browser": "./dist/index-browser.js",
