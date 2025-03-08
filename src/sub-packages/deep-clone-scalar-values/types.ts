@@ -1,4 +1,4 @@
-import { z } from "zod";
+/*import { z } from "zod";
 
 const ScalarSchema = z.union([
     z.string(),
@@ -7,6 +7,13 @@ const ScalarSchema = z.union([
 ]);
 export const AnyScalarSchema = ScalarSchema;
 type Scalar = z.infer<typeof AnyScalarSchema>;
+*/
+
+export function isScalar(x: unknown): x is Scalar {
+    return typeof x==='number' || typeof x==='boolean' || typeof x==='string';
+}
+
+type Scalar = string | number | boolean;
 
 
 export type DeepSerializable<T> = T extends Function

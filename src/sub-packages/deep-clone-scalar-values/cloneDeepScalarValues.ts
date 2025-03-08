@@ -1,6 +1,6 @@
 
 import { simplePrivateDataReplacer } from "./simplePrivateDataReplacer.ts";
-import { AnyScalarSchema, type DeepSerializable } from "./types.ts";
+import { isScalar, type DeepSerializable } from "./types.ts";
 
 
 
@@ -35,14 +35,14 @@ export function cloneDeepScalarValues<T extends object | Array<any>>(obj: T, str
                 if (typeof value === 'object' && !!value) {
                     if (Array.isArray(value)) {
                         safeVersion[key] = value.map(x => {
-                            if (AnyScalarSchema.safeParse(x).success) return x;
+                            if (isScalar(x)) return x;
                             return cloneDeepScalarValues(x, stripSensitiveInfo)
                         }) as T[typeof key];
                     } else {
                         // Object
                         safeVersion[key] = cloneDeepScalarValues(value, stripSensitiveInfo) as T[typeof key];
                     }
-                } else if (AnyScalarSchema.safeParse(value).success) {
+                } else if (isScalar(value)) {
                     if ((typeof value === 'string' || typeof value === 'number') && stripSensitiveInfo) {
                         value = simplePrivateDataReplacer(value) as T[typeof key];
                     }
