@@ -1,4 +1,4 @@
-import {z} from "zod";
+
 import { simplePrivateDataReplacer } from "./simplePrivateDataReplacer.ts";
 import { AnyScalarSchema, type DeepSerializable } from "./types.ts";
 

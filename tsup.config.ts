@@ -16,9 +16,6 @@ export default defineConfig({
     
     'deep-clone-scalar-values': "src/sub-packages/deep-clone-scalar-values/index.ts",
 
-    'logging': "src/sub-packages/logging/index.ts",
-    'logging-browser': "src/sub-packages/logging/index-browser.ts",
-    'logging-node': "src/sub-packages/logging/index-node.ts",
 
     'kv-storage': "src/sub-packages/kv-storage/index.ts",
     'kv-storage-browser': "src/sub-packages/kv-storage/index-browser.ts",

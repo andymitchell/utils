@@ -56,7 +56,7 @@ class QueueIoIdb extends Dexie implements IQueueIo {
     #id: string;
     #queue: Dexie.Table<QueueItemDB, number>;
     #dexieSubscription?: Subscription;
-    #testing?: Testing;
+    //#testing?: Testing;
     #testing_idb: boolean
     #disposed = false;
 
@@ -73,7 +73,7 @@ class QueueIoIdb extends Dexie implements IQueueIo {
 
         this.#id = id;
         this.#addDbListener();
-        this.#testing = testing;
+        //this.#testing = testing;
 
         if( this.isTestingIdb() && !testing?.idb_with_multiple_clients ) this.#testingInitialHealthCheck();
     }

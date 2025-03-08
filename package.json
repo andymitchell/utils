@@ -49,20 +49,6 @@
             "types": "./dist/deep-clone-scalar-values.d.ts",
             "default": "./dist/deep-clone-scalar-values.js"
         },
-        "./logging": {
-            "types": "./dist/logging.d.ts",
-            "browser": "./dist/logging-browser.js",
-            "node": "./dist/logging-node.js",
-            "default": "./dist/logging.js"
-        },
-        "./logging-browser": {
-            "types": "./dist/logging-browser.d.ts",
-            "default": "./dist/logging-browser.js"
-        },
-        "./logging-node": {
-            "types": "./dist/logging-node.d.ts",
-            "default": "./dist/logging-node.js"
-        },
         "./kv-storage": {
             "types": "./dist/kv-storage.d.ts",
             "browser": "./dist/kv-storage-browser.js",
