@@ -26,6 +26,7 @@ const input = {
         "secret_numeric_token": 1234567891234567,
         "secret_number_string_token": "123456789123456789123456789123456789",
         "secret_numeric_credit_card": "1234 1234 1234 1234",
+        "_dangerous_allow_id": "123456789123456789123456789123456789",
         "provider": {
             "type": "google"
         },
@@ -55,9 +56,29 @@ describe('cloneDeepScalarValues', () => {
         expect(output.method.secret_numeric_token).toBe('12...67');
         expect(output.method.secret_number_string_token).toBe('12...89');
         expect(output.method.secret_numeric_credit_card).toBe('12...34');
+        expect(output.method._dangerous_allow_id).toBe('12...89');
         expect(output.method.id).toBe('lwa...gle');
         expect(output.method.redirect_uri_suffix).toBe('oauth2');
         expect(output.message).toBe(input.message);
+        
+
+    })
+    
+
+
+    test('private data removed, except dangerous', () => {
+        const output = cloneDeepScalarValues(input, true, true);
+
+        
+        expect(output.request.email).toBe('b...@...ail.com');
+        expect(output.method.secret_numeric_token).toBe('12...67');
+        expect(output.method.secret_number_string_token).toBe('12...89');
+        expect(output.method.secret_numeric_credit_card).toBe('12...34');
+        expect(output.method.id).toBe('lwa...gle');
+        expect(output.method.redirect_uri_suffix).toBe('oauth2');
+        expect(output.message).toBe(input.message);
+
+        expect(output.method._dangerous_allow_id).toBe('123456789123456789123456789123456789');
         
 
     })

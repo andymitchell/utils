@@ -16,12 +16,17 @@ export function isScalar(x: unknown): x is Scalar {
 type Scalar = string | number | boolean;
 
 
-export type DeepSerializable<T> = T extends Function
+export type ClonedDeepScalarValues<T> = T extends Function
     ? never
     : T extends Scalar
     ? T
     : T extends Array<infer U>
-    ? Array<DeepSerializable<U>>
+    ? Array<ClonedDeepScalarValues<U>>
     : T extends object
-    ? { [K in keyof T]: DeepSerializable<T[K]> }
+    ? { [K in keyof T]: ClonedDeepScalarValues<T[K]> }
     : never;
+
+/**
+ * Alias of ClonedDeepScalarValues
+ */
+export type DeepSerializable<T> = ClonedDeepScalarValues<T>;

@@ -1,6 +1,6 @@
 import { cloneDeepScalarValues } from "./cloneDeepScalarValues.ts";
 import { simplePrivateDataReplacer } from "./simplePrivateDataReplacer.ts";
-import type { DeepSerializable } from "./types.ts";
+import type { ClonedDeepScalarValues, DeepSerializable } from "./types.ts";
 
 export {
     cloneDeepScalarValues,
@@ -8,5 +8,6 @@ export {
 }
 
 export type {
+    ClonedDeepScalarValues,
     DeepSerializable
 }
