@@ -9,7 +9,7 @@ import isTypeEqual, {isTypeEqualIgnoringPartials} from "./types/isTypeEqual.ts"
 import isTypeExtended from "./types/isTypeExtended.ts"
 import typeHasKeys from "./types/typeHasKeys.ts"
 import { applyPlaceholderToTemplateStringFunction, convertPlaceholderToTemplateStringsArray } from "./convert-placeholder-to-template-strings-array/index.ts"
-import type { LooseUnionRecord } from "./types/LooseUnionRecord.ts"
+import { loosenUnionRecordType, type LooseUnionRecord } from "./types/LooseUnionRecord.ts"
 import  isPropertyRequired from "./types/isPropertyRequired.ts"
 
 
@@ -33,7 +33,8 @@ export {
     isTypeEqualIgnoringPartials,
     isTypeExtended,
     typeHasKeys,
-    isPropertyRequired
+    isPropertyRequired,
+    loosenUnionRecordType
 }
 
 export {validateRangeMatchesRules};
