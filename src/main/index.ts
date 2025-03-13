@@ -9,6 +9,7 @@ import isTypeEqual, {isTypeEqualIgnoringPartials} from "./types/isTypeEqual.ts"
 import isTypeExtended from "./types/isTypeExtended.ts"
 import typeHasKeys from "./types/typeHasKeys.ts"
 import { applyPlaceholderToTemplateStringFunction, convertPlaceholderToTemplateStringsArray } from "./convert-placeholder-to-template-strings-array/index.ts"
+import type { LooseUnionRecord } from "./types/LooseUnionRecord.ts"
 
 
 
@@ -30,7 +31,7 @@ export {
     isTypeEqual,
     isTypeEqualIgnoringPartials,
     isTypeExtended,
-    typeHasKeys
+    typeHasKeys,
 }
 
 export {validateRangeMatchesRules};
@@ -46,6 +47,7 @@ export * as PostgresHelpers from './db/postgres/index.js';
 
 export type {
     EnsureAllMethodsAreAsync,
+    LooseUnionRecord,
     RangeRules,
     FuzzySubString,
     PromiseWithTrigger,
