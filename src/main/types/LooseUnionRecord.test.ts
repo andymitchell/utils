@@ -2,7 +2,7 @@ import isPropertyRequired from "./isPropertyRequired.ts";
 import type { LooseUnionRecord } from "./LooseUnionRecord.ts";
 
 
-function it() {
+test('type', () => {
     type TestUnion = {ok: true, name: string} | {ok: false, error: any};
     type TestUnionLoose = LooseUnionRecord<TestUnion>;
 
@@ -10,6 +10,6 @@ function it() {
     a.error; // OK to directly address it without union conditional check
     isPropertyRequired<TestUnionLoose, 'ok'>(true);
     
-
     
-}
+    
+})
