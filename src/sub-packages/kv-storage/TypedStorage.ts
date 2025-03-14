@@ -1,19 +1,19 @@
 
 import {type ZodSchema} from "zod"
-import type { RawStorage, RawStorageEventMap } from "./types.ts";
+import type { IRawStorage, RawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
 
 
-export class TypedStorage<T> implements RawStorage<T> {
-    #rawStorage:RawStorage;
+export class TypedStorage<T> implements IRawStorage<T> {
+    #rawStorage:IRawStorage;
     #schema?: ZodSchema<T>;
     #keyNamespace: string;
     #unsubscribes:Function[] = []
     events = new TypedCancelableEventEmitter<RawStorageEventMap<T>>();
 
     constructor(
-        rawStorage:RawStorage,
+        rawStorage:IRawStorage,
         schema?: ZodSchema<T>,
         namespace = ""
     ) {

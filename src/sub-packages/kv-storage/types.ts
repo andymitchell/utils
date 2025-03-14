@@ -4,7 +4,7 @@ export type RawStorageEventMap<T = any> = {
     CHANGE: (event:{key: string, newValue?: T}) => void
 }
 
-export interface RawStorage<T = any> {
+export interface IRawStorage<T = any> {
     events: TypedCancelableEventEmitter<RawStorageEventMap<T>>;
     set(key:string, value:T):Promise<void>;
     get(key:string):Promise<T | undefined>;

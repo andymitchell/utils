@@ -1,8 +1,8 @@
 
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
-import type { RawStorage, RawStorageEventMap } from "./types.ts";
+import type { IRawStorage, RawStorageEventMap } from "./types.ts";
 
-export class ChromeStorage implements RawStorage {
+export class ChromeStorage implements IRawStorage {
 
     #storage:chrome.storage.StorageArea;
     #unsubscribes:Function[] = [];

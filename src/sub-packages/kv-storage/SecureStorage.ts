@@ -6,7 +6,7 @@
  */
 
 import {type ZodSchema} from "zod"
-import type { RawStorage, RawStorageEventMap } from "./types.ts";
+import type { IRawStorage, RawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
 
@@ -30,8 +30,8 @@ const DEFAULT_NS_SIZE = 8
 const DEFAULT_NS_SEPARATOR = "|:|"
 
 
-export class SecureStorage<T> implements RawStorage<T> {
-    #rawStorage:RawStorage;
+export class SecureStorage<T> implements IRawStorage<T> {
+    #rawStorage:IRawStorage;
     #schema?: ZodSchema<T>;
     #unsubscribes:Function[] = []
     events = new TypedCancelableEventEmitter<RawStorageEventMap<T>>();
@@ -53,7 +53,7 @@ export class SecureStorage<T> implements RawStorage<T> {
     }
 
     constructor(
-        rawStorage:RawStorage,
+        rawStorage:IRawStorage,
         password: string,
         schema?: ZodSchema<T>,
         namespace = ""
