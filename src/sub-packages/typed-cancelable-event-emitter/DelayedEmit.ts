@@ -1,5 +1,7 @@
-import type { EventMap } from "typed-emitter";
-import { TypedCancelableEventEmitter } from "./index.ts";
+import type { TypedCancelableEventEmitter } from "./index.ts";
+import type { EventMap } from "./typed-emitter.ts";
+
+
 
 export class DelayedEmit<T extends EventMap> {
     private queued: Function[];

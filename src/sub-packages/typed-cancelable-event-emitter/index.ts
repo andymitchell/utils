@@ -1,6 +1,11 @@
-import type { TypedCancel } from './TypedCancelableEventEmitter.js';
+import TypedCancelableEventEmitter3 from './TypedCancelableEventEmitter3.ts';
+import TypedCancelableEventEmitter from './TypedCancelableEventEmitter3.ts';
+import type { TypedCancel } from './types.ts';
 
-export {TypedCancelableEventEmitter} from './TypedCancelableEventEmitter.js';
+export { 
+    TypedCancelableEventEmitter,  // This is named for backwards compatibility 
+    TypedCancelableEventEmitter3
+} 
 export type {
     TypedCancel
 }

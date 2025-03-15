@@ -7,6 +7,7 @@ export default defineConfig({
     'index-node': "src/index-node.ts",
 
     'typed-cancelable-event-emitter': "src/sub-packages/typed-cancelable-event-emitter/index.ts",
+    'typed-cancelable-event-emitter-node': "src/sub-packages/typed-cancelable-event-emitter/index-node.ts",
     'fake-idb': "src/sub-packages/fake-idb/index.ts",
     'dom-helpers': "src/sub-packages/dom-helpers/index.ts",
     'react-helpers': "src/sub-packages/react-helpers/index.ts",
@@ -37,7 +38,8 @@ export default defineConfig({
     'dexie',
     'react',
     'react-dom',
-    'zod'
+    'zod',
+    'eventemitter3'
   ],
   dts: true,
   format: ['esm'], // When this changes, update 'type' in package.json 

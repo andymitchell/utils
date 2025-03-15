@@ -1,4 +1,4 @@
-import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
+import { type TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
 export type RawStorageEventMap<T = any> = {
     CHANGE: (event:{key: string, newValue?: T}) => void
