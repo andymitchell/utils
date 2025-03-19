@@ -1,4 +1,4 @@
-import { getGlobal, promiseWithTrigger } from "./misc.ts"
+import { convertArrayToRecord, getGlobal, promiseWithTrigger } from "./misc.ts"
 
 test('getGlobal', () => {
     const glob = getGlobal();
@@ -20,4 +20,11 @@ describe('promiseWithTrigger', () => {
         expect(error?.message).toBe('Timed out');
 
     }, 1000)
+})
+
+describe('convertArrayToRecord', () => {
+    test('basic', () => {
+        const result = convertArrayToRecord([{name: 'Bob'}], 'name');
+        expect(result).toEqual({'Bob': {name: 'Bob'}})
+    })
 })

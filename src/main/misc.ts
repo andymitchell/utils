@@ -74,6 +74,20 @@ export function dLogWarn(area: string, message: string, meta?: any):void {
     dLog(area, message, meta, 'warn');
 }
 
+/**
+ * Given an array, turn it into an record (aka object, aka map)
+ * @param arr 
+ * @param keyProperty the property whose value will become the record key
+ * @example `convertArrayToRecord([{name: 'Bob'}], 'name')` returns {'Bob': {name: 'Bob'}}`
+ * @returns 
+ */
+export function convertArrayToRecord<T extends object = any>(arr:T[], keyProperty: keyof T):Record<string, T> {
+    const record:Record<string, T> = {};
+    arr.forEach(x => record[x[keyProperty] as string] = x);
+    return record;
+}
+
+
 
 
 /**

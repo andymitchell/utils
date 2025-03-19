@@ -1,4 +1,4 @@
-import {  type PromiseWithTrigger, dLog, dLogDebug, dLogWarn, getGlobal, midnight, promiseWithTrigger, sleep } from "./misc.ts"
+import {  type PromiseWithTrigger, convertArrayToRecord, dLog, dLogDebug, dLogWarn, getGlobal, midnight, promiseWithTrigger, sleep } from "./misc.ts"
 
 
 import { ContentEditable } from "./content-editable/index.ts"
@@ -17,6 +17,7 @@ import  isPropertyRequired from "./types/isPropertyRequired.ts"
 export {
     sleep, 
     promiseWithTrigger, 
+    convertArrayToRecord,
     midnight,
     dLog,
     dLogDebug,
