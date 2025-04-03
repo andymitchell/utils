@@ -21,6 +21,7 @@ export default defineConfig({
     'kv-storage': "src/sub-packages/kv-storage/index.ts",
     'kv-storage-browser': "src/sub-packages/kv-storage/index-browser.ts",
     'kv-storage-node': "src/sub-packages/kv-storage/index-node.ts",
+    'kv-storage-types': "src/sub-packages/kv-storage/index-types.ts",
 
     'queue': "src/sub-packages/queue/index.ts",
     'queue-browser': "src/sub-packages/queue/index-browser.ts",

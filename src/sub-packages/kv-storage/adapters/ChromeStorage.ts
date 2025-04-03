@@ -1,12 +1,12 @@
 
-import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
-import type { IRawStorage, RawStorageEventMap } from "./types.ts";
+import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
+import type { IKvStorage, KvRawStorageEventMap } from "../types.ts";
 
-export class ChromeStorage implements IRawStorage {
+export class ChromeStorage implements IKvStorage {
 
     #storage:chrome.storage.StorageArea;
     #unsubscribes:Function[] = [];
-    events = new TypedCancelableEventEmitter<RawStorageEventMap>()
+    events = new TypedCancelableEventEmitter<KvRawStorageEventMap>()
 
     constructor(storage:chrome.storage.StorageArea = chrome.storage.local) {
         this.#storage = storage;

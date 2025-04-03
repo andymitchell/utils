@@ -6,7 +6,7 @@
  */
 
 import {type ZodSchema} from "zod"
-import type { IRawStorage, RawStorageEventMap } from "./types.ts";
+import type { IKvStorage, IKvStorageNamespaced, KvRawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
 
@@ -30,11 +30,11 @@ const DEFAULT_NS_SIZE = 8
 const DEFAULT_NS_SEPARATOR = "|:|"
 
 
-export class SecureStorage<T> implements IRawStorage<T> {
-    #rawStorage:IRawStorage;
+export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
+    #adapter:IKvStorage;
     #schema?: ZodSchema<T>;
     #unsubscribes:Function[] = []
-    events = new TypedCancelableEventEmitter<RawStorageEventMap<T>>();
+    events = new TypedCancelableEventEmitter<KvRawStorageEventMap<T>>();
     
     #encoder = new TextEncoder()
     #decoder = new TextDecoder()
@@ -53,12 +53,12 @@ export class SecureStorage<T> implements IRawStorage<T> {
     }
 
     constructor(
-        rawStorage:IRawStorage,
+        adapter:IKvStorage,
         password: string,
         schema?: ZodSchema<T>,
         namespace = ""
     ) {
-        this.#rawStorage = rawStorage;
+        this.#adapter = adapter;
         this.#schema = schema;
 
 
@@ -84,7 +84,7 @@ export class SecureStorage<T> implements IRawStorage<T> {
             }
         })
 
-        this.#unsubscribes.push(this.#rawStorage.events.onCancelable('CHANGE', async (event) => {
+        this.#unsubscribes.push(this.#adapter.events.onCancelable('CHANGE', async (event) => {
             if( event.key.startsWith(await this.keyNamespace) ) {
                 // TODO Share this code with .get:
                 const boxBase64 = event.newValue;
@@ -107,7 +107,7 @@ export class SecureStorage<T> implements IRawStorage<T> {
 
     get = async (key: string):Promise<T | undefined> => {
         const nsKey = await this.#getNamespacedKey(key)
-        const boxBase64 = await this.#rawStorage.get(nsKey)
+        const boxBase64 = await this.#adapter.get(nsKey)
         if (boxBase64 !== undefined && boxBase64 !== null) {
             const rawValue = await this.#decrypt(boxBase64)
             const value = JSON.parse(rawValue);
@@ -126,17 +126,17 @@ export class SecureStorage<T> implements IRawStorage<T> {
         const nsKey = await this.#getNamespacedKey(key)
         const jsonValue = JSON.stringify(value)
         const boxBase64 = await this.#encrypt(jsonValue)
-        return await this.#rawStorage.set(nsKey, boxBase64)
+        return await this.#adapter.set(nsKey, boxBase64)
     }
 
     remove = async (key: string) => {
         const nsKey = await this.#getNamespacedKey(key)
-        return await this.#rawStorage.remove(nsKey)
+        return await this.#adapter.remove(nsKey)
     }
 
     getAllKeys = async (): Promise<string[]> => {
         const keyNamespace = await this.keyNamespace;
-        const nsKeys = await this.#rawStorage.getAllKeys(keyNamespace);
+        const nsKeys = await this.#adapter.getAllKeys(keyNamespace);
         return nsKeys.map(nsKey => nsKey.replace(keyNamespace, ''));
     }
 

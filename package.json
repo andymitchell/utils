@@ -68,6 +68,10 @@
             "types": "./dist/kv-storage-node.d.ts",
             "default": "./dist/kv-storage-node.js"
         },
+        "./kv-storage-types": {
+            "types": "./dist/kv-storage-types.d.ts",
+            "default": "./dist/kv-storage-types.js"
+        },
         "./queue": {
             "types": "./dist/queue.d.ts",
             "browser": "./dist/queue-browser.js",

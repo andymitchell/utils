@@ -1,28 +1,28 @@
 
 import {type ZodSchema} from "zod"
-import type { IRawStorage, RawStorageEventMap } from "./types.ts";
+import type { IKvStorage, IKvStorageNamespaced, KvRawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
 
 
-export class TypedStorage<T> implements IRawStorage<T> {
-    #rawStorage:IRawStorage;
+export class TypedStorage<T> implements IKvStorageNamespaced<T> {
+    #adapter:IKvStorage;
     #schema?: ZodSchema<T>;
     #keyNamespace: string;
     #unsubscribes:Function[] = []
-    events = new TypedCancelableEventEmitter<RawStorageEventMap<T>>();
+    events = new TypedCancelableEventEmitter<KvRawStorageEventMap<T>>();
 
     constructor(
-        rawStorage:IRawStorage,
+        adapter:IKvStorage,
         schema?: ZodSchema<T>,
         namespace = ""
     ) {
-        this.#rawStorage = rawStorage;
+        this.#adapter = adapter;
         this.#schema = schema;
         this.#keyNamespace = namespace;
 
         
-        this.#unsubscribes.push(this.#rawStorage.events.onCancelable('CHANGE', (event) => {
+        this.#unsubscribes.push(this.#adapter.events.onCancelable('CHANGE', (event) => {
             if( event.key.startsWith(this.#keyNamespace) ) {
                 this.events.emit('CHANGE', {
                     key: this.#removeNamespacedKey(event.key),
@@ -35,7 +35,7 @@ export class TypedStorage<T> implements IRawStorage<T> {
 
     get = async (key: string):Promise<T | undefined> => {
         const nsKey = await this.#getNamespacedKey(key)
-        const rawValue = await this.#rawStorage.get(nsKey)
+        const rawValue = await this.#adapter.get(nsKey)
         if (rawValue !== undefined && rawValue !== null) {
             const value = JSON.parse(rawValue);
             if( this.#schema && !this.#schema.safeParse(value).success ) {
@@ -52,17 +52,17 @@ export class TypedStorage<T> implements IRawStorage<T> {
         }
         const nsKey = await this.#getNamespacedKey(key)
         const jsonValue = JSON.stringify(value);
-        return await this.#rawStorage.set(nsKey, jsonValue);
+        return await this.#adapter.set(nsKey, jsonValue);
     }
 
     remove = async (key: string) => {
         const nsKey = await this.#getNamespacedKey(key)
-        return await this.#rawStorage.remove(nsKey)
+        return await this.#adapter.remove(nsKey)
     }
 
     getAllKeys = async (): Promise<string[]> => {
         const keyNamespace = await this.#keyNamespace;
-        const nsKeys = await this.#rawStorage.getAllKeys(keyNamespace);
+        const nsKeys = await this.#adapter.getAllKeys(keyNamespace);
         return nsKeys.map(nsKey => nsKey.replace(keyNamespace, ''));
     }
 
