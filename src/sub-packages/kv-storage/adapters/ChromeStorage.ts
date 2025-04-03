@@ -27,6 +27,14 @@ export class ChromeStorage implements IKvStorage {
         
         await this.#storage.set({ [key]: value })
 
+        if( typeof chrome!=='undefined' ) { 
+            const lastErrorMessage = chrome?.runtime.lastError?.message;
+            if( lastErrorMessage?.toLowerCase().includes("quota") ) {
+                const bytesInUse = await this.#storage.getBytesInUse();
+                throw new Error(`Could not write due to exceeding quota. Bytes in use: ${bytesInUse}. lastError: ${lastErrorMessage}`);
+            }
+        }
+
     }
     async get(key: string): Promise<string | undefined> {
         
