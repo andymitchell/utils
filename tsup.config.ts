@@ -35,6 +35,7 @@ export default defineConfig({
   target: ['esnext'],
   minify: false,
   splitting: true,
+  treeshake: false, // It's a library. Let consumers tree shake. If treeShaking is enabled, then you cannot use code like "export * from './index-browser.ts'" because it may choose to tree shake some items.
   external: [
     'dexie',
     'react',
