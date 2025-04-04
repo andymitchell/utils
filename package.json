@@ -56,8 +56,6 @@
         },
         "./kv-storage": {
             "types": "./dist/kv-storage.d.ts",
-            "browser": "./dist/kv-storage-browser.js",
-            "node": "./dist/kv-storage-node.js",
             "default": "./dist/kv-storage.js"
         },
         "./kv-storage-browser": {

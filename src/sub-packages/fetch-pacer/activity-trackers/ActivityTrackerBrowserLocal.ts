@@ -4,9 +4,11 @@
 import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
 
 import { BaseActivityTracker } from '../BaseActivityTracker.js';
-import { ChromeStorage, type RawStorage } from '../../kv-storage/index.js';
+
 import { type IQueue, QueueMemory } from '../../queue/index-memory.js';
 import { uuidV4 } from '../../uid/uid.js';
+import type { IKvStorage } from '../../kv-storage/types.ts';
+import { ChromeStorage } from '../../kv-storage/adapters/ChromeStorage.ts';
 
 type ActivityTrackerBrowserLocalOptions = ActivityTrackerOptions & {
     failsafe_active_sync_poll_ms?: number
@@ -16,7 +18,7 @@ export class ActivityTrackerBrowserLocal extends BaseActivityTracker implements 
     
     
     
-    #chromeStore:RawStorage;
+    #chromeStore:IKvStorage;
     #failSafeSync:{every_ms:number, timer?: NodeJS.Timeout | number} = {every_ms: -1}
     #storageKey: string;
     #transaction:IQueue = new QueueMemory('');

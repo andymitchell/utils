@@ -13,11 +13,9 @@ export {
     ChromeStorage,
     MemoryStorage,
     IdbStorage,
-    DexieStorage
-}
+    DexieStorage,
 
-
-// Test helpers
-export {
+    // Test helpers
     MockChromeStorageArea
 }
+
