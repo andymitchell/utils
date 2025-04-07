@@ -231,7 +231,7 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
             keyUsage
         )
 
-    dispose() {
+    async dispose() {
         this.events.removeAllListeners();
         this.#unsubscribes.forEach(x => x());
         this.#unsubscribes = [];

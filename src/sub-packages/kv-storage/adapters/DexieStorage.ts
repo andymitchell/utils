@@ -107,7 +107,7 @@ export class DexieStorage<T = any> implements IKvStorage<T> {
         return keys;
     }
 
-    dispose() {
+    async dispose() {
         this.#broadcast.close();
         this.events.removeAllListeners();
         this.#dexie?.close();

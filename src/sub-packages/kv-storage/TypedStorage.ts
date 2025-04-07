@@ -78,7 +78,7 @@ export class TypedStorage<T> implements IKvStorageNamespaced<T> {
         return result;
     }
 
-    dispose() {
+    async dispose() {
         this.events.removeAllListeners();
         this.#unsubscribes.forEach(x => x());
         this.#unsubscribes = [];

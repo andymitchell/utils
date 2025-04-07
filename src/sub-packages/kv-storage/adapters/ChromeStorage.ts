@@ -55,7 +55,7 @@ export class ChromeStorage implements IKvStorage {
         return keys;
     }
 
-    dispose() {
+    async dispose() {
         this.events.removeAllListeners();
         this.#unsubscribes.forEach(x => x());
         this.#unsubscribes = [];

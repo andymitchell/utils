@@ -114,7 +114,7 @@ export class IdbStorage<T = any> implements IKvStorage<T> {
         });
     }
 
-    dispose() {
+    async dispose() {
         this.#broadcast.close();
         this.events.removeAllListeners();
         this.#db?.close();

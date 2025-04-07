@@ -10,7 +10,7 @@ export interface IKvStorage<T = any> {
     get(key:string):Promise<T | undefined>;
     remove(key:string):Promise<void>;
     getAllKeys(keyNamespace?:string):Promise<string[]>;
-    dispose():void;
+    dispose():Promise<void>;
 }
 
 

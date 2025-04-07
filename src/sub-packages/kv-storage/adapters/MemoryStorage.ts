@@ -28,7 +28,7 @@ export class MemoryStorage implements IKvStorage<string> {
         return keys;
     }
 
-    dispose(): void {
+    async dispose(): Promise<void>{
         this.events.removeAllListeners();
         this.#store.clear();
     }
