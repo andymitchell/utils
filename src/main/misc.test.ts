@@ -1,5 +1,6 @@
 import { convertArrayToRecord, getGlobal, promiseWithTrigger } from "./misc.ts"
 
+
 test('getGlobal', () => {
     const glob = getGlobal();
     expect(!!glob).toBe(true);
@@ -28,3 +29,4 @@ describe('convertArrayToRecord', () => {
         expect(result).toEqual({'Bob': {name: 'Bob'}})
     })
 })
+
