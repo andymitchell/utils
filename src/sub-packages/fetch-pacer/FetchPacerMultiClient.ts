@@ -56,11 +56,6 @@ export default class FetchPacerMultiClient {
     }
 
 
-    checkPace(points = 0, trackingID?: string, clientId?:string) {
-        const fetchPacer = this.#getFetchPacer(clientId);
-        return fetchPacer.checkPace(points, trackingID);
-    }
-
     logPointsManually(points:number, clientId?:string) {
         const fetchPacer = this.#getFetchPacer(clientId);
         return fetchPacer.logPointsManually(points);

@@ -1,5 +1,5 @@
 
-import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
+import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, SetBackOffUntilTsOptions, StoredActivityItem } from '../types.js';
 
 import { BaseActivityTracker } from '../BaseActivityTracker.js';
 import { uuidV4 } from '../../uid/uid.js';
@@ -7,7 +7,7 @@ import { uuidV4 } from '../../uid/uid.js';
 export class ActivityTrackerMemory extends BaseActivityTracker implements IActivityTracker {
     
     
-    
+    #backOffUntilTs: number | undefined;
     
 
     constructor(id: string, options?: ActivityTrackerOptions) {
@@ -22,14 +22,31 @@ export class ActivityTrackerMemory extends BaseActivityTracker implements IActiv
 
     }
 
+    override async isActive(): Promise<boolean> {
+        return this.active;
+    }
     override async setActive(active: boolean): Promise<void> {
         this.active = active;
     }
 
     override async list():Promise<StoredActivityItem[]> {
-        return [...this.activities];
+        return structuredClone(this.activities);
     }
 
+
+    override async setBackOffUntilTs(ts: number, options?: SetBackOffUntilTsOptions): Promise<void> {
+        if( options?.onlyIfExceedsCurrentTs && this.#backOffUntilTs ) {
+            if( ts>this.#backOffUntilTs ) {
+                this.#backOffUntilTs = ts;
+            }
+        } else {
+            this.#backOffUntilTs = ts;
+        }
+    }
+
+    override async getBackOffUntilTs(): Promise<number | undefined> {
+        return this.#backOffUntilTs;
+    }
 
     override async dispose(): Promise<void> {
         await super.dispose();

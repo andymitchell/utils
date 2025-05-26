@@ -1,20 +1,59 @@
-import type { ActivityTrackerOptions, CheckPaceResponse, IActivityTracker, PaceTrackerOptions, StoredActivityItem } from './types.js';
-import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.js';
-import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.js';
+import type { ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem } from './types.ts';
+import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.ts';
+import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.ts';
+import { convertTimestampToMillisecondsFromNow } from './utils/convertTimestampToMillisecondsFromNow.ts';
 
 
-
-export default class PaceTracker {
+/**
+ * Helps manage the rate of fetch requests to
+ * respect usage quotas and handle server-indicated (429) rate limits.
+ *
+ * It works by:
+ * 1.  **Proactive Pacing (Quota Management)**: If `max_points_per_second` is configured,
+ *     it monitors "points" consumed by successful operations. After each success,
+ *     it sets a cool-off period to allow the quota usage to return to 0, advising a pause for
+ *     future operations until the projected rate is acceptable.
+ *
+ * 2.  **Reactive Backoff (429 Handling)**: When a server signals a rate limit (a
+ *     HTTP 429 error), this event is logged via `logBackOff()`. It then
+ *     calculates a back-off duration, potentially using an exponential strategy for
+ *     consecutive failures. 
+ *
+ * The cool off period (retrievable via `getActiveBackOffUntilTs()`) represents the
+ * earliest time the next operation should ideally be attempted. This timestamp is
+ * designed to only ever increase or stay the same; successful operations do not
+ * reduce an active cool-off or back-off period. A configurable cap
+ * (`max_single_back_off_ms`) prevents runaway back-off calculations from causing
+ * excessively long pauses.
+ *
+ * Activity history (successes and backoffs) is managed by an `IActivityTracker`
+ * implementation, allowing for different storage backends like in-memory,
+ * browser localStorage, or a custom solution.
+ * 
+ * Designed to be used before a fetch request, by calling `getActiveBackOffUntilTs`
+ * 
+ * ===
+ * 
+ * **Architecture Note**:
+ * Cool-off is applied *after* a request runs, not before.
+ * 
+ * This design has two advantages:
+ * 1. It simplifies the logic, especially when handling burst allowances.
+ * 2. It ensures even large requests (that exceed the per-second quota) are allowed to run once,
+ *    instead of being blocked forever by a pre-check.
+ * 
+ * In short, the system reacts to quota overuse *after* the fact (by pausing future requests),
+ * rather than trying to predict whether a request should be allowed in advance.
+ */
+export default class PaceTracker implements IPaceTracker {
     
     #activityTracker:IActivityTracker;
     #options:PaceTrackerOptions;
 
-    #paceChecks: Record<string, number>;
 
     constructor(id: string, options?:PaceTrackerOptions) {
         
         this.#options = {
-            hail_mary_after_many_failures: true,
             storage: {
                 type: 'memory'
             },
@@ -28,7 +67,7 @@ export default class PaceTracker {
         }
 
         const activityTrackerOptions:ActivityTrackerOptions = {
-            clear_activities_older_than_ms: 1000*60*1
+            clear_activities_older_than_ms: 1000*60*5
         }
         switch(this.#options.storage!.type) {
             case 'memory': 
@@ -45,139 +84,119 @@ export default class PaceTracker {
         }
 
         
-        this.#paceChecks = {};
     }
 
-
-
-    /**
-     * Check the pace of recorded points against the maximum points/second. 
-     * 
-     * Optionally provide points to anticipate if they'll exceed the pace. 
-     * 
-     * @param points Would the pace be too_fast if these points are applied? Use to pre-empt if a fetch will trigger a 429. 
-     * @param trackingID Used for hail mary's. Probably the queue job's id; so if it's been blocked too many times it'll risk running it. 
-     * @returns 
-     */
-    async checkPace(points: number = 0, trackingID?: string): Promise<CheckPaceResponse> {
-        const maxPointsPerSecond = this.#options?.max_points_per_second;
-        
-
-        const activities = await this.#activityTracker.list();
-
-        // Check for any hard back off
-        let backoffResponse:CheckPaceResponse | undefined;
-        if( this.#options.back_off_calculation ) {
-
-            const backOffPeriod = this.#calculateBackOffPeriod(activities);
-            if( backOffPeriod>0 ) {
-                backoffResponse = {too_fast: true, pause_for: backOffPeriod, is_back_off: true};
-            }
-        }
-
-        
-
-        // Now check the rest
-        let pointsResponse:CheckPaceResponse | undefined;
-        if( maxPointsPerSecond ) {
-            const recent = this.checkPaceInPeriod(1, points, activities);
-            const rolling = this.checkPaceInPeriod(15, points, activities);
-
-            let too_fast = recent.too_fast || rolling.too_fast;
-
-
-            // check if will allow a burst, as otherwise any call larger than the hard max will be permanently denied. 
-            if (too_fast && points > maxPointsPerSecond && recent.pointsInPeriodRaw === 0 && !rolling.too_fast) {
-                too_fast = false;
-                if( this.#options?.verbose ) console.log("FetchPacer is permitting the API units, as 'bursts' are allowed for excessively large requests.");
-            }
-
-            // check if it's been held too many times, and then hail mary it (if it's going to fail, at least give it a chance with the api's burst allowance)
-            if (trackingID) {
-                if( this.#options.hail_mary_after_many_failures ) {
-                    if (!this.#paceChecks[trackingID]) this.#paceChecks[trackingID] = 0;
-                    if (this.#paceChecks[trackingID]++ >= 10) {
-                        too_fast = false;
-                        console.warn("FetchPacer is permitting the API units, as it's been held too many times. Hope it gets through on the burst.");
-                    }
-                }
-            }
-
-            let pause_for: number = 0;
-            if (too_fast) {
-                // Calculate time it'll take (#periods) before it drops below the points amassed 
-                const recentPeriodsToClear = recent.pointsInPeriod>recent.maxPointsInPeriod? Math.floor(recent.pointsInPeriod / recent.maxPointsInPeriod) : 0;
-                const rollingPeriodsToClear = rolling.pointsInPeriod>rolling.maxPointsInPeriod? Math.floor(rolling.pointsInPeriod / rolling.maxPointsInPeriod) : 0;
-                const recentMsToClear = recentPeriodsToClear * recent.period;
-                const rollingMsToClear = rollingPeriodsToClear * rolling.period;
-
-                
-
-                pause_for = recentMsToClear > rollingMsToClear ? recentMsToClear : rollingMsToClear;
-                if (pause_for < 0) pause_for = 0;
-                if( this.#options?.verbose ) console.log("FetchPacer detected running tooFast, will sleep.", { trackingID, recent, rolling, points, maxPointsPerSecond, pause_for, recentMsToClear, rollingMsToClear });
-            }
-            pointsResponse = { too_fast, pause_for, points_in_last_second: recent.pointsInPeriod };
-        }
-
-        // Return the greatest pause request 
-        if( backoffResponse || pointsResponse ) {
-            if( backoffResponse && pointsResponse ) {
-                return backoffResponse.pause_for > pointsResponse.pause_for? backoffResponse : pointsResponse;
-            } else if( backoffResponse ) {
-                return backoffResponse;
-            } else if( pointsResponse ) {
-                return pointsResponse;
-            } else {
-                throw new Error("noop");
-            }
-        } else {
-            return {too_fast: false, pause_for: 0};
-        }
+    async getActiveBackOffUntilTs(): Promise<number | undefined> {
+        const ts = await this.#activityTracker.getBackOffUntilTs();
+        if( typeof ts==='number' && ts>Date.now() ) return ts;
+        return undefined;
     }
 
-    private checkPaceInPeriod(seconds = 1, points: number, activities:StoredActivityItem[]): { too_fast: boolean, pointsInPeriod: number, maxPointsInPeriod: number, period: number, pointsInPeriodRaw: number } {
-        const maxPointsPerSecond = this.#options?.max_points_per_second;
-        if( !maxPointsPerSecond ) return { too_fast: false, pointsInPeriod: 0, pointsInPeriodRaw: 0, period: 0, maxPointsInPeriod: 0 };
-
-        
-
-
-        const period = 1000 * seconds;
-        const after = Date.now() - period;
-        activities = activities.filter(x => x.timestamp > after);
-
-        const pointsInPeriodRaw = activities.filter(x => x.type==='success').reduce((previousValue, currentValue) => previousValue + currentValue.points, 0);
-        const pointsInPeriod = pointsInPeriodRaw + points;
-
-
-        const maxPointsInPeriod = (maxPointsPerSecond * seconds);
-        const too_fast = pointsInPeriod > maxPointsInPeriod;
-        return { too_fast, pointsInPeriod, maxPointsInPeriod, period, pointsInPeriodRaw };
+    async getActiveBackOffForMs():Promise<number | undefined> {
+        return convertTimestampToMillisecondsFromNow(await this.getActiveBackOffUntilTs());
     }
 
-
-    async logPoints(points:number):Promise<void> {
+    async logSuccess(points:number): Promise<void> {
         await this.#activityTracker.add({
             type: 'success',
             timestamp: Date.now(),
             points
         })
+
+        
+        const maxPointsPerSecond = this.#options?.max_points_per_second;
+        if( maxPointsPerSecond ) {
+            
+            const activities = await this.#activityTracker.list();
+
+            const calculateMsToDropQuotaToZero = (windowSeconds:number) => {
+                const pace = this.checkPaceInPeriod(windowSeconds, activities);
+                const pcQuotaUsed = pace.pointsInPeriod>0 && pace.maxPointsInPeriod>0? pace.pointsInPeriod / pace.maxPointsInPeriod : 0;
+                const msToClear = pcQuotaUsed * pace.period;
+                return Math.round(msToClear);
+            }
+
+            // Test different moving averages, and use the longest
+            const msToClearForVariousPeriods:number[] = [];
+            for( let windowSeconds = 1; windowSeconds <= 30; windowSeconds++ ) {
+                msToClearForVariousPeriods.push(
+                    calculateMsToDropQuotaToZero(windowSeconds)
+                )
+            }
+
+            const maxPauseMs = msToClearForVariousPeriods.reduce((a, b) => Math.max(a, b), -Infinity);
+
+            if( maxPauseMs>0 ) {
+                this.#activityTracker.setBackOffUntilTs(Date.now()+maxPauseMs, {onlyIfExceedsCurrentTs: true});
+            }
+
+            
+        }
+
+        
+
     }
 
-    #calculateBackOffPeriod(activities:StoredActivityItem[]):number {
+    async logBackOff(minimumBackOffPeriodMs?:number): Promise<void> {
+        await this.#activityTracker.add({
+            type: 'back_off',
+            timestamp: Date.now(),
+            force_back_off_until_at_least_ts: minimumBackOffPeriodMs? Date.now()+minimumBackOffPeriodMs : undefined
+        });
+
+        const activities = await this.#activityTracker.list();
+        const backoffForMs = this.#calculateBackOffPeriodMs(activities);
+
+        
+        if( backoffForMs>0 ) {
+            
+            await this.#activityTracker.setBackOffUntilTs(Date.now()+backoffForMs, {onlyIfExceedsCurrentTs: true});
+        }
+
+    }
+
+    
+
+    private checkPaceInPeriod(seconds = 1, activities:StoredActivityItem[]): { too_fast: boolean, pointsInPeriod: number, maxPointsInPeriod: number, period: number } {
+        const maxPointsPerSecond = this.#options?.max_points_per_second;
+        if( !maxPointsPerSecond ) return { too_fast: false, pointsInPeriod: 0,  period: 0, maxPointsInPeriod: 0 };
+
+        const period = 1000 * seconds;
+        const after = Date.now() - period;
+        activities = activities.filter(x => x.timestamp > after);
+
+        const pointsInPeriod = activities.filter(x => x.type==='success').reduce((previousValue, currentValue) => previousValue + currentValue.points, 0);
+
+
+        const maxPointsInPeriod = (maxPointsPerSecond * seconds);
+        const too_fast = pointsInPeriod > maxPointsInPeriod;
+        return { too_fast, pointsInPeriod, maxPointsInPeriod, period };
+    }
+
+
+    /**
+     * Return the number of milliseconds to back off for
+     * 
+     * @param activities 
+     * @returns 
+     */
+    #calculateBackOffPeriodMs(activities:StoredActivityItem[]):number {
 
         // Only back off if recent failures have been reported
         const lastSuccessIdx = activities.findLastIndex(x => x.type==='success');
         const sequentialFailures = activities.slice(lastSuccessIdx+1);
         
-        const forcedBackOffUntilTs = activities.filter(x => x.type==='back_off').reduce((prev, cur) => (cur.force_back_off_until_ts??0)>prev? cur.force_back_off_until_ts! : prev, 0);
-        let forcedBackOffPeriod = forcedBackOffUntilTs-Date.now()
+        const backoffActivities = activities.filter(x => x.type==='back_off');
+
+        const forcedBackOffUntilAtLeastTs = backoffActivities.reduce((prev, cur) => (cur.force_back_off_until_at_least_ts??0)>prev? cur.force_back_off_until_at_least_ts! : prev, 0);
+        let forcedBackOffPeriod = forcedBackOffUntilAtLeastTs-Date.now()
         if( forcedBackOffPeriod<0 ) forcedBackOffPeriod = 0; 
 
+        
         if( forcedBackOffPeriod===0 && sequentialFailures.length===0 ) {
             return 0;
         }
+        
         
 
         let backOffPeriod = 200; // Dumb default back off 
@@ -185,7 +204,7 @@ export default class PaceTracker {
         if( this.#options.back_off_calculation?.type==='exponential' ) {
 
             if( sequentialFailures.length>0 ) {
-                console.log({sequentialFailures});
+                //console.log({sequentialFailures});
                 
                 // TODO This could be much more intelligently done by knowing how well spaced each one is. I.e. if trying for a while, then grow it. Or based on the previous back off? Actually shouldn't be necessary if fetch is correctly utilising the checkPace.pause_for period.
                 backOffPeriod = (Math.pow(2, sequentialFailures.length-1)) * 100; // 100, 200, 400, 800;
@@ -200,30 +219,29 @@ export default class PaceTracker {
             jitter = Math.floor(backOffPeriod * 0.4 * Math.random());
         }
 
+
         
 
-        backOffPeriod = Math.min(backOffPeriod+jitter, this.#options?.back_off_calculation?.max_single_back_off_ms!-jitter)
+        let maxSingleBackOffMs = (this.#options?.back_off_calculation?.max_single_back_off_ms ?? 1000*60*5)-jitter;
+        if( maxSingleBackOffMs<0 ) maxSingleBackOffMs = 0;
+        backOffPeriod = Math.min(backOffPeriod+jitter, maxSingleBackOffMs)
         backOffPeriod = Math.max(backOffPeriod, forcedBackOffPeriod);
-
+        
         return backOffPeriod;
     
     }
 
-    async logBackOffResponse(forceBackOffPeriod?:number):Promise<void> {
-
-        await this.#activityTracker.add({
-            type: 'back_off',
-            timestamp: Date.now(),
-            force_back_off_until_ts: forceBackOffPeriod? Date.now()+forceBackOffPeriod : undefined
-        });
+    async isActive():Promise<boolean> {
+        return await this.#activityTracker.isActive();
     }
-
     async setActive(active:boolean):Promise<void> {
         await this.#activityTracker.setActive(active);
     }
+
 
     async dispose():Promise<void> {
         await this.#activityTracker.dispose();
     }
 
 }
+

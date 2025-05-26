@@ -1,7 +1,7 @@
 /// <reference types="chrome" />
 
 
-import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from '../types.js';
+import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, SetBackOffUntilTsOptions, StoredActivityItem } from '../types.js';
 
 import { BaseActivityTracker } from '../BaseActivityTracker.js';
 
@@ -20,7 +20,8 @@ export class ActivityTrackerBrowserLocal extends BaseActivityTracker implements 
     
     #chromeStore:IKvStorage;
     #failSafeSync:{every_ms:number, timer?: NodeJS.Timeout | number} = {every_ms: -1}
-    #storageKey: string;
+    #storageKeyActivities: string;
+    #storageKeyBackOffUntil: string;
     #transaction:IQueue = new QueueMemory('');
 
     constructor(id: string, options?: ActivityTrackerBrowserLocalOptions, storage:chrome.storage.StorageArea = chrome.storage.local) {
@@ -29,12 +30,13 @@ export class ActivityTrackerBrowserLocal extends BaseActivityTracker implements 
         this.#chromeStore = new ChromeStorage(storage);
         
         this.#failSafeSync.every_ms = options?.failsafe_active_sync_poll_ms ?? (1000*20);
-        this.#storageKey = `fetch_pacer_activity_tracker_${id}`;
+        this.#storageKeyActivities = `fetch_pacer_activity_tracker_${id}.activities`;
+        this.#storageKeyBackOffUntil = `fetch_pacer_activity_tracker_${id}.backoff`;
 
         this.#loadActivitiesFromStorage();
 
         this.#chromeStore.events.on('CHANGE', (event) => {
-            if( event.key===this.#storageKey ) {
+            if( event.key===this.#storageKeyActivities ) {
                 this.activities = event.newValue;
             }
         })
@@ -46,7 +48,7 @@ export class ActivityTrackerBrowserLocal extends BaseActivityTracker implements 
         await this.#transaction.enqueue(async () => {
             await this.#loadActivitiesFromStorage();
             const newActivities = this.discardOldActivities([...this.activities, storedActivity]);
-            await this.#chromeStore.set(this.#storageKey, newActivities);
+            await this.#chromeStore.set(this.#storageKeyActivities, newActivities);
             this.activities = newActivities;
         })
         
@@ -58,6 +60,11 @@ export class ActivityTrackerBrowserLocal extends BaseActivityTracker implements 
         })
     }
 
+
+    override async isActive(): Promise<boolean> {
+        return this.active;
+    }
+    
     override async setActive(active: boolean): Promise<void> {
         if (this.active === active) return;
 
@@ -74,8 +81,29 @@ export class ActivityTrackerBrowserLocal extends BaseActivityTracker implements 
         }
     }
 
+
+    override async setBackOffUntilTs(ts: number, options?: SetBackOffUntilTsOptions): Promise<void> {
+        if( options?.onlyIfExceedsCurrentTs ) {
+            const backOffUntilTs: number | undefined = await this.#chromeStore.get(this.#storageKeyBackOffUntil);
+            if( typeof backOffUntilTs==='number' && backOffUntilTs>ts ) {
+                return;
+            }
+        }
+
+        await this.#chromeStore.set(this.#storageKeyBackOffUntil, ts);
+
+    }
+
+    override async getBackOffUntilTs(): Promise<number | undefined> {
+        const backOffUntilTs: number | undefined = await this.#chromeStore.get(this.#storageKeyBackOffUntil);
+        if( typeof backOffUntilTs==='number' && backOffUntilTs>Date.now() ) {
+            return backOffUntilTs;
+        }
+        return undefined;
+    }
+
     async #loadActivitiesFromStorage(): Promise<void> {
-        const storedActivities: StoredActivityItem[] = await this.#chromeStore.get(this.#storageKey) ?? [];
+        const storedActivities: StoredActivityItem[] = await this.#chromeStore.get(this.#storageKeyActivities) ?? [];
         this.activities = storedActivities;
     }
 

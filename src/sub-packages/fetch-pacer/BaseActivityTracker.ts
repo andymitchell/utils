@@ -1,5 +1,5 @@
 
-import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, StoredActivityItem } from './types.js';
+import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, SetBackOffUntilTsOptions, StoredActivityItem } from './types.js';
 
 
 export class BaseActivityTracker implements IActivityTracker {
@@ -32,10 +32,22 @@ export class BaseActivityTracker implements IActivityTracker {
         throw new Error("Method Not Implemented");
     }
 
+
+    async isActive(): Promise<boolean> {
+        throw new Error("Method Not Implemented");
+    }
+
     async setActive(active: boolean): Promise<void> {
         throw new Error("Method Not Implemented");
     }
 
+    async setBackOffUntilTs(ts: number, options?: SetBackOffUntilTsOptions): Promise<void> {
+        throw new Error("Method Not Implemented");
+    }
+
+    async getBackOffUntilTs(): Promise<number | undefined> {
+        throw new Error("Method Not Implemented");
+    }
 
     async dispose(): Promise<void> {
     }
