@@ -1,4 +1,4 @@
-type ActivityItemSuccess = {
+export type ActivityItemSuccess = {
     type: 'success';
     timestamp: number;
     points: number;
@@ -10,9 +10,13 @@ type ActivityItemBackOff = {
 }
 export type ActivityItem = ActivityItemSuccess | ActivityItemBackOff;
 
-export type StoredActivityItem = ActivityItem & {
+type BaseStoredActivityItem = {
     id: string;
 }
+export type StoredActivityItemSuccess = ActivityItemSuccess & BaseStoredActivityItem;
+export type StoredActivityItemBackOff = ActivityItemBackOff & BaseStoredActivityItem;
+
+export type StoredActivityItem = StoredActivityItemSuccess | StoredActivityItemBackOff;
 
 export type Fetch = typeof fetch;
 

@@ -1,4 +1,4 @@
-import type { ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem } from './types.ts';
+import type { ActivityItemSuccess, ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemSuccess } from './types.ts';
 import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.ts';
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.ts';
 import { convertTimestampToMillisecondsFromNow } from './utils/convertTimestampToMillisecondsFromNow.ts';
@@ -165,7 +165,7 @@ export default class PaceTracker implements IPaceTracker {
         const after = Date.now() - period;
         activities = activities.filter(x => x.timestamp > after);
 
-        const pointsInPeriod = activities.filter(x => x.type==='success').reduce((previousValue, currentValue) => previousValue + currentValue.points, 0);
+        const pointsInPeriod = activities.filter((x):x is StoredActivityItemSuccess => x.type==='success').reduce((previousValue, currentValue) => previousValue + currentValue.points, 0);
 
 
         const maxPointsInPeriod = (maxPointsPerSecond * seconds);
@@ -186,7 +186,7 @@ export default class PaceTracker implements IPaceTracker {
         const lastSuccessIdx = activities.findLastIndex(x => x.type==='success');
         const sequentialFailures = activities.slice(lastSuccessIdx+1);
         
-        const backoffActivities = activities.filter(x => x.type==='back_off');
+        const backoffActivities = activities.filter((x):x is StoredActivityItemBackOff => x.type==='back_off');
 
         const forcedBackOffUntilAtLeastTs = backoffActivities.reduce((prev, cur) => (cur.force_back_off_until_at_least_ts??0)>prev? cur.force_back_off_until_at_least_ts! : prev, 0);
         let forcedBackOffPeriod = forcedBackOffUntilAtLeastTs-Date.now()
