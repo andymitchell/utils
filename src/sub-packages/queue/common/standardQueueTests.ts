@@ -8,18 +8,19 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
         const queue = createQueueFunction();
 
-        const state = {run1: false};
+        const state = {run1: false, attempt: -1};
         const st = Date.now();
-        console.log("START TEST RUN");
-        await queue('TEST_RUN', async () => {
+        await queue('TEST_RUN', async (job) => {
             console.log("Queue run time: "+(Date.now()-st));
             state.run1 = true;
+            state.attempt = job.attempt;
         });
 
-        console.log("Queue test run", state);
+        
 
 
         expect(state.run1).toBe(true);
+        expect(state.attempt).toBe(0);
     }, 1000*15)
     
 
@@ -343,8 +344,11 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         const startedRun2 = promiseWithTrigger<void>();
         const state = {run1Attempts: 0, run1aborted: false, run1: false, run2: false};
 
+        const job1AttemptLogger:number[] = [];
+
         const st = Date.now();
         queue('TEST_RUN', async (job) => {
+            job1AttemptLogger.push(job.attempt);
             state.run1Attempts++;
             if( state.run1Attempts<=1 ) {
                 state.run1aborted = true;
@@ -352,11 +356,14 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
                 return;
             }
 
+            
+
             state.run1 = true;
         }, 'Run 1').catch(e => null);
 
         queue('TEST_RUN', async (job) => {
             startedRun2.trigger();
+            
             state.run2 = true;
         }, 'Run 2');
 
@@ -367,6 +374,8 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         expect(state.run2).toBe(true);
         expect(state.run1aborted).toBe(true);
         expect(state.run1Attempts).toBe(2);
+
+        expect(job1AttemptLogger).toEqual([0,1]);
 
         const duration = Date.now()-st;
         expect(duration).toBeGreaterThan(wait_for_ms);

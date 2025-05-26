@@ -58,7 +58,7 @@ export class BaseItemQueue implements IQueue {
             let item:QueueItemDB = {
                 // @ts-ignore IDB will fill 'id' in
                 id: undefined,
-
+                attempts: 0,
                 ts: Date.now(),
                 client_id: this.clientId, 
                 client_id_job_count: Object.values(this.jobs).length,
@@ -124,7 +124,9 @@ export class BaseItemQueue implements IQueue {
             
             if( result && result.delayed_until_ts ) {
 
+                
                 await this.queueIo.updateItem(item.id, {run_id, started_at: undefined, start_after_ts: result.delayed_until_ts});
+                await this.queueIo.incrementAttempts(item.id);
 
                 setTimeout(() => this.next(true), (result.delayed_until_ts-Date.now())+1);
             }
@@ -164,6 +166,7 @@ export class BaseItemQueue implements IQueue {
             const preventCompletionContainer = preventCompletionFactory();
             const output = await job.onRun({
                 id: job.job_id,
+                attempt: item.attempts,
                 created_at: job.created_at,
                 preventCompletion: preventCompletionContainer.preventCompletion
             });

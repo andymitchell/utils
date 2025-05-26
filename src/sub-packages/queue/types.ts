@@ -9,6 +9,14 @@ export type HaltPromise = Promise<void>;
 type PublicQueueItem = {
     id: string, 
     created_at: number,
+
+    /**
+     * The number of times this has been attempted.
+     * 
+     * Starts at 0, and increments for every subsequent attempt. 
+     */
+    attempt: number,
+
     preventCompletion: (delayRetryMs:number) => void
 }
 export type OnRun<T = any> = (queueItem:PublicQueueItem) => T | PromiseLike<T>

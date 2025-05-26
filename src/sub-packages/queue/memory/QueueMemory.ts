@@ -10,6 +10,7 @@ import type { HaltPromise, IQueue, JobItem, OnRun } from "../types.ts";
 
 
 type QueueItem = JobItem & {
+    attempts: number,
 	running: boolean,
     halted?: boolean,
     start_after_ts?: number
@@ -38,6 +39,7 @@ export class QueueMemory implements IQueue {
         return new Promise<T>(async (resolve, reject) => {
             const q:QueueItem = {
                 job_id: uid(),
+                attempts: 0,
                 resolve: (result:T) => {
                     resolve(result)
                 },
@@ -104,6 +106,7 @@ export class QueueMemory implements IQueue {
             const output = await q.onRun({
                 id: q.job_id,
                 created_at: q.created_at,
+                attempt: q.attempts++,
                 preventCompletion: preventCompletionContainer.preventCompletion
             });
             const delayMs = preventCompletionContainer.getDelayMs();
@@ -137,6 +140,7 @@ export class QueueMemory implements IQueue {
             // Create item to inhibit others
             const item:QueueItem = {
                 job_id: id,
+                attempts:0,
                 running: true,
                 created_at: Date.now(),
                 resolve: emptyFunction,
@@ -148,7 +152,7 @@ export class QueueMemory implements IQueue {
             // Run it
             try {
                 const preventCompletionContainer = preventCompletionFactory();
-                const output = onRun({id, created_at: item.created_at, preventCompletion: preventCompletionContainer.preventCompletion });
+                const output = onRun({id, created_at: item.created_at, attempt: ++item.attempts, preventCompletion: preventCompletionContainer.preventCompletion });
 
                 if( preventCompletionContainer.getDelayMs()===undefined ) {
                     // Clear it

@@ -4,6 +4,7 @@ import { TypedCancelableEventEmitter } from "../../../../typed-cancelable-event-
 export type QueueItemDB = {
     id: number,
     ts: number,
+    attempts: number,
     client_id: string, 
     job_id: string,
     client_id_job_count: number,
@@ -30,6 +31,7 @@ export interface IQueueIo {
     listItems():Promise<QueueItemDB[]>
     nextItem(clientId:string):Promise<{item:QueueItemDB, run_id: string} | undefined>
     updateItem(itemId: number, changes:Partial<QueueItemDB>):Promise<boolean>
+    incrementAttempts(itemId: number):Promise<boolean>
     deleteItem(itemId: number):Promise<void>
     completeItem(item:QueueItemDB, force?: boolean):Promise<void>
     countItems():Promise<number>
