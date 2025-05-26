@@ -34,11 +34,14 @@ describe('extended', () => {
         test('basic', async () => {
 
             const ee = new TypedCancelableEventEmitter3<TestEvents>();
+            const event = {name: 'abc'};
             setTimeout(() => {
-                ee.emit('EVENT_123', {name: 'abc'});
+                ee.emit('EVENT_123', event);
             }, 1);
             const result = await ee.onceConditionMet('EVENT_123', (event) => true);
             expect(result.status).toBe('ok');
+            expect(result.events).toEqual([[event]])
+            expect(result.firstPassParam).toEqual(event);
         })
     })
 

@@ -1,5 +1,5 @@
 
-import type { TypedCancel } from "./types.ts";
+import type { OnceConditionMetResponse, TypedCancel } from "./types.ts";
 
 type MinimumEventEmitter = { on: Function; off: Function };
 
@@ -24,7 +24,10 @@ export class ExtendedEventEmitter {
          * @param errorOnTimeout 
          * @returns 
          */
-    onceConditionMet(event: string | number | symbol, condition: (...args: any[]) => boolean, timeoutMs = 30000, errorOnTimeout = false): Promise<{ status: 'ok' | 'timeout', events: any[] }> {
+    onceConditionMet(event: string | number | symbol, condition: (...args: any[]) => boolean, timeoutMs = 30000, errorOnTimeout = false): Promise<OnceConditionMetResponse> {
+
+        
+
         return new Promise((resolve, reject) => {
             const state: { cancel?: TypedCancel, timeout?: ReturnType<typeof setTimeout>, events: any[] } = { events: [] }
             const wrappedListener = (...args: any[]) => {
@@ -32,7 +35,7 @@ export class ExtendedEventEmitter {
                 if (condition(...args)) {
                     state.cancel!();
                     clearTimeout(state.timeout!);
-                    resolve({ status: 'ok', events: state.events })
+                    resolve({ status: 'ok', events: state.events, firstPassParam: args[0] })
                 }
             };
             state.cancel = this.onCancelable(event, wrappedListener);
@@ -58,7 +61,7 @@ export class ExtendedEventEmitter {
      * @param timeoutMs 
      * @returns 
      */
-    conditionMetAfterTimeout(event: string | number | symbol, condition: (...args: any[]) => boolean, timeoutMs = 30000): Promise<{ status: 'ok' | 'fail', events: any[] }> {
+    conditionMetAfterTimeout(event: string | number | symbol, condition: (...args: any[]) => boolean, timeoutMs = 30000): Promise<OnceConditionMetResponse> {
 
         return new Promise((resolve, reject) => {
             const state: { cancel?: TypedCancel, timeout?: ReturnType<typeof setTimeout>, events: any[], last_condition_met?: boolean } = { events: [] }
@@ -71,9 +74,9 @@ export class ExtendedEventEmitter {
                 state.cancel!();
 
                 if (state.last_condition_met) {
-                    resolve({ status: 'ok', events: state.events })
+                    resolve({ status: 'ok', events: state.events, firstPassParam: state.events.flat()[0] })
                 } else {
-                    resolve({ status: 'fail', events: state.events });
+                    resolve({ status: 'timeout', events: state.events });
                 }
             }, timeoutMs);
         })

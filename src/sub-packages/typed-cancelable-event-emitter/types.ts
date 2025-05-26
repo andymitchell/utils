@@ -23,7 +23,7 @@ interface TypedEventEmitterExtended<T extends EventMap> {
          * @param errorOnTimeout 
          * @returns 
          */
-    onceConditionMet<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs?: number, errorOnTimeout?: boolean): Promise<{ status: 'ok' | 'timeout', events: Parameters<T[E]>[] }>;
+    onceConditionMet<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs?: number, errorOnTimeout?: boolean): Promise<OnceConditionMetResponse<Parameters<T[E]>>>;
 
     /**
      * Make sure that the final firing of the event, in the time period, has parameters that fulfil the predicate. 
@@ -34,8 +34,28 @@ interface TypedEventEmitterExtended<T extends EventMap> {
      * @param timeoutMs 
      * @returns 
      */
-    conditionMetAfterTimeout<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs?:number): Promise<{ status: 'ok' | 'fail', events: Parameters<T[E]>[] }>
+    conditionMetAfterTimeout<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs?:number): Promise<OnceConditionMetResponse<Parameters<T[E]>>>
 }
 
 export type TypedEventEmitter3Extended<T extends EventMap> = TypedEventEmitter3<T> & TypedEventEmitterExtended<T>;
 export type TypedEventEmitterNodeExtended<T extends EventMap> = TypedEventEmitterNode<T> & TypedEventEmitterExtended<T>;
+
+export type OnceConditionMetResponse<EParams extends any[] = any> = {
+    status: 'ok',
+    /**
+     * An array of the parameters each time the event fired
+     */
+    events: EParams[],
+    /**
+     * For the first event that passes the condition, this is the first parameter. Typically the `event`. 
+     */
+    firstPassParam: EParams[number]
+} | {
+    status: 'timeout',
+    /**
+     * An array of the parameters each time the event fired
+     */
+    events: EParams[]
+    
+    firstPassParam?: undefined
+}
