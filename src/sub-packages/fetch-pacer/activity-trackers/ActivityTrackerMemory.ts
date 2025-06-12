@@ -1,8 +1,28 @@
+import { MemoryStorage } from '../../kv-storage/index.ts';
+import type { IActivityTracker } from '../types.js';
 
+import { ActivityTrackerKvStorage, type ActivityTrackerKvStorageOptions } from './ActivityTrackerKvStorage.ts';
+
+
+
+export class ActivityTrackerMemory extends ActivityTrackerKvStorage implements IActivityTracker {
+    
+    
+    constructor(id: string, options?: ActivityTrackerKvStorageOptions) {
+        const kvStorage = new MemoryStorage();
+        super(id, kvStorage, options);
+
+        
+    }
+
+}
+
+/*
 import type { ActivityItem, ActivityTrackerOptions, IActivityTracker, SetBackOffUntilTsOptions, StoredActivityItem } from '../types.js';
 
 import { BaseActivityTracker } from '../BaseActivityTracker.js';
 import { uuidV4 } from '../../uid/uid.js';
+
 
 export class ActivityTrackerMemory extends BaseActivityTracker implements IActivityTracker {
     
@@ -52,3 +72,4 @@ export class ActivityTrackerMemory extends BaseActivityTracker implements IActiv
         await super.dispose();
     }
 }
+*/

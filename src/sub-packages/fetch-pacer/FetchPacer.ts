@@ -5,7 +5,7 @@ import { type IQueue, QueueMemory } from '../queue/index-memory.js';
 import { sleep } from '../../main/index.js';
 import PaceTracker from './PaceTracker.ts';
 import {  TypedCancelableEventEmitter3 } from '../typed-cancelable-event-emitter/index.ts';
-import { isBackOffResponse } from './utils/isBackoffResponse.ts';
+import { isBackOffResponse } from './utils/isBackOffResponse.ts';
 
 export const fetchPacerOptionsDefault:FetchPacerOptions = {
     mode: {

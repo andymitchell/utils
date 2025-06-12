@@ -30,7 +30,7 @@ import type { BackingOffEvent, BackOffResponse, FetchPacerOnlyOptions, FetchPace
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.ts';
 import { MockChromeStorageArea } from '../kv-storage/index.ts';
 import { FetchPacerForTesting } from './testing-utils/FetchPacerForTesting.ts';
-import { isBackOffResponse } from './utils/isBackoffResponse.ts';
+import { isBackOffResponse } from './utils/isBackOffResponse.ts';
 import { promiseWithTrigger, sleep } from '../../index.ts';
 import { expectBetweenNumbers, expectBoundGreaterThan, expectCloseTo } from './testing-utils/expectInRange.ts';
 

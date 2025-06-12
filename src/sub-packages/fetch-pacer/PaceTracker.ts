@@ -1,4 +1,4 @@
-import type { ActivityItemSuccess, ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemSuccess } from './types.ts';
+import type {  ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemSuccess } from './types.ts';
 import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.ts';
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.ts';
 import { convertTimestampToMillisecondsFromNow } from './utils/convertTimestampToMillisecondsFromNow.ts';

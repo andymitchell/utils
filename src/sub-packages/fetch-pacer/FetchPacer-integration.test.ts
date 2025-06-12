@@ -19,7 +19,7 @@ import type {  FetchPacerOnlyOptions, FetchPacerOptions, PaceTrackerOptions } fr
 
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.ts';
 import { MockChromeStorageArea } from '../kv-storage/index.ts';
-import { isBackOffResponse } from './utils/isBackoffResponse.ts';
+import { isBackOffResponse } from './utils/isBackOffResponse.ts';
 import FetchPacer from './FetchPacer.ts';
 
 
