@@ -2,12 +2,14 @@ import { ActivityTrackerKvStorage } from "./activity-trackers/ActivityTrackerKvS
 import FetchPacer, { fetchPacerOptionsDefault } from "./FetchPacer.ts";
 import FetchPacerMultiClient from "./FetchPacerMultiClient.ts";
 import type { FetchPacerOptions, IActivityTracker } from "./types.ts";
+import { isBackOffResponse } from "./utils/isBackOffResponse.ts";
 
 export { 
     FetchPacer,
     FetchPacerMultiClient,
     fetchPacerOptionsDefault,
-    ActivityTrackerKvStorage
+    ActivityTrackerKvStorage,
+    isBackOffResponse
 }
 
 export type {
