@@ -467,6 +467,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
 
                     // Last should be cannot recover, as we elapsed time 
                     expect(events[events.length-1]?.event.cannot_recover).toBe(true);
+                    
 
                 }
 
@@ -649,6 +650,7 @@ describe('mode attempt_recovery specific tests', () => {
             expect(mockFetch).not.toHaveBeenCalled(); // Should not attempt fetch
             expect(res.cannot_recover).toBe(true);
             expect(res.back_off_for_ms).toBeGreaterThanOrEqual(100); // It still reports the suggested backoff
+            expect(res.back_off_accumulated_ms).toBe(0);
             
         });
 
@@ -684,6 +686,7 @@ describe('mode attempt_recovery specific tests', () => {
             expect(res.status).toBe(429); // The original 429 response is returned
             expect(res.cannot_recover).toBe(true);
             expect(res.back_off_for_ms).toBeGreaterThanOrEqual(50); // Should be around 60ms
+            expect(res.back_off_accumulated_ms).toBe(10);
             expect(mockPaceTracker.logBackOff).toHaveBeenCalledTimes(1);
             vi.useRealTimers();
         });

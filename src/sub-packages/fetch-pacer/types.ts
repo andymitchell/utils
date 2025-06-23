@@ -79,6 +79,11 @@ export interface BackOffResponse extends PaceResponse {
 
     /** `attempt_recovery` tried too many times and could not make it work. Implies the request may exceed any allowable quota. */
     cannot_recover?: boolean;
+
+    /**
+     * The time since the first request started
+     */
+    back_off_accumulated_ms?: number
 }
 
 /**

@@ -87,6 +87,7 @@ export default class FetchPacer {
                 if( this.#options.mode.type==='attempt_recovery' ) {
                     if( pauseExceedsMaxTimeout(pauseFor) ) {
                         response.cannot_recover = true;
+                        response.back_off_accumulated_ms = Date.now() - job.created_at;
                     } else {
                         // Tell it to retry 
                         will_retry = true;
@@ -117,6 +118,7 @@ export default class FetchPacer {
                     if( this.#options.mode.type==='attempt_recovery' ) {
                         if( pauseExceedsMaxTimeout(pauseFor) ) {
                             response.cannot_recover = true;
+                            response.back_off_accumulated_ms = Date.now() - job.created_at;
                         } else {
                             will_retry = true;
                             job.preventCompletion(pauseFor);
