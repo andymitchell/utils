@@ -66,9 +66,7 @@ export class IdbStorage<T = any> implements IKvStorage<T> {
     }
 
     async get(key: string): Promise<T | undefined> {
-        console.log("Get 1");
         const db = await this.#init();
-        console.log("Get 2");
         return await new Promise<T | undefined>((resolve, reject) => {
             const tx = db.transaction(this.#storeName, "readonly");
             const store = tx.objectStore(this.#storeName);
