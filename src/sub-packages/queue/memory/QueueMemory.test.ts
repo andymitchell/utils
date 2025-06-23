@@ -42,7 +42,7 @@ describe('QueueMemory class test', () => {
     );
     
 
-    it.only('handles multiple async requests', async () => {
+    it('handles multiple async requests', async () => {
         const q = new QueueMemory('');
 
         const outerPromises:Promise<void>[] = [];
