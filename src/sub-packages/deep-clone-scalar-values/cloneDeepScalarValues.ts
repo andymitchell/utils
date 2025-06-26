@@ -3,6 +3,7 @@ import { simplePrivateDataReplacer } from "./simplePrivateDataReplacer.ts";
 import { isScalar, type ClonedDeepScalarValues } from "./types.ts";
 
 
+const unsafeKeys = Object.freeze(['__proto__', 'constructor', 'prototype']);
 
 /**
  * Recursively extracts scalar values (string, number, boolean) from an object or array.
@@ -21,6 +22,92 @@ import { isScalar, type ClonedDeepScalarValues } from "./types.ts";
 export function cloneDeepScalarValues<T extends object | Array<any>>(obj: T, stripSensitiveInfo?: boolean, allowSensitiveInDangerousProperties?: boolean): ClonedDeepScalarValues<T> {
 
 
+    return internalCloneDeepScalarValues<T>(obj, stripSensitiveInfo, allowSensitiveInDangerousProperties);
+}
+
+function internalCloneDeepScalarValues<T extends object>(
+    obj: T,
+    stripSensitiveInfo?: boolean,
+    allowSensitiveInDangerousProperties?: boolean,
+    visited: WeakSet<object> = new WeakSet(), // circular reference tracking
+    allowGetters = false
+): ClonedDeepScalarValues<T> {
+
+    // Handle circular references
+    if (visited.has(obj)) {
+        // If we've seen this object before, return undefined instead of recursing
+        return undefined as any; 
+    }
+    // Add the current object to the set of visited objects.
+    visited.add(obj);
+
+    // Handle top-level arrays 
+    const safeVersion: any = Array.isArray(obj) ? [] : {};
+
+    const keys = Reflect.ownKeys(obj); // This gets all property keys, including non-enumerable and symbol properties
+
+    for (const key of keys) {
+
+        if (typeof key === 'string' && unsafeKeys.includes(key)) {
+            continue; // Skip potentially malicious keys like `__proto__`
+        }
+
+        let value;
+        if( allowGetters ) {
+            // You probably don't want to do this. It's too easy for it to have side effects. 
+            // An example of a side effect: {get pollute() {Object.prototype.polluted = 'true'; return 'value'}}
+            try {
+                // Use a try-catch block to prevent getters that throw from crashing the function
+                value = (obj as any)[key];
+            } catch {
+                // If accessing the property throws (e.g., a malicious getter), skip it.
+                continue;
+            }
+        } else {
+            const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+
+            if (!descriptor) {
+                continue;
+            }
+
+            // If the property has a getter, we treat it as unsafe and skip it.
+            // We cannot safely execute a getter as it could have side effects (like prototype pollution).
+            if (descriptor.get) {
+                continue;
+            }
+            
+            // Now we know it's a data property, we can safely access its value.
+            value = descriptor.value;
+        }
+        
+        
+        
+
+        
+        
+        
+        
+        const keyAsString = String(key); // For use with string-based checks
+
+        if (typeof value === 'object' && value !== null) {
+            // Recursively call, passing the `visited` set along.
+            safeVersion[key] = internalCloneDeepScalarValues(value, stripSensitiveInfo, allowSensitiveInDangerousProperties, visited);
+        } else if (isScalar(value)) {
+            if ((typeof value === 'string' || typeof value === 'number') && stripSensitiveInfo && !(allowSensitiveInDangerousProperties && keyAsString.startsWith('_dangerous'))) {
+                value = simplePrivateDataReplacer(value);
+            }
+            safeVersion[key] = value;
+        }
+        // Non-scalar, non-object values (like functions) are implicitly skipped.
+    }
+
+    return safeVersion as ClonedDeepScalarValues<T>;
+}
+
+/*
+export function cloneDeepScalarValues<T extends object | Array<any>>(obj: T, stripSensitiveInfo?: boolean, allowSensitiveInDangerousProperties?: boolean): ClonedDeepScalarValues<T> {
+
+
     let safeVersion: Partial<T> = {};
 
     const keys = Reflect.ownKeys(obj); // This gets all property keys, including non-enumerable and symbol properties (the only way to get 'message' on an Error)
@@ -29,9 +116,14 @@ export function cloneDeepScalarValues<T extends object | Array<any>>(obj: T, str
         return typeof x === 'string';
     }
 
+    
+
     for (const key of keys) {
         if (isKeyOfT(key) && typeof key === 'string') {
             if (obj.hasOwnProperty(key)) {
+                if( unsafeKeys.includes(key) ) continue; // Skip these potentially malicious keys
+
+
                 let value = obj[key];
                 if (typeof value === 'object' && !!value) {
                     if (Array.isArray(value)) {
@@ -57,3 +149,4 @@ export function cloneDeepScalarValues<T extends object | Array<any>>(obj: T, str
     return safeVersion as ClonedDeepScalarValues<T>;
 
 }
+*/
