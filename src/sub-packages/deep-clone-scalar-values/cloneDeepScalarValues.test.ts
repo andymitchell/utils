@@ -2,53 +2,73 @@
 
 import { cloneDeepScalarValues } from "./cloneDeepScalarValues.ts"
 
-const input = {
-    "message": "Here is a long message which should not be affected by token guarding. Here is a long message which should not be affected by token guarding.",
-    "issues": [
-        {
-            "code": "invalid_type",
-            "expected": "array",
-            "received": "undefined",
-            "path": [
-                "scopes"
-            ],
-            "message": "Required"
-        }
-    ],
-    "request": {
-        "email": "bob@gmail.com"
-    },
-    "method": {
-        "method": "lwaf-authorization-code-refresh",
-        "id": "lwaf_auth_refresh_google",
-        "redirect_uri_suffix": "oauth2",
-        "description": "",
-        "secret_numeric_token": 1234567891234567,
-        "secret_number_string_token": "123456789123456789123456789123456789",
-        "secret_numeric_credit_card": "1234 1234 1234 1234",
-        "_dangerous_allow_id": "123456789123456789123456789123456789",
-        "provider": {
-            "type": "google"
-        },
-        "available_scopes": [
-            "email"
+function getInput() {
+    return {
+        "message": "Here is a long message which should not be affected by token guarding. Here is a long message which should not be affected by token guarding.",
+        "issues": [
+            {
+                "code": "invalid_type",
+                "expected": "array",
+                "received": "undefined",
+                "path": [
+                    "scopes"
+                ],
+                "message": "Required"
+            }
         ],
-        "removeMe": () => null
-    }
-} as const;
+        "request": {
+            "email": "bob@gmail.com"
+        },
+        "method": {
+            "method": "lwaf-authorization-code-refresh",
+            "id": "lwaf_auth_refresh_google",
+            "redirect_uri_suffix": "oauth2",
+            "description": "",
+            "secret_numeric_token": 1234567891234567,
+            "secret_number_string_token": "123456789123456789123456789123456789",
+            "secret_numeric_credit_card": "1234 1234 1234 1234",
+            "_dangerous_allow_id": "123456789123456789123456789123456789",
+            "provider": {
+                "type": "google"
+            },
+            "available_scopes": [
+                "email"
+            ],
+            "removeMe": () => null
+        }
+    } as const;
+}
 
 describe('cloneDeepScalarValues', () => {
 
-    test('basic', () => {
-        const output = cloneDeepScalarValues(input);
+    describe("Can clone correctly", () => {
+        test('basic', () => {
+            const input = getInput();
+            const output = cloneDeepScalarValues(input);
 
-        expect(output.request.email).toBe('bob@gmail.com');
-        expect(output.issues[0].path[0]).toBe('scopes');
-        expect(output.method.removeMe).toBe(undefined);
+            expect(output.request.email).toBe('bob@gmail.com');
+            expect(output.issues[0].path[0]).toBe('scopes');
+            expect(output.method.removeMe).toBe(undefined);
 
+        })
+
+
+        test('matches deeply', () => {
+            const input = getInput();
+            const input2 = getInput();
+            // @ts-ignore
+            input2.method.removeMe = null;
+            // @ts-ignore
+            delete input2.method.removeMe;
+            
+            const output = cloneDeepScalarValues(input);
+
+            expect(output).toEqual(input2);
+        })
     })
 
     test('private data removed', () => {
+        const input = getInput();
         const output = cloneDeepScalarValues(input, true);
 
         
@@ -67,6 +87,7 @@ describe('cloneDeepScalarValues', () => {
 
 
     test('private data removed, except dangerous', () => {
+        const input = getInput();
         const output = cloneDeepScalarValues(input, true, true);
 
         
@@ -90,6 +111,7 @@ describe('cloneDeepScalarValues', () => {
     })
 
     test('array', () => {
+        const input = getInput();
         const output = cloneDeepScalarValues([input]);
 
         expect(output[0]!.method.available_scopes[0]).toBe('email');
