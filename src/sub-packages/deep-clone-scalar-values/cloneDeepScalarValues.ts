@@ -1,9 +1,39 @@
 
 import { simplePrivateDataReplacer } from "./simplePrivateDataReplacer.ts";
-import { isScalar, type ClonedDeepScalarValues } from "./types.ts";
+import { isScalar, type ClonedDeepScalarValues, type Scalar } from "./types.ts";
 
 
 const unsafeKeys = Object.freeze(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Creates a deeply cloned version of any input value, keeping only simple scalar values.
+ *
+ * This function checks if the input is a plain object or array and recursively clones it,
+ * keeping only scalar values like strings, numbers, booleans, null, or undefined.
+ * If the input is a single scalar (not an object/array), it is returned as-is.
+ * 
+ * Scalars are masked if they look potentially sensitive (e.g. token-esque) and the parameter stripSensitiveInfo is true
+ *
+ * @param {T} obj - The value to investigate. Can be anything.
+ * @param {boolean} [stripSensitiveInfo=false] - Whether to replace sensitive scalar values.
+ * @param {boolean} [allowSensitiveInDangerousProperties=false] - Allow object properties prefixed with '_dangerous' to not be stripped
+ * @returns {ClonedDeepScalarValues<T>} - A deeply serialized version of the input, containing only scalar values.
+ */
+export function cloneDeepScalarValuesAny<T = any>(obj: T, stripSensitiveInfo?: boolean, allowSensitiveInDangerousProperties?: boolean): ClonedDeepScalarValues<T> | Scalar | undefined {
+    if( Array.isArray(obj) || (typeof obj==='object' && obj!==null) ) {
+        return cloneDeepScalarValues(obj, stripSensitiveInfo, allowSensitiveInDangerousProperties);
+    } else {
+        if( isScalar(obj) ) {
+            if ( shouldStripSensitiveInfo(obj, stripSensitiveInfo, allowSensitiveInDangerousProperties) ) {
+                return simplePrivateDataReplacer(obj);
+            } else {
+                return obj;
+            }
+        } else {
+            return undefined;
+        }
+    }
+}
 
 /**
  * Recursively extracts scalar values (string, number, boolean) from an object or array.
@@ -93,7 +123,7 @@ function internalCloneDeepScalarValues<T extends object>(
             // Recursively call, passing the `visited` set along.
             safeVersion[key] = internalCloneDeepScalarValues(value, stripSensitiveInfo, allowSensitiveInDangerousProperties, visited);
         } else if (isScalar(value)) {
-            if ((typeof value === 'string' || typeof value === 'number') && stripSensitiveInfo && !(allowSensitiveInDangerousProperties && keyAsString.startsWith('_dangerous'))) {
+            if ( shouldStripSensitiveInfo(value, stripSensitiveInfo, allowSensitiveInDangerousProperties, keyAsString) ) {
                 value = simplePrivateDataReplacer(value);
             }
             safeVersion[key] = value;
@@ -102,6 +132,10 @@ function internalCloneDeepScalarValues<T extends object>(
     }
 
     return safeVersion as ClonedDeepScalarValues<T>;
+}
+
+function shouldStripSensitiveInfo(x: unknown, stripSensitiveInfo?: boolean, allowSensitiveInDangerousProperties?: boolean, key?: string) {
+    return (typeof x === 'string' || typeof x === 'number') && stripSensitiveInfo && !(allowSensitiveInDangerousProperties && key?.startsWith('_dangerous'))
 }
 
 /*

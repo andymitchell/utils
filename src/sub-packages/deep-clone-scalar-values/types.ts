@@ -13,8 +13,7 @@ export function isScalar(x: unknown): x is Scalar {
     return typeof x==='number' || typeof x==='boolean' || typeof x==='string';
 }
 
-type Scalar = string | number | boolean;
-
+export type Scalar = string | number | boolean;
 
 export type ClonedDeepScalarValues<T> = T extends Function
     ? never
