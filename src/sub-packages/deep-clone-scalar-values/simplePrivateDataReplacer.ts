@@ -1,3 +1,5 @@
+import type { Scalar } from "./types.ts";
+
 /**
  * Replaces sensitive private data (emails, sequences of digits, and tokens) with a partially obfuscated version,
  * while intelligently handling URLs by sanitizing their query parameters.
@@ -11,7 +13,7 @@
  * @param {any} value - The input value to process. It will be converted to a string.
  * @returns {string} - A sanitized version of the input with sensitive data partially obscured.
  */
-export function simplePrivateDataReplacer(value: any): string {
+export function simplePrivateDataReplacer<T = any>(value: T): T | string {
     return internalSimplePrivateDataReplacer(value);
 }
 
@@ -19,7 +21,7 @@ export function simplePrivateDataReplacer(value: any): string {
 const URL_PLACEHOLDER = "__URL_PH@";
 if( URL_PLACEHOLDER.length>10 ) throw new Error("URL_PLACEHOLDER must be short, otherwise it will get picked up as a token.");
 
-function internalSimplePrivateDataReplacer(value: any, depth = 0): string {
+function internalSimplePrivateDataReplacer<T = any>(value: T, depth = 0): T | string {
     
 
     // Prevent infinite recursion attacks.
@@ -32,14 +34,14 @@ function internalSimplePrivateDataReplacer(value: any, depth = 0): string {
     // Safely convert the input value to a string, guarding against malicious .toString() methods.
     try {
         const valueType = typeof value;
-        if (valueType === 'string') {
+        if ( typeof value === 'string') {
             strValue = value;
         } else if (valueType === 'number' || valueType === 'boolean' || valueType === 'bigint') {
             strValue = String(value);
         } else if (value === null) {
-            return '[sanitized:null]';
+            return null as T;
         } else if (value === undefined) {
-            return '[sanitized:undefined]';
+            return undefined as T;
         } else {
             // For objects/arrays, use JSON.stringify as a safe serialization method.
             // It handles circular references by throwing an error, which we catch.
@@ -48,6 +50,7 @@ function internalSimplePrivateDataReplacer(value: any, depth = 0): string {
     } catch(e) {
         return '[Sanitized: Unserializable Input]';
     }
+    const initialStrValue = strValue;
 
 
     // Helper function to partially hide email addresses
@@ -142,6 +145,6 @@ function internalSimplePrivateDataReplacer(value: any, depth = 0): string {
         strValue = strValue.replace(placeholder, restoredValue);
     });
 
-    return strValue;
+    return initialStrValue===strValue? value : strValue;
 }
 

@@ -3,6 +3,30 @@ import { simplePrivateDataReplacer } from './simplePrivateDataReplacer.ts'; // A
 
 describe('simplePrivateDataReplacer', () => {
 
+    describe("Good vars return same type", () => {
+        it('returns a number', () => {
+            expect(simplePrivateDataReplacer(12)).toBe(12);
+        })
+        it('returns a boolean', () => {
+            
+            expect(simplePrivateDataReplacer(true)).toBe(true);
+            expect(simplePrivateDataReplacer(false)).toBe(false);
+        })
+        it('returns an undefined', () => {
+            expect(simplePrivateDataReplacer(undefined)).toBe(undefined);
+        })
+
+
+        it('returns a null', () => {
+            expect(simplePrivateDataReplacer(null)).toBe(null);
+        })
+
+        it('should handle a simple object', () => {
+            const obj = { id: 123, name: 'test-object', active: true };
+            expect(simplePrivateDataReplacer(obj)).toEqual(obj);
+        });
+    })
+
     describe('URL Sanitization', () => {
         it('should recursively sanitize a sensitive token in a URL query parameter', () => {
             const url = 'https://api.example.com/v1/users?token=a_very_long_and_super_secret_api_key_12345';
@@ -168,20 +192,6 @@ describe('simplePrivateDataReplacer', () => {
             expect(simplePrivateDataReplacer('')).toBe('');
         });
 
-        it('should handle numbers by converting them to strings', () => {
-            expect(simplePrivateDataReplacer(12345)).toBe('12345');
-        });
-
-        it('should handle booleans by converting them to strings', () => {
-            expect(simplePrivateDataReplacer(true)).toBe('true');
-            expect(simplePrivateDataReplacer(false)).toBe('false');
-        });
-
-        it('should handle a simple object by JSON stringifying it', () => {
-            const obj = { id: 123, name: 'test-object', active: true };
-            const expected = JSON.stringify(obj, undefined, 1);
-            expect(simplePrivateDataReplacer(obj)).toBe(expected);
-        });
     });
 
     describe('Hardening and Attack Vector Tests', () => {
@@ -192,11 +202,6 @@ describe('simplePrivateDataReplacer', () => {
             circularObj.a = circularObj;
             const expected = '[Sanitized: Unserializable Input]';
             expect(simplePrivateDataReplacer(circularObj)).toBe(expected);
-        });
-
-        it('should handle null and undefined inputs gracefully', () => {
-            expect(simplePrivateDataReplacer(null)).toBe('[sanitized:null]');
-            expect(simplePrivateDataReplacer(undefined)).toBe('[sanitized:undefined]');
         });
 
         it('should handle an extremely long string that is not an email without crashing (ReDoS test)', () => {
