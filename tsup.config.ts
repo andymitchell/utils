@@ -13,6 +13,7 @@ export default defineConfig({
     'react-helpers': "src/sub-packages/react-helpers/index.ts",
     'crypto-helpers': "src/sub-packages/crypto-helpers/index.ts",
     'uid': "src/sub-packages/uid/index.ts",
+    'deep-freeze': "src/sub-packages/deep-freeze/index.ts",
     'fetch-pacer': "src/sub-packages/fetch-pacer/index.ts",
     
     'deep-clone-scalar-values': "src/sub-packages/deep-clone-scalar-values/index.ts",

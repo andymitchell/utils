@@ -50,6 +50,10 @@
             "types": "./dist/uid.d.ts",
             "default": "./dist/uid.js"
         },
+        "./deep-freeze": {
+            "types": "./dist/deep-freeze.d.ts",
+            "default": "./dist/deep-freeze.js"
+        },
         "./deep-clone-scalar-values": {
             "types": "./dist/deep-clone-scalar-values.d.ts",
             "default": "./dist/deep-clone-scalar-values.js"
