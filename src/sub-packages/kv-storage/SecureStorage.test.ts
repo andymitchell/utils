@@ -10,7 +10,7 @@ describe('SecureTypedStorage', () => {
     commonNamespacedTypedTests((namespace, adapter, schema) => new SecureTypedStorage(adapter ?? new MemoryStorage(), '123', schema, namespace), {include_schema: true});
 
 
-    it.only("includes schema details", async () => {
+    it("includes schema details", async () => {
         const store = new SecureTypedStorage(new MemoryStorage(), '123', z.object({id: z.number()}), 'abc')
 
         let error:Error | undefined;
