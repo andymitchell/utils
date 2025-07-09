@@ -54,6 +54,11 @@
             "types": "./dist/deep-freeze.d.ts",
             "default": "./dist/deep-freeze.js"
         },
+        "./prettify-zod-v3-error": {
+
+            "types": "./dist/prettify-zod-v3-error.d.ts",
+            "default": "./dist/prettify-zod-v3-error.js"
+        },
         "./deep-clone-scalar-values": {
             "types": "./dist/deep-clone-scalar-values.d.ts",
             "default": "./dist/deep-clone-scalar-values.js"

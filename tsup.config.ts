@@ -14,6 +14,7 @@ export default defineConfig({
     'crypto-helpers': "src/sub-packages/crypto-helpers/index.ts",
     'uid': "src/sub-packages/uid/index.ts",
     'deep-freeze': "src/sub-packages/deep-freeze/index.ts",
+    'prettify-zod-v3-error': "src/sub-packages/prettify-zod-v3-error/index.ts",
     'fetch-pacer': "src/sub-packages/fetch-pacer/index.ts",
     
     'deep-clone-scalar-values': "src/sub-packages/deep-clone-scalar-values/index.ts",
