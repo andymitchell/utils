@@ -8,6 +8,7 @@
 import {type ZodSchema} from "zod"
 import type { IKvStorage, IKvStorageNamespaced, KvRawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
+import { prettifyZod3ErrorAsJson } from "../prettify-zod-v3-error/prettifyZod3Error.ts";
 
 
 
@@ -120,8 +121,12 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
     }
 
     set = async (key: string, value: T) => {
-        if( this.#schema && !this.#schema.safeParse(value).success ) {
-            throw new Error(`Cannot set value in secure storage, as value does not match schema. Key: ${key}`);
+        if( this.#schema ) {
+            const result = this.#schema.safeParse(value);
+            if( !result.success ) {
+                const schemaFailSummary = prettifyZod3ErrorAsJson(result.error);
+                throw new Error(`Cannot set value in secure storage, as value does not match schema. Key: ${key}`, {cause: {schemaFailSummary}});
+            }
         }
         const nsKey = await this.#getNamespacedKey(key)
         const jsonValue = JSON.stringify(value)
