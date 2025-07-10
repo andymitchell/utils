@@ -22,6 +22,36 @@ export type PromiseWithTrigger<T = any> = {
     promise: Promise<T>,
     trigger: ((value: T | PromiseLike<T>) => void)
 }
+/**
+ * Creates a promise that can be resolved externally by calling its `trigger` function.
+ * Optionally rejects with a timeout if not triggered within the specified duration.
+ *
+ * This is useful when you need to defer resolution of a promise until some external event or callback
+ * occurs, and optionally guard against hanging by specifying a timeout.
+ *
+ * @template T
+ * @param {number} [timeoutMs] - Maximum time in milliseconds to wait for the trigger before rejecting.
+ *                                If omitted, the promise will never time out.
+ * @returns An object containing:
+ * - `promise`: The Promise<T> that will resolve when `trigger` is called.
+ * - `trigger(value)`: A function to resolve the promise. Throws an error if the promise is not yet set up.
+ * 
+ *
+ * @throws {Error} If time out occurs. Has a cause of `{cause: 'timeout'}`
+ *
+ * @example
+ * // Example 1: Manually resolving
+ * const pwt = promiseWithTrigger<number>();
+ * setTimeout(() => pwt.trigger(42), 100); // external event after 100ms
+ * const value = await pwt.promise; // value = 42
+ *
+ * @example
+ * // Example 2: Automatic timeout
+ * const { promise, trigger } = promiseWithTrigger<string>(500);
+ * promise
+ *   .then(value => console.log('Resolved:', value)) // 500
+ *   .catch(err => console.error('Error:', err.message)); // logs 'Error: Timed out' after 500ms
+ */
 export function promiseWithTrigger<T = any>(timeoutMs?: number):PromiseWithTrigger<T> {
     const state:{accept?:  (value: T | PromiseLike<T>) => void, timeout?: NodeJS.Timeout | number} = {accept: undefined};
     return {
@@ -35,7 +65,7 @@ export function promiseWithTrigger<T = any>(timeoutMs?: number):PromiseWithTrigg
 
             if( typeof timeoutMs==='number' ) {
                 state.timeout = setTimeout(() => {
-                    reject(new Error("Timed out"));
+                    reject(new Error("Timed out", {cause: 'timeout'}));
                 }, timeoutMs);
             }
         })
