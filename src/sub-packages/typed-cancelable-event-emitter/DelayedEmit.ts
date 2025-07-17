@@ -1,12 +1,21 @@
 import type { TypedCancelableEventEmitter } from "./index.ts";
 import type { EventMap } from "./typed-emitter.ts";
+import type TypedCancelableEventEmitter3 from "./TypedCancelableEventEmitterNode.ts";
 
 
-
+type AnyTypedCancelableEventEmitter<T extends EventMap> = TypedCancelableEventEmitter<T> | TypedCancelableEventEmitter3<T>;
+/**
+ * Catches and holds EventEmitter events until flushed.
+ * This is useful for situations where you want to delay the emission of events until a certain point,
+ * for example, after a transaction has successfully completed.
+ *
+ * 
+ * @template T - A map of event names to their listener signatures.
+ */
 export class DelayedEmit<T extends EventMap> {
     private queued: Function[];
-    private emitter: TypedCancelableEventEmitter<T>;
-    constructor(emitter: TypedCancelableEventEmitter<T>) {
+    private emitter: AnyTypedCancelableEventEmitter<T>;
+    constructor(emitter: AnyTypedCancelableEventEmitter<T>) {
         this.queued = [];
         this.emitter = emitter;
     }
@@ -23,3 +32,4 @@ export class DelayedEmit<T extends EventMap> {
         queued.forEach(x => x());
     }
 }
+
