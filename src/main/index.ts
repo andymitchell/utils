@@ -8,6 +8,7 @@ import typeHasKeys from "./types/typeHasKeys.ts"
 import { applyPlaceholderToTemplateStringFunction, convertPlaceholderToTemplateStringsArray } from "./convert-placeholder-to-template-strings-array/index.ts"
 import { loosenUnionRecordType, type LooseUnionRecord } from "./types/LooseUnionRecord.ts"
 import  isPropertyRequired from "./types/isPropertyRequired.ts"
+import { reduceCharactersToEssentialsForComparison } from "./reduceCharactersToEssentials.ts"
 
 
 
@@ -19,7 +20,8 @@ export {
     dLog,
     dLogDebug,
     dLogWarn,
-    getGlobal
+    getGlobal,
+    reduceCharactersToEssentialsForComparison
 }
 
 
