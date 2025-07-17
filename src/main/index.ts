@@ -41,7 +41,7 @@ export {
     applyPlaceholderToTemplateStringFunction
 }
 
-export * as EmailHelpers from "./email-helpers/index.ts";
+
 export * as PostgresHelpers from './db/postgres/index.js';
 export * from './moveObjectToFrontOfArray.ts'
 

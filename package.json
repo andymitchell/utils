@@ -75,10 +75,17 @@
             "types": "./dist/prettify-zod-v3-error.d.ts",
             "default": "./dist/prettify-zod-v3-error.js"
         },
+
         "./deep-clone-scalar-values": {
             "types": "./dist/deep-clone-scalar-values.d.ts",
             "default": "./dist/deep-clone-scalar-values.js"
         },
+
+        "./email-helpers": {
+            "types": "./dist/email-helpers.d.ts",
+            "default": "./dist/email-helpers.js"
+        },
+
         "./kv-storage": {
             "types": "./dist/kv-storage.d.ts",
             "default": "./dist/kv-storage.js"

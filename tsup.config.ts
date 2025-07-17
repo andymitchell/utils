@@ -18,6 +18,8 @@ export default defineConfig({
     'fetch-pacer': "src/sub-packages/fetch-pacer/index.ts",
     
     'deep-clone-scalar-values': "src/sub-packages/deep-clone-scalar-values/index.ts",
+    
+    'email-helpers': "src/sub-packages/email-helpers/index.ts",
 
     'dom-helpers': "src/sub-packages/dom-helpers/index.ts",
     'dom-helpers-fuzzy-sub-string': "src/sub-packages/dom-helpers/fuzzy-sub-string/index.ts",
