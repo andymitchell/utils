@@ -17,15 +17,15 @@ describe('fuzzySubString', () => {
         expect(!!result3).toBe(true); if( !result3 ) throw new Error("noop - typeguard");
         
         
-        const expected1 = {"matched_text":"amazing how quick he was","start_position":5,"end_position":29,"has_gaps":false};
-        const expected2And3 = {"matched_text":"amazing how quick he was","start_position":5,"end_position":29,"has_gaps":true};
+        const expected1 = {"matchedText":"amazing how quick he was","startPosition":5,"endPosition":29,"hasGaps":false};
+        const expected2And3 = {"matchedText":"amazing how quick he was","startPosition":5,"endPosition":29,"hasGaps":true};
 
         expect(result1).toEqual(expected1);
         expect(result2).toEqual(expected2And3);
         expect(result3).toEqual(expected2And3);
 
-        const resultText2 = haystack1.substring(result2.start_position, result2.end_position);
-        expect(resultText2).toBe(expected2And3.matched_text);
+        const resultText2 = haystack1.substring(result2.startPosition, result2.endPosition);
+        expect(resultText2).toBe(expected2And3.matchedText);
 
     });
 });

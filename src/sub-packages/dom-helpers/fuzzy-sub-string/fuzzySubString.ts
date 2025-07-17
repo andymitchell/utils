@@ -30,24 +30,24 @@ export function fuzzySubString(haystack:string, needleParts:TextTokens, allowMis
     if( !firstNeedlePart ) return undefined;
 
     const paths:Path[] = [];
-    let start_position = 0;
+    let startPosition = 0;
     while(true) {
-        start_position = haystack.indexOf(firstNeedlePart, start_position);
-        if( start_position===-1 ) break;
-        const end_position = start_position + firstNeedlePart.length;
+        startPosition = haystack.indexOf(firstNeedlePart, startPosition);
+        if( startPosition===-1 ) break;
+        const endPosition = startPosition + firstNeedlePart.length;
         paths.push({
-            parts: [{needlePart: firstNeedlePart, start_position, end_position}],
+            parts: [{needlePart: firstNeedlePart, startPosition, endPosition}],
             final: {
-                matched_text: firstNeedlePart,
-                start_position,
-                end_position,
-                has_gaps: false
+                matchedText: firstNeedlePart,
+                startPosition,
+                endPosition,
+                hasGaps: false
             },
-            has_missing_needle_parts: false,
-            has_gaps: false,
-            cumulative_distance_between_parts: 0
+            hasMissingNeedleParts: false,
+            hasGaps: false,
+            cumulativeDistanceBetweenParts: 0
         })
-        start_position = end_position;
+        startPosition = endPosition;
     }
 
     // Do the remainder of the needle parts
@@ -56,29 +56,29 @@ export function fuzzySubString(haystack:string, needleParts:TextTokens, allowMis
             if( !path.invalid ) {
                 const previousPart = path.parts[path.parts.length-1];
                 if( !previousPart ) throw new Error("No op. At least one part should already exist after firstNeedlePart processed");
-                const start_position = haystack.indexOf(needlePart, previousPart.end_position);
-                if( start_position===-1 ) {
+                const startPosition = haystack.indexOf(needlePart, previousPart.endPosition);
+                if( startPosition===-1 ) {
                     if( allowMissingNeedleParts ) {
-                        path.has_missing_needle_parts = true;
+                        path.hasMissingNeedleParts = true;
                     } else {
                         path.invalid = true;
                     }
                 } else {
-                    const end_position = start_position+needlePart.length;
-                    const part:PathPart = {needlePart, start_position, end_position};
+                    const endPosition = startPosition+needlePart.length;
+                    const part:PathPart = {needlePart, startPosition, endPosition};
                     path.parts.push(part);
 
-                    const distanceFromPrevious = start_position-previousPart.end_position;
-                    path.cumulative_distance_between_parts += distanceFromPrevious;
+                    const distanceFromPrevious = startPosition-previousPart.endPosition;
+                    path.cumulativeDistanceBetweenParts += distanceFromPrevious;
 
-                    const textBetweenPrevious = haystack.substring(previousPart.end_position, start_position);
-                    path.final.matched_text += textBetweenPrevious;
-                    path.final.matched_text += needlePart;
+                    const textBetweenPrevious = haystack.substring(previousPart.endPosition, startPosition);
+                    path.final.matchedText += textBetweenPrevious;
+                    path.final.matchedText += needlePart;
 
                     part.debug = {textBetweenPrevious, distanceFromPrevious};
 
-                    path.has_gaps = distanceFromPrevious>0;
-                    path.final.end_position = end_position;
+                    path.hasGaps = distanceFromPrevious>0;
+                    path.final.endPosition = endPosition;
                 }
             }
             
@@ -88,13 +88,13 @@ export function fuzzySubString(haystack:string, needleParts:TextTokens, allowMis
     // Find the path that's got the shortest number of gaps
     let pathWithShortestCumulativeDistanceBetweenParts:Path | undefined;
     for( const path of paths ) {
-        if( !path.invalid && (!pathWithShortestCumulativeDistanceBetweenParts || path.cumulative_distance_between_parts<pathWithShortestCumulativeDistanceBetweenParts.cumulative_distance_between_parts) ) {
+        if( !path.invalid && (!pathWithShortestCumulativeDistanceBetweenParts || path.cumulativeDistanceBetweenParts<pathWithShortestCumulativeDistanceBetweenParts.cumulativeDistanceBetweenParts) ) {
             pathWithShortestCumulativeDistanceBetweenParts = path;
         }
     }
     
     if( pathWithShortestCumulativeDistanceBetweenParts ) {
-        pathWithShortestCumulativeDistanceBetweenParts.final.has_gaps = pathWithShortestCumulativeDistanceBetweenParts.has_gaps;
+        pathWithShortestCumulativeDistanceBetweenParts.final.hasGaps = pathWithShortestCumulativeDistanceBetweenParts.hasGaps;
     }
     return pathWithShortestCumulativeDistanceBetweenParts?.final;
 }
