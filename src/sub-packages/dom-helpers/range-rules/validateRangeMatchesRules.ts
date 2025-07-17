@@ -1,11 +1,6 @@
+import type { RangeRules, ValidatedRangeRules } from "./types.ts";
 
-
-export type RangeRules = {
-    denyIntersectAnchors?: boolean
-    denyIntersectAnyBlock?: boolean
-}
-
-export default function validateRangeMatchesRules(range:Range, rules: RangeRules):{ok:boolean, broken?: keyof RangeRules} {
+export function validateRangeMatchesRules(range:Range, rules: RangeRules):ValidatedRangeRules {
     let broken:keyof RangeRules | undefined;
 
     // Get the common ancestor
@@ -33,10 +28,10 @@ export default function validateRangeMatchesRules(range:Range, rules: RangeRules
         throw new Error("Range had no common ancestor to read.");
     }
     
-    return {
-        ok: !broken,
+    return broken? {
+        ok: false,
         broken
-    }
+    } : {ok: true}
 }
 
 function isPartiallyIntersecting(range:Range, element:Element):boolean {

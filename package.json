@@ -34,10 +34,27 @@
             "types": "./dist/crypto-helpers.d.ts",
             "default": "./dist/crypto-helpers.js"
         },
+
+
         "./dom-helpers": {
             "types": "./dist/dom-helpers.d.ts",
             "default": "./dist/dom-helpers.js"
         },
+        "./dom-helpers/fuzzy-sub-string": {
+            "types": "./dist/dom-helpers-fuzzy-sub-string.d.ts",
+            "default": "./dist/dom-helpers-fuzzy-sub-string.js"
+        },
+
+        "./dom-helpers/content-editable": {
+            "types": "./dist/dom-helpers-content-editable.d.ts",
+            "default": "./dist/dom-helpers-content-editable.js"
+        },
+
+        "./dom-helpers/range-rules": {
+            "types": "./dist/dom-helpers-range-rules.d.ts",
+            "default": "./dist/dom-helpers-range-rules.js"
+        },
+
         "./react-helpers": {
             "types": "./dist/react-helpers.d.ts",
             "default": "./dist/react-helpers.js"

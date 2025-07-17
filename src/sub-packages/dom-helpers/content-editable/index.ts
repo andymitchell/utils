@@ -3,7 +3,7 @@ import { applyInheritedStyles, getInheritedStyles } from "./applyInheritedStyles
 import { getCursorPosition, setCursorPosition } from "./cursorPosition.ts";
 import insertHTMLatCursor from "./insertHTMLatCursor.ts";
 
-export const ContentEditable = {
+export {
     applyInheritedStyles,
     getInheritedStyles,
     getCursorPosition,

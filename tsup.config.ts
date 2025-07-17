@@ -9,7 +9,7 @@ export default defineConfig({
     'typed-cancelable-event-emitter': "src/sub-packages/typed-cancelable-event-emitter/index.ts",
     'typed-cancelable-event-emitter-node': "src/sub-packages/typed-cancelable-event-emitter/index-node.ts",
     'fake-idb': "src/sub-packages/fake-idb/index.ts",
-    'dom-helpers': "src/sub-packages/dom-helpers/index.ts",
+    
     'react-helpers': "src/sub-packages/react-helpers/index.ts",
     'crypto-helpers': "src/sub-packages/crypto-helpers/index.ts",
     'uid': "src/sub-packages/uid/index.ts",
@@ -19,6 +19,10 @@ export default defineConfig({
     
     'deep-clone-scalar-values': "src/sub-packages/deep-clone-scalar-values/index.ts",
 
+    'dom-helpers': "src/sub-packages/dom-helpers/index.ts",
+    'dom-helpers-fuzzy-sub-string': "src/sub-packages/dom-helpers/fuzzy-sub-string/index.ts",
+    'dom-helpers-content-editable': "src/sub-packages/dom-helpers/content-editable/index.ts",
+    'dom-helpers-range-rules': "src/sub-packages/dom-helpers/range-rules/index.ts",
 
     'kv-storage': "src/sub-packages/kv-storage/index.ts",
     'kv-storage-browser': "src/sub-packages/kv-storage/index-browser.ts",

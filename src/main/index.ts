@@ -1,9 +1,6 @@
 import {  type PromiseWithTrigger, convertArrayToRecord, dLog, dLogDebug, dLogWarn, getGlobal, midnight, promiseWithTrigger, sleep } from "./misc.ts"
 
 
-import { ContentEditable } from "./content-editable/index.ts"
-import fuzzySubString, { type FuzzySubString } from "./fuzzySubString/index.ts"
-import validateRangeMatchesRules, { type RangeRules } from "./range-rules/index.ts"
 import type { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync.ts"
 import isTypeEqual, {isTypeEqualIgnoringPartials} from "./types/isTypeEqual.ts"
 import isTypeExtended from "./types/isTypeExtended.ts"
@@ -26,8 +23,6 @@ export {
 }
 
 
-export {ContentEditable};
-export {fuzzySubString};
 
 export {
     isTypeEqual,
@@ -38,7 +33,6 @@ export {
     loosenUnionRecordType
 }
 
-export {validateRangeMatchesRules};
 
 export {
     convertPlaceholderToTemplateStringsArray,
@@ -52,7 +46,5 @@ export * from './moveObjectToFrontOfArray.ts'
 export type {
     EnsureAllMethodsAreAsync,
     LooseUnionRecord,
-    RangeRules,
-    FuzzySubString,
     PromiseWithTrigger,
 }

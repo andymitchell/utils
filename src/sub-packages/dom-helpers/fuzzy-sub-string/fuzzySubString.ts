@@ -1,24 +1,4 @@
-
-
-
-type TextTokens = string[];
-
-export type FuzzySubString = {
-    matched_text: string, 
-    start_position: number,
-    end_position: number,
-    has_gaps: boolean
-};
-
-type PathPart = {needlePart:string, start_position: number, end_position: number, debug?: {distanceFromPrevious: number, textBetweenPrevious:string}};
-type Path = {
-    parts: PathPart[],
-    invalid?: boolean,
-    has_missing_needle_parts: boolean,
-    has_gaps: boolean,
-    cumulative_distance_between_parts:number,
-    final: FuzzySubString
-}
+import type { FuzzySubString, Path, PathPart, TextTokens } from "./types.ts";
 
 /**
  * 
@@ -35,7 +15,7 @@ type Path = {
  * @param haystack 
  * @param needleParts 
  */
-export default function fuzzySubString(haystack:string, needleParts:TextTokens, allowMissingNeedleParts?:boolean):FuzzySubString | undefined {
+export function fuzzySubString(haystack:string, needleParts:TextTokens, allowMissingNeedleParts?:boolean):FuzzySubString | undefined {
     
     
     const needlePartsNonEmpty = needleParts.filter(x => !!x);
