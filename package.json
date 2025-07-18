@@ -55,10 +55,6 @@
             "default": "./dist/dom-helpers-range-rules.js"
         },
 
-        "./react-helpers": {
-            "types": "./dist/react-helpers.d.ts",
-            "default": "./dist/react-helpers.js"
-        },
         "./fetch-pacer": {
             "types": "./dist/fetch-pacer.d.ts",
             "default": "./dist/fetch-pacer.js"
@@ -164,8 +160,6 @@
         "@types/jest": "^29.5.12",
         "@types/lodash-es": "^4.17.12",
         "@types/md5": "^2.3.5",
-        "@types/react": "^18.2.79",
-        "@types/react-dom": "^18.2.25",
         "@types/uuid": "^9.0.8",
         "babel-jest": "^29.7.0",
         "babel-plugin-transform-import-meta": "^2.2.1",
@@ -183,8 +177,6 @@
     "peerDependencies": {
         "dexie": "^4.0.10",
         "eventemitter3": "^5.0.1",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
         "zod": "^3.23.8"
     }
 }

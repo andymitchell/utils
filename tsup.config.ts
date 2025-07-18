@@ -10,7 +10,7 @@ export default defineConfig({
     'typed-cancelable-event-emitter-node': "src/sub-packages/typed-cancelable-event-emitter/index-node.ts",
     'fake-idb': "src/sub-packages/fake-idb/index.ts",
     
-    'react-helpers': "src/sub-packages/react-helpers/index.ts",
+    
     'crypto-helpers': "src/sub-packages/crypto-helpers/index.ts",
     'uid': "src/sub-packages/uid/index.ts",
     'deep-freeze': "src/sub-packages/deep-freeze/index.ts",
@@ -45,8 +45,6 @@ export default defineConfig({
   splitting: true,
   external: [
     'dexie',
-    'react',
-    'react-dom',
     'zod',
     'eventemitter3'
   ],
