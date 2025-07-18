@@ -1,6 +1,6 @@
 {
     "name": "@andyrmitchell/utils",
-    "version": "0.18.2",
+    "version": "0.19.0",
     "description": "",
     "sideEffects": false,
     "exports": {
@@ -34,8 +34,6 @@
             "types": "./dist/crypto-helpers.d.ts",
             "default": "./dist/crypto-helpers.js"
         },
-
-
         "./dom-helpers": {
             "types": "./dist/dom-helpers.d.ts",
             "default": "./dist/dom-helpers.js"
@@ -44,17 +42,14 @@
             "types": "./dist/dom-helpers-fuzzy-sub-string.d.ts",
             "default": "./dist/dom-helpers-fuzzy-sub-string.js"
         },
-
         "./dom-helpers/content-editable": {
             "types": "./dist/dom-helpers-content-editable.d.ts",
             "default": "./dist/dom-helpers-content-editable.js"
         },
-
         "./dom-helpers/range-rules": {
             "types": "./dist/dom-helpers-range-rules.d.ts",
             "default": "./dist/dom-helpers-range-rules.js"
         },
-
         "./fetch-pacer": {
             "types": "./dist/fetch-pacer.d.ts",
             "default": "./dist/fetch-pacer.js"
@@ -71,17 +66,14 @@
             "types": "./dist/prettify-zod-v3-error.d.ts",
             "default": "./dist/prettify-zod-v3-error.js"
         },
-
         "./deep-clone-scalar-values": {
             "types": "./dist/deep-clone-scalar-values.d.ts",
             "default": "./dist/deep-clone-scalar-values.js"
         },
-
         "./email-helpers": {
             "types": "./dist/email-helpers.d.ts",
             "default": "./dist/email-helpers.js"
         },
-
         "./kv-storage": {
             "types": "./dist/kv-storage.d.ts",
             "default": "./dist/kv-storage.js"
