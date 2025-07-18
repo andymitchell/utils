@@ -33,11 +33,11 @@ export function createIconElement(materialName: string, classNames?: Array<strin
 }
 
 
-export const make = <ElementType extends HTMLElement>(nodeName: string, parent?: HTMLElement, className?: string, textContent?: string, style?: React.CSSProperties, child?: HTMLElement) => {
+export const make = <ElementType extends HTMLElement>(nodeName: string, parent?: HTMLElement, className?: string, textContent?: string, style?: Record<string, any>, child?: HTMLElement) => {
     const el = document.createElement(nodeName);
     if (style) {
         for (const key in style) {
-            const styleKey = key as keyof React.CSSProperties;
+            const styleKey = key;
             const styleValue = style[styleKey];
             if (styleValue !== undefined) {
                 (el.style as any)[styleKey] = styleValue;
