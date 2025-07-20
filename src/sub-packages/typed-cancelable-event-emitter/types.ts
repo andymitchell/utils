@@ -4,10 +4,11 @@ export type TypedCancel = () => void;
 
 
 interface BaseEventMap<T extends EventMap> {
-    newListener: (eventName: keyof MergedEventMap<T>, listener: (...args: any[]) => void) => void;
+    newListener: <E extends keyof MergedEventMap<T>>(eventName: E, listener: MergedEventMap<T>[E]) => void;//(...args: any[]) => void) => void;
     removeListener: (eventName: keyof MergedEventMap<T>, listener: (...args: any[]) => void) => void;
 }
 export type MergedEventMap<T extends EventMap> = T & BaseEventMap<T>;
+
 
 
 interface TypedEventEmitterExtended<T extends EventMap> {

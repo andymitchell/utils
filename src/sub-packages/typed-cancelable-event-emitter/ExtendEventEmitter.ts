@@ -4,14 +4,15 @@ import type { OnceConditionMetResponse, TypedCancel } from "./types.ts";
 type MinimumEventEmitter = { on: Function; off: Function };
 
 export class ExtendedEventEmitter {
-    
-    #eventEmitter:MinimumEventEmitter;
-    
-    constructor(eventEmitter:MinimumEventEmitter) {
+
+    #eventEmitter: MinimumEventEmitter;
+
+    constructor(eventEmitter: MinimumEventEmitter) {
         this.#eventEmitter = eventEmitter;
     }
 
-    onCancelable( event: string | number | symbol, listener: Function): TypedCancel {
+
+    onCancelable(event: string | number | symbol, listener: Function): TypedCancel {
         this.#eventEmitter.on(event, listener);
         return () => this.#eventEmitter.off(event, listener);
     }
@@ -26,7 +27,7 @@ export class ExtendedEventEmitter {
          */
     onceConditionMet(event: string | number | symbol, condition: (...args: any[]) => boolean, timeoutMs = 30000, errorOnTimeout = false): Promise<OnceConditionMetResponse> {
 
-        
+
 
         return new Promise((resolve, reject) => {
             const state: { cancel?: TypedCancel, timeout?: ReturnType<typeof setTimeout>, events: any[] } = { events: [] }

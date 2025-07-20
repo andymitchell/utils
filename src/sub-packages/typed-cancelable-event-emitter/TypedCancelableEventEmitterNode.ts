@@ -1,16 +1,37 @@
 import { EventEmitter } from 'events'; 
 
-import type { EventMap, TypedEventEmitterNode } from './typed-emitter.ts';
-import type { MergedEventMap, OnceConditionMetResponse, TypedCancel, TypedEventEmitterNodeExtended } from './types.ts';
+import type { EventMap, TypedEventEmitter3, TypedEventEmitterNode } from './typed-emitter.ts';
+import type { MergedEventMap, OnceConditionMetResponse, TypedCancel, TypedEventEmitter3Extended, TypedEventEmitterNodeExtended } from './types.ts';
 import { ExtendedEventEmitter } from './ExtendEventEmitter.ts';
 
 
-export default class TypedCancelableEventEmitter3<T extends EventMap> extends (EventEmitter as unknown as { new <U extends EventMap>(): TypedEventEmitterNode<U> })<T> implements TypedEventEmitterNodeExtended<MergedEventMap<T>> {
+export default class TypedCancelableEventEmitterNode<T extends EventMap> extends (EventEmitter as unknown as { new <U extends EventMap>(): TypedEventEmitter3<U> })<T> implements TypedEventEmitter3Extended<MergedEventMap<T>> {
 
     #extendedEventEmitter:ExtendedEventEmitter;
     constructor() {
         super();
         this.#extendedEventEmitter = new ExtendedEventEmitter(this);
+    }
+
+    override on<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): this {
+        return super.on(event, listener);
+    }
+
+    override addListener<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): this {
+        return super.addListener(event, listener);
+    }
+
+    override off<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): this {
+        return super.off(event, listener);
+    }
+
+    override removeListener<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): this {
+        return super.removeListener(event, listener);
+    }
+
+    //override emit<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): this {
+    override emit<E extends keyof T>(event: E, ...args: Parameters<T[E]>): boolean {
+        return super.emit(event, ...args);
     }
 
     onCancelable<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): TypedCancel {
