@@ -2,12 +2,12 @@ import { EventEmitter } from 'events';
 
 import type { EventMap, TypedEventEmitter3, TypedEventEmitterNode } from './typed-emitter.ts';
 import type { MergedEventMap, OnceConditionMetResponse, TypedCancel, TypedEventEmitter3Extended, TypedEventEmitterNodeExtended } from './types.ts';
-import { ExtendedEventEmitter } from './ExtendEventEmitter.ts';
+import { ExtendedEventEmitter } from './ExtendedEventEmitter.ts';
 
 
 export default class TypedCancelableEventEmitterNode<T extends EventMap> extends (EventEmitter as unknown as { new <U extends EventMap>(): TypedEventEmitter3<U> })<T> implements TypedEventEmitter3Extended<MergedEventMap<T>> {
 
-    #extendedEventEmitter:ExtendedEventEmitter;
+    #extendedEventEmitter:ExtendedEventEmitter<T>;
     constructor() {
         super();
         this.#extendedEventEmitter = new ExtendedEventEmitter(this);

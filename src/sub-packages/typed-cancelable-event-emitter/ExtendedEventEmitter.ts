@@ -1,9 +1,37 @@
 
-import type { OnceConditionMetResponse, TypedCancel } from "./types.ts";
+import type { EventMap } from "./typed-emitter.ts";
+import type { IExtendedEventEmitter, OnceConditionMetResponse, TypedCancel } from "./types.ts";
 
 type MinimumEventEmitter = { on: Function; off: Function };
 
-export class ExtendedEventEmitter {
+
+
+
+
+/**
+ * Attaches to a regular event emitter (anything with 'on'/'off') to provide additional functionality. 
+ * 
+ * @example
+ * 
+ *  class OriginalEventEmitter {
+
+        #extendedEventEmitter: ExtendedEventEmitter;
+        constructor() {
+            this.#extendedEventEmitter = new ExtendedEventEmitter(this);
+        }
+
+        on(event: string, listener: Function) {
+        }
+
+        off(event: string, listener: Function) {
+        }
+
+        onCancelable(event: string, listener: Function): TypedCancel {
+            return this.#extendedEventEmitter.onCancelable(event, listener);
+        }
+    }
+ */
+export class ExtendedEventEmitter<T extends EventMap> implements IExtendedEventEmitter<T> {
 
     #eventEmitter: MinimumEventEmitter;
 

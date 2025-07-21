@@ -11,7 +11,7 @@ export type MergedEventMap<T extends EventMap> = T & BaseEventMap<T>;
 
 
 
-interface TypedEventEmitterExtended<T extends EventMap> {
+export interface IExtendedEventEmitter<T extends EventMap> {
 
 
     onCancelable<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): TypedCancel;
@@ -38,8 +38,8 @@ interface TypedEventEmitterExtended<T extends EventMap> {
     conditionMetAfterTimeout<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs?:number): Promise<OnceConditionMetResponse<Parameters<T[E]>>>
 }
 
-export type TypedEventEmitter3Extended<T extends EventMap> = TypedEventEmitter3<T> & TypedEventEmitterExtended<T>;
-export type TypedEventEmitterNodeExtended<T extends EventMap> = TypedEventEmitterNode<T> & TypedEventEmitterExtended<T>;
+export type TypedEventEmitter3Extended<T extends EventMap> = TypedEventEmitter3<T> & IExtendedEventEmitter<T>;
+export type TypedEventEmitterNodeExtended<T extends EventMap> = TypedEventEmitterNode<T> & IExtendedEventEmitter<T>;
 
 export type OnceConditionMetResponse<EParams extends any[] = any> = {
     status: 'ok',
