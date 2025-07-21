@@ -1,6 +1,6 @@
 
-import type { EventMap } from "./typed-emitter.ts";
-import type { IExtendedEventEmitter, OnceConditionMetResponse, TypedCancel } from "./types.ts";
+
+import type { EventMap, IEventEmitterExtension, OnceConditionMetResponse, TypedCancel } from "../types.ts";
 
 type MinimumEventEmitter = { on: Function; off: Function };
 
@@ -15,9 +15,9 @@ type MinimumEventEmitter = { on: Function; off: Function };
  * 
  *  class OriginalEventEmitter {
 
-        #extendedEventEmitter: ExtendedEventEmitter;
+        #extendedEventEmitter: EventEmitterExtension;
         constructor() {
-            this.#extendedEventEmitter = new ExtendedEventEmitter(this);
+            this.#extendedEventEmitter = new EventEmitterExtension(this);
         }
 
         on(event: string, listener: Function) {
@@ -31,7 +31,7 @@ type MinimumEventEmitter = { on: Function; off: Function };
         }
     }
  */
-export class ExtendedEventEmitter<T extends EventMap> implements IExtendedEventEmitter<T> {
+export class EventEmitterExtension<T extends EventMap> implements IEventEmitterExtension<T> {
 
     #eventEmitter: MinimumEventEmitter;
 

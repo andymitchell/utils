@@ -1,5 +1,5 @@
 
-import { commonTests, type TestEvents } from './commonTests.ts';
+import { commonTests, type TestEvents } from '../../commonTests.ts';
 import TypedCancelableEventEmitterNode from './TypedCancelableEventEmitterNode.ts';
 
 

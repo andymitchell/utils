@@ -1,6 +1,6 @@
 import type { TypedCancelableEventEmitter } from "./index.ts";
-import type { EventMap } from "./typed-emitter.ts";
-import type TypedCancelableEventEmitter3 from "./TypedCancelableEventEmitterNode.ts";
+import type TypedCancelableEventEmitter3 from "./implementations/node/TypedCancelableEventEmitterNode.ts";
+import type { EventMap } from "./types.ts";
 
 
 type AnyTypedCancelableEventEmitter<T extends EventMap> = TypedCancelableEventEmitter<T> | TypedCancelableEventEmitter3<T>;

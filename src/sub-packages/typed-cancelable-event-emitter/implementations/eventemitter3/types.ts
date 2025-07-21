@@ -1,11 +1,12 @@
-// With thanks to https://github.com/andywer/typed-emitter from which this was taken (but customised to work with EventEmitter3)
-
-export type EventMap = {
-    [key: string]: (...args: any[]) => void
-}
+import type { EventMap, IEventEmitterExtension } from "../../types.ts";
 
 /**
- * Type-safe event emitter.
+ * A typed version of EventEmitter3, extended with helpful functions in IEventEmitterExtension (e.g. onCancelable)
+ */
+export type ITypedEventEmitter3<T extends EventMap> = ITypedEventEmitter3Source<T> & IEventEmitterExtension<T>;
+
+/**
+ * Type-safe event emitter for eventemitter3
  *
  * Use it like this:
  *
@@ -20,7 +21,7 @@ export type EventMap = {
  * myEmitter.emit("error", "x")  // <- Will catch this type error;
  * ```
  */
-export interface TypedEventEmitter3<Events extends EventMap> {
+export interface ITypedEventEmitter3Source<Events extends EventMap> {
     addListener<E extends keyof Events>(event: E, listener: Events[E]): this
     on<E extends keyof Events>(event: E, listener: Events[E]): this
     once<E extends keyof Events>(event: E, listener: Events[E]): this
@@ -37,17 +38,3 @@ export interface TypedEventEmitter3<Events extends EventMap> {
     listenerCount<E extends keyof Events>(event: E): number
 
 }
-
-export interface TypedEventEmitterNode<Events extends EventMap> extends TypedEventEmitter3<Events> {
-    
-
-    prependListener<E extends keyof Events>(event: E, listener: Events[E]): this
-    prependOnceListener<E extends keyof Events>(event: E, listener: Events[E]): this
-
-    rawListeners<E extends keyof Events>(event: E): Events[E][]
-
-    getMaxListeners(): number
-    setMaxListeners(maxListeners: number): this
-    
-}
-

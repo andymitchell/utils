@@ -1,17 +1,65 @@
-import type {EventMap, TypedEventEmitter3, TypedEventEmitterNode} from "./typed-emitter.ts";
 
-export type TypedCancel = () => void;
+/**
+ * User-defined events
+ * 
+ * @example
+ * {
+ *  'CLICK': (event: {element:HTMLElement}) => void
+ * }
+ */
+export interface EventMap {
+    [key: string]: (...args: any[]) => void
+}
 
 
+
+/**
+ * The event map, including the universal events (like newListener)
+ */
+export type MergedEventMap<T extends EventMap> = T & BaseEventMap<T>;
+
+/**
+ * The universal events provided by the lsistener
+ */
 interface BaseEventMap<T extends EventMap> {
     newListener: <E extends keyof MergedEventMap<T>>(eventName: E, listener: MergedEventMap<T>[E]) => void;//(...args: any[]) => void) => void;
     removeListener: (eventName: keyof MergedEventMap<T>, listener: (...args: any[]) => void) => void;
 }
-export type MergedEventMap<T extends EventMap> = T & BaseEventMap<T>;
 
 
 
-export interface IExtendedEventEmitter<T extends EventMap> {
+/**
+ * The cancel function for onCancelable
+ */
+export type TypedCancel = () => void;
+
+
+export type OnceConditionMetResponse<EParams extends any[] = any> = {
+    status: 'ok',
+    /**
+     * An array of the parameters each time the event fired
+     */
+    events: EParams[],
+    /**
+     * For the first event that passes the condition, this is the first parameter. Typically the `event`. 
+     */
+    firstPassParam: EParams[number]
+} | {
+    status: 'timeout',
+    /**
+     * An array of the parameters each time the event fired
+     */
+    events: EParams[]
+    
+    firstPassParam?: undefined
+}
+
+
+
+
+
+
+export interface IEventEmitterExtension<T extends EventMap> {
 
 
     onCancelable<E extends keyof MergedEventMap<T>>(event: E, listener: MergedEventMap<T>[E]): TypedCancel;
@@ -38,25 +86,5 @@ export interface IExtendedEventEmitter<T extends EventMap> {
     conditionMetAfterTimeout<E extends keyof T>(event: E, condition: (...args: Parameters<T[E]>) => boolean, timeoutMs?:number): Promise<OnceConditionMetResponse<Parameters<T[E]>>>
 }
 
-export type TypedEventEmitter3Extended<T extends EventMap> = TypedEventEmitter3<T> & IExtendedEventEmitter<T>;
-export type TypedEventEmitterNodeExtended<T extends EventMap> = TypedEventEmitterNode<T> & IExtendedEventEmitter<T>;
 
-export type OnceConditionMetResponse<EParams extends any[] = any> = {
-    status: 'ok',
-    /**
-     * An array of the parameters each time the event fired
-     */
-    events: EParams[],
-    /**
-     * For the first event that passes the condition, this is the first parameter. Typically the `event`. 
-     */
-    firstPassParam: EParams[number]
-} | {
-    status: 'timeout',
-    /**
-     * An array of the parameters each time the event fired
-     */
-    events: EParams[]
-    
-    firstPassParam?: undefined
-}
+

@@ -1,6 +1,6 @@
 
-import { commonTests } from './commonTests.ts';
-import { TypedCancelableEventEmitterNode } from './index-node.ts';
+import { commonTests } from '../../commonTests.ts';
+
 import TypedCancelableEventEmitter3 from './TypedCancelableEventEmitter3.ts';
 
 
