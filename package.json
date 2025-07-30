@@ -74,6 +74,10 @@
             "types": "./dist/email-helpers.d.ts",
             "default": "./dist/email-helpers.js"
         },
+        "./serialize-error": {
+            "types": "./dist/serialize-error.d.ts",
+            "default": "./dist/serialize-error.js"
+        },
         "./kv-storage": {
             "types": "./dist/kv-storage.d.ts",
             "default": "./dist/kv-storage.js"

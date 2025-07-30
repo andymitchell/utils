@@ -21,6 +21,8 @@ export default defineConfig({
     
     'email-helpers': "src/sub-packages/email-helpers/index.ts",
 
+    'serialize-error': "src/sub-packages/serialize-error/index.ts",
+
     'dom-helpers': "src/sub-packages/dom-helpers/index.ts",
     'dom-helpers-fuzzy-sub-string': "src/sub-packages/dom-helpers/fuzzy-sub-string/index.ts",
     'dom-helpers-content-editable': "src/sub-packages/dom-helpers/content-editable/index.ts",
