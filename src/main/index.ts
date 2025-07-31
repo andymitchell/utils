@@ -1,4 +1,4 @@
-import {  type PromiseWithTrigger, convertArrayToRecord, dLog, dLogDebug, dLogWarn, getGlobal, midnight, promiseWithTrigger, sleep } from "./misc.ts"
+import {  type PromiseWithTrigger, convertArrayToRecord, dLog, dLogDebug, dLogWarn, getGlobal, isTest, midnight, promiseWithTrigger, sleep } from "./misc.ts"
 
 
 import type { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync.ts"
@@ -21,7 +21,8 @@ export {
     dLogDebug,
     dLogWarn,
     getGlobal,
-    reduceCharactersToEssentialsForComparison
+    reduceCharactersToEssentialsForComparison,
+    isTest
 }
 
 
