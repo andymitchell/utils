@@ -1,12 +1,5 @@
 import { cloneDeepScalarValues } from "../deep-clone-scalar-values/cloneDeepScalarValues.ts";
-
-export interface SerializableError {
-    message: string;
-    cause?: unknown;
-    stack?: string;
-    name?: string;
-    originalFormat: 'Error' | 'undefined' | 'string' | 'object' | 'other' | 'internal-error';
-}
+import type { SerializableError } from "./types.ts";
 
 
 /**
