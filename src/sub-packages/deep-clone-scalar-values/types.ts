@@ -1,14 +1,3 @@
-/*import { z } from "zod";
-
-const ScalarSchema = z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-]);
-export const AnyScalarSchema = ScalarSchema;
-type Scalar = z.infer<typeof AnyScalarSchema>;
-*/
-
 import { isTypeEqual } from "../../index-browser.ts";
 
 export function isScalar(x: unknown): x is Scalar {
@@ -41,6 +30,20 @@ export type JsonValue =
   | { [key: string]: JsonValue };
 
 
+
+
+
+/**
+ * A version of `JsonValue` with its recursive depth capped.
+ */
+export type JsonValueCapped<D extends number = 6> = D extends 0
+  ? Scalar
+  :
+      | Scalar
+      | JsonValueCapped<Decrement<D>>[]
+      | { [key: string]: JsonValueCapped<Decrement<D>> };
+type Decrement<N extends number> = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ...number[]][N];
+isTypeEqual<JsonValueCapped, JsonValue>(true);
 
 
 /**
