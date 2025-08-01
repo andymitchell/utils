@@ -1,6 +1,6 @@
 {
     "name": "@andyrmitchell/utils",
-    "version": "0.22.2",
+    "version": "0.22.3",
     "description": "",
     "sideEffects": false,
     "exports": {
