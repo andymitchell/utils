@@ -39,7 +39,7 @@ export interface IQueue {
      * The number of active jobs in the queue
      */
     count():Promise<number>;
-    dispose():Promise<void>
+    dispose(timeoutMs?: number):Promise<void>
 }
 
 

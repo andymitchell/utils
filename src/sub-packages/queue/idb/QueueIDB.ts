@@ -18,7 +18,7 @@ import { BaseItemQueue } from "../common/helpers/item-queue/BaseItemQueue.ts";
 import type { IQueueIo, QueueIoEvents, QueueItemDB } from "../common/helpers/item-queue/types.ts";
 import type { FakeIdb } from "../../fake-idb/types.ts";
 import { uid } from "../../uid/index.ts";
-import { getGlobal, sleep } from "../../../main/misc.ts";
+import { getGlobal, promiseWithTrigger, sleep } from "../../../main/misc.ts";
 
 
 
@@ -194,19 +194,27 @@ class QueueIoIdb extends Dexie implements IQueueIo {
     }
 
 
-    async dispose(clientId:string) {
+    async dispose(clientId:string, progressTracker:string[]) {
         this.#disposed = true;
+
         if( this.#dexieSubscription ) {
             this.#dexieSubscription.unsubscribe();
         }
 
+        progressTracker.push("dexie unsubscribed");
 
         await this.#queue.where('client_id').equals(clientId).delete();
 
+        progressTracker.push("deleted client id");
+
         super.close();
+
+        progressTracker.push('super.closed');
 
         // Dexie's unsubscribe (and maybe close) aren't promises, but they do take time to run, breaking tests by leaving open handles. 
         await sleep(3000);
+        progressTracker.push('slept');
+
     }
 
 }

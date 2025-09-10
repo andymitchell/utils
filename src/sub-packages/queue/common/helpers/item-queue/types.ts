@@ -35,5 +35,5 @@ export interface IQueueIo {
     deleteItem(itemId: number):Promise<void>
     completeItem(item:QueueItemDB, force?: boolean):Promise<void>
     countItems():Promise<number>
-    dispose(clientId:string):Promise<void>
+    dispose(clientId:string, progressTracker?: string[]):Promise<void>
 }

@@ -253,26 +253,48 @@ export class BaseItemQueue implements IQueue {
     }
 
     
-    async dispose() {
+    async dispose(timeoutMs = 1000*20) {
         this.disposed = true;
 
-        if( this.nextTimeout  ) clearTimeout(this.nextTimeout);
 
-        const jobs = Object.values(this.jobs);
-        this.jobs = {};
-        jobs.forEach(job => {
-            job.resolve(null);
-        })
+        let progress:string[] = [];
+        const pwt = promiseWithTrigger<void>(timeoutMs);
 
-        if( this.lockingRequests.length ) {
-            const timeout = setTimeout(() => {
-                throw new Error("Cannot dispose while things still running");
-            }, 4000);
-            await Promise.all(this.lockingRequests.map(x => x.promise));
-            clearTimeout(timeout);
+        (async () => {
+                
+            if( this.nextTimeout  ) clearTimeout(this.nextTimeout);
+
+            const jobs = Object.values(this.jobs);
+            this.jobs = {};
+            jobs.forEach(job => {
+                job.resolve(null);
+            })
+
+            progress.push("jobs resolved");
+
+            if( this.lockingRequests.length ) {
+                const timeout = setTimeout(() => {
+                    progress.push("Error: Cannot dispose while things still running [4000ms]");
+                }, 4000);
+                await Promise.all(this.lockingRequests.map(x => x.promise));
+                clearTimeout(timeout);
+            }
+
+            progress.push("locking requests resolved");
+
+            await this.queueIo.dispose(this.clientId, progress);
+        
+            progress.push('complete');
+
+            pwt.trigger();
+        })();
+
+
+        try {
+            await pwt.promise;
+        } catch(e) {
+            throw new Error(`BaseItemQueue dispose timed out. Progress: ${progress.join()}`)
         }
-
-        await this.queueIo.dispose(this.clientId);
 
     }
 
