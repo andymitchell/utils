@@ -54,24 +54,28 @@ export class BaseItemQueue implements IQueue {
                 descriptor
             };
 
+            let item:QueueItemDB;
             const clearRequest = this.request('run');
-            let item:QueueItemDB = {
-                // @ts-ignore IDB will fill 'id' in
-                id: undefined,
-                attempts: 0,
-                ts: Date.now(),
-                client_id: this.clientId, 
-                client_id_job_count: Object.values(this.jobs).length,
-                job_id,
-                descriptor,
-                start_after_ts: 0,
-                completed_at: 0
-            }
-            
-            item = await this.queueIo.addItem(item);
-            
+            try {
+                item = {
+                    // @ts-ignore IDB will fill 'id' in
+                    id: undefined,
+                    attempts: 0,
+                    ts: Date.now(),
+                    client_id: this.clientId, 
+                    client_id_job_count: Object.values(this.jobs).length,
+                    job_id,
+                    descriptor,
+                    start_after_ts: 0,
+                    completed_at: 0
+                }
+                
+                item = await this.queueIo.addItem(item);
+                
 
-            clearRequest();
+            } finally {
+                clearRequest();
+            }
             if( enqueuedCallback ) enqueuedCallback();
             
             if( halt ) {
@@ -110,32 +114,35 @@ export class BaseItemQueue implements IQueue {
         
         const clearRequest = this.request('next');
 
-        
-        
-        
-        const nextItem = await this.queueIo.nextItem(this.clientId);
-        
-        
-        if( nextItem ) {
-            const {item, run_id} = nextItem;
+        try {
             
+            
+            const nextItem = await this.queueIo.nextItem(this.clientId);
+            
+            
+            if( nextItem ) {
+                const {item, run_id} = nextItem;
+                
 
-            const result = await this.runItem(item);
-            
-            if( result && result.delayed_until_ts ) {
+                const result = await this.runItem(item);
+                
+                if( result && result.delayed_until_ts ) {
+
+                    
+                    await this.queueIo.updateItem(item.id, {run_id, started_at: undefined, start_after_ts: result.delayed_until_ts});
+                    await this.queueIo.incrementAttempts(item.id);
+
+                    setTimeout(() => this.next(true), (result.delayed_until_ts-Date.now())+1);
+                }
 
                 
-                await this.queueIo.updateItem(item.id, {run_id, started_at: undefined, start_after_ts: result.delayed_until_ts});
-                await this.queueIo.incrementAttempts(item.id);
 
-                setTimeout(() => this.next(true), (result.delayed_until_ts-Date.now())+1);
             }
 
-            
-
+        } finally {
+            clearRequest();
         }
 
-        clearRequest();
     }
 
 
@@ -223,26 +230,29 @@ export class BaseItemQueue implements IQueue {
     ) {
         
         const clearRequest = this.request('checkTimeout');
+        try {
+        
+            const items = await this.queueIo.listItems();
 
-    
-        const items = await this.queueIo.listItems();
-
-        for( const item of items ) {
-            const clientIdText = this.clientId!==item.client_id? `[Different client ID to item: ${this.clientId}]` : '';
-            if( item.completed_at && item.completed_at<completedCutoff ) {
-                console.log(`QueueIDB [${this.id}] cleaning up a completed item. ${clientIdText}`, {item});
-                await this.queueIo.deleteItem(item.id);
-            } else if( item.started_at && !item.completed_at && item.started_at<startedCutoff ) {
-                console.warn(`QueueIDB [${this.id}] a started item timed out, which should never happen. ${clientIdText}`, {item});
-                await this.completeItem(item, undefined, "Started, but timed out", true);
-            } else if( !item.started_at && !item.completed_at && item.ts<notStartedCutoff ) {
-                console.warn(`QueueIDB [${this.id}] an item never started, which should never happen. ${clientIdText}`, {item});
-                await this.completeItem(item, undefined, "Item never started, timed out", true);
+            for( const item of items ) {
+                const clientIdText = this.clientId!==item.client_id? `[Different client ID to item: ${this.clientId}]` : '';
+                if( item.completed_at && item.completed_at<completedCutoff ) {
+                    console.log(`QueueIDB [${this.id}] cleaning up a completed item. ${clientIdText}`, {item});
+                    await this.queueIo.deleteItem(item.id);
+                } else if( item.started_at && !item.completed_at && item.started_at<startedCutoff ) {
+                    console.warn(`QueueIDB [${this.id}] a started item timed out, which should never happen. ${clientIdText}`, {item});
+                    await this.completeItem(item, undefined, "Started, but timed out", true);
+                } else if( !item.started_at && !item.completed_at && item.ts<notStartedCutoff ) {
+                    console.warn(`QueueIDB [${this.id}] an item never started, which should never happen. ${clientIdText}`, {item});
+                    await this.completeItem(item, undefined, "Item never started, timed out", true);
+                }
             }
-        }
 
+        } finally {
+            clearRequest();
+        }
     
-        clearRequest();
+        
 
         if( this.nextTimeout ) clearTimeout(this.nextTimeout);
         if( !this.disposed ) {
