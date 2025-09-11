@@ -73,6 +73,8 @@ export class BaseItemQueue implements IQueue {
                 item = await this.queueIo.addItem(item);
                 
 
+            } catch(e) {
+                reject(e);
             } finally {
                 clearRequest();
             }
