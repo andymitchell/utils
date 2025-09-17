@@ -3,7 +3,7 @@
 //document.body.setAttribute('data-formz_debug_enterreplacement', '1');
 const isDebugging = () => true || !!document.body.dataset['formz_debug_enterreplacement'];
 
-type KeySignature = {key: string, shiftKey?:boolean};
+type KeySignature = {key: string, shiftKey?:boolean, ctrlKey?: boolean, metaKey?: boolean};
 export class KeyRemapping {
 
     private unregisters: Function[];
@@ -81,7 +81,10 @@ function getNodeAtCursor() {
 
 function matchKeySignature(event:KeyboardEvent, keys:KeySignature[]) {
     return keys.some(key=> {
-        return key.key===event.key && (key.shiftKey===undefined || key.shiftKey===event.shiftKey);
+        return key.key===event.key && 
+        (key.shiftKey===undefined || key.shiftKey===event.shiftKey) &&
+        (key.ctrlKey===undefined || key.ctrlKey===event.ctrlKey) &&
+        (key.metaKey===undefined || key.metaKey===event.metaKey);
     })
 }
 
