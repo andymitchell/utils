@@ -217,10 +217,10 @@ function focusContentEditable(editableDiv:HTMLElement):void {
 function isTesting():boolean { 
     
     try {
-        if( typeof navigator!==undefined && navigator.userAgent.includes('jsdom') ) return true;
+        if( typeof navigator!=='undefined' && navigator.userAgent.includes('jsdom') ) return true;
     } finally {}
     try {
-        if( typeof process!==undefined && process?.env?.NODE_ENV==='test' ) return true;
+        if( typeof process!=='undefined' && process?.env?.NODE_ENV==='test' ) return true;
     } finally {}
 
     return false;
