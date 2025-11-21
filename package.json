@@ -1,6 +1,6 @@
 {
     "name": "@andyrmitchell/utils",
-    "version": "0.23.4",
+    "version": "0.24.0",
     "description": "",
     "sideEffects": false,
     "exports": {
@@ -58,7 +58,6 @@
             "types": "./dist/stable-json-stringify.d.ts",
             "default": "./dist/stable-json-stringify.js"
         },
-        
         "./uid": {
             "types": "./dist/uid.d.ts",
             "default": "./dist/uid.js"
