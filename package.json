@@ -54,6 +54,11 @@
             "types": "./dist/fetch-pacer.d.ts",
             "default": "./dist/fetch-pacer.js"
         },
+        "./stable-json-stringify": {
+            "types": "./dist/stable-json-stringify.d.ts",
+            "default": "./dist/stable-json-stringify.js"
+        },
+        
         "./uid": {
             "types": "./dist/uid.d.ts",
             "default": "./dist/uid.js"

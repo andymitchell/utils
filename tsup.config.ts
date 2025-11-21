@@ -16,6 +16,8 @@ export default defineConfig({
     'deep-freeze': "src/sub-packages/deep-freeze/index.ts",
     'prettify-zod-v3-error': "src/sub-packages/prettify-zod-v3-error/index.ts",
     'fetch-pacer': "src/sub-packages/fetch-pacer/index.ts",
+
+    'stable-json-stringify': "src/sub-packages/stable-json-stringify/index.ts",
     
     'deep-clone-scalar-values': "src/sub-packages/deep-clone-scalar-values/index.ts",
     

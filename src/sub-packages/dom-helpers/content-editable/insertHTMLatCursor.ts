@@ -161,8 +161,8 @@ export function _insertHTMLatCursor(
  * @throws If the active selection’s range is not inside `editableDiv` (and can’t be corrected).
  */
 function getRangeForCursorInElement(editableDiv:HTMLElement, selection: Selection, assistTesting = true):Range | undefined {
-    if( (selection.rangeCount===0) && assistTesting && isTesting() ) {
-        // This indicates there's no cursor set anywhere. This is typical in a test environment like JSDom where it may have focused on nothing. 
+    if( (selection.rangeCount===0) ) {
+        // This indicates there's no cursor set anywhere, so force it.
         focusContentEditable(editableDiv);
     }
 
@@ -172,7 +172,6 @@ function getRangeForCursorInElement(editableDiv:HTMLElement, selection: Selectio
     range = selection.getRangeAt(0);
     if( !editableDiv.contains(range.commonAncestorContainer) && assistTesting && isTesting() ) {
         // This can happen in testing as things like JSDom might not update on the initial element.focus() to select the correct input box - so force it
-        console.log("Changing focus");
         focusContentEditable(editableDiv);
     }
     range = selection.getRangeAt(0);
