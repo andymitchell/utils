@@ -30,6 +30,7 @@ export interface Options {
     cmp?: Comparator;
 }
 
+export type JsonStringifyReturnType = ReturnType<typeof JSON.stringify>;
 
 /**
  * Stringify a JSON object with a deterministic key order.
@@ -40,4 +41,4 @@ export interface Options {
 export type StableJsonStringify = (
     data: any,
     options?: Options
-) => ReturnType<typeof JSON.stringify>;
+) => JsonStringifyReturnType;

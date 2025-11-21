@@ -1,4 +1,4 @@
-import type { StableJsonStringify } from "./types.ts";
+import type { JsonStringifyReturnType, StableJsonStringify } from "./types.ts";
 
 /**
  * Stringify a JSON object with a deterministic key order.
@@ -96,7 +96,7 @@ export const stableJsonStringifyInline: StableJsonStringify = (data, options) =>
         return out;
     };
 
-    const result = stringify(data);
-    return result===undefined? JSON.stringify(undefined) : result;
+    // JSON.stringify can return undefined (see `JSON.stringify(undefined)`), it just doesn't admit it in the type system. So coerce it.
+    return stringify(data) as JsonStringifyReturnType;
 };
 
