@@ -40,4 +40,4 @@ export interface Options {
 export type StableJsonStringify = (
     data: any,
     options?: Options
-) => string | undefined;
+) => ReturnType<typeof JSON.stringify>;

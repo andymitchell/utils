@@ -6,7 +6,6 @@ import type { StableJsonStringify } from './types.ts';
 
 
 performanceComparison('stableJsonStringifyInline', 'stableJsonStringifyOrderedClone', stableJsonStringifyInline, stableJsonStringifyOrderedClone);
-
 commonTests(stableJsonStringifyOrderedClone);
 commonTests(stableJsonStringifyInline);
 
@@ -208,6 +207,7 @@ function commonTests(stringify:StableJsonStringify) {
 
         describe('Edge Cases & Full Coverage', () => {
             it('should return undefined for root undefined', () => {
+                console.log(stringify(undefined))
                 expect(stringify(undefined)).toBeUndefined();
             });
 

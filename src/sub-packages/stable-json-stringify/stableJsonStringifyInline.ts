@@ -7,7 +7,7 @@ import type { StableJsonStringify } from "./types.ts";
  * @param options - Configuration options.
  */
 export const stableJsonStringifyInline: StableJsonStringify = (data, options) => {
-    // Inspired by https://github.com/epoberezkin/fast-json-stable-stringify, but found to be than ordered clone. Not recommended.
+    // Inspired by https://github.com/epoberezkin/fast-json-stable-stringify, but found to be slower than ordered clone. Not recommended.
 
     const opts = options || {};
     const cycles = opts.serialize_circular_references === true;
@@ -96,6 +96,7 @@ export const stableJsonStringifyInline: StableJsonStringify = (data, options) =>
         return out;
     };
 
-    return stringify(data);
+    const result = stringify(data);
+    return result===undefined? JSON.stringify(undefined) : result;
 };
 
