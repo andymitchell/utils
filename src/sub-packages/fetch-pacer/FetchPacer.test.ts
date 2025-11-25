@@ -512,7 +512,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
             describe('minimum_time_between_fetch', () => {
                 it('enforces minimum_time_between_fetch for sequential fetches', async () => {
                     const min = 60;
-                    const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: min });
+                    const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: min, testing_queue_disable_check_timeout: true });
                     pacer.getMockPaceTracker().getActiveBackOffForMs.mockResolvedValue(undefined);
 
                     const callTimes: number[] = [];
