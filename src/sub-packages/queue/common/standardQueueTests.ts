@@ -2,7 +2,7 @@
 import { promiseWithTrigger, sleep } from "../../../main/misc.ts";
 import type { IQueue, QueueConstructorOptions, QueueFunction } from "../types.ts";
 
-export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueueFunction: (options?:QueueConstructorOptions) => QueueFunction, createQueue: (options?:QueueConstructorOptions) => Promise<IQueue>) {
+export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueueFunction: () => QueueFunction, createQueue: (options?:QueueConstructorOptions) => Promise<IQueue>) {
     
     test('Queue basic', async () => {
 

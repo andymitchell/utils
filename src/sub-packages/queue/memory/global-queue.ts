@@ -10,7 +10,7 @@ This is fixed if your test runner isolates global variables per test file (as Je
 
 
 import { QueueMemory } from "./QueueMemory.ts";
-import type { HaltPromise, QueueFunction, Testing } from "../types.ts";
+import type { HaltPromise, QueueConstructorOptions, QueueFunction, Testing } from "../types.ts";
 
 const queueTestFiles:string[] = [];
 let queuesMemorys:{[queueName:string]: QueueMemory} = {};
@@ -24,8 +24,8 @@ export const queueRunSyncIfPossible = <T>(queueName:string, onRun:(...args: any[
     return q.runSyncIfPossible(onRun, descriptor, halt);
 }
     
-export const queue:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing):Promise<T> => {
-    if( !queuesMemorys[queueName] ) queuesMemorys[queueName] = new QueueMemory(queueName);
+export const queue:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void,options?: QueueConstructorOptions,  testing?: Testing):Promise<T> => {
+    if( !queuesMemorys[queueName] ) queuesMemorys[queueName] = new QueueMemory(queueName, options);
     const q:QueueMemory | undefined = queuesMemorys[queueName];
     if( !q ) throw new Error("noop - queue should be there");
     

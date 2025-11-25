@@ -16,9 +16,9 @@ export class QueueWorkspaceIDB extends QueueWorkspace {
     }
 
 
-    enqueueIDB:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?) => {
+    enqueueIDB:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?, options?) => {
         if( this.disposed ) throw new Error("QueueWorkspace is disposed. Can't enqueue.");
-        if( !this.queueIDBs[queueName] ) this.queueIDBs[queueName] = new QueueIDB(queueName, this.testing);
+        if( !this.queueIDBs[queueName] ) this.queueIDBs[queueName] = new QueueIDB(queueName, options, this.testing);
         return this.queueIDBs[queueName]!.enqueue(onRun, descriptor, halt, enqueuedCallback);
     }
 

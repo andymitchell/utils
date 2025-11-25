@@ -6,7 +6,7 @@ import { fakeIdb } from "../../fake-idb/index.ts";
 
 
 
-import type { HaltPromise, QueueFunction } from "../types.ts";
+import type { HaltPromise, QueueConstructorOptions, QueueFunction } from "../types.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
 import { QueueIDB, type TestingIDB } from "./QueueIDB.ts";
 import { uid } from "../../uid/uid.ts";
@@ -27,16 +27,16 @@ describe('queueIDB global test', () => {
         expect, 
         () => {
             const queueNameSpace = uid();
-            return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: any) => {
+            return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void,  options?: QueueConstructorOptions, testing?: any) => {
                 if( !testing ) testing = {};
                 testing.idb = fakeIdb();
                 return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
             }) as QueueFunction
         },
-        async () => {
+        async (options) => {
             const testing:TestingIDB = {};
             testing.idb = fakeIdb();
-            return new QueueIDB('', testing)
+            return new QueueIDB('', options, testing)
         }
     );
     

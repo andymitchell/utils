@@ -9,7 +9,7 @@ This is fixed if your test runner isolates global variables per test file (as Je
 */
 
 import { QueueIDB, type TestingIDB } from "./QueueIDB.ts";
-import type { HaltPromise, QueueFunction } from "../types.ts";
+import type { HaltPromise, QueueConstructorOptions, QueueFunction } from "../types.ts";
 
 const queueTestFiles:string[] = [];
 let queueDbs:{[queueName:string]: QueueIDB} = {};
@@ -36,8 +36,8 @@ export function registerTestFileUsingGlobalQueuesIDB(name:string) {
     queueTestFiles.push(name);
 }
 
-export const queueIDB:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: TestingIDB):Promise<T> => {
-    if( !queueDbs[queueName] ) queueDbs[queueName] = new QueueIDB(queueName, testing);
+export const queueIDB:QueueFunction = async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, options?: QueueConstructorOptions, testing?: TestingIDB):Promise<T> => {
+    if( !queueDbs[queueName] ) queueDbs[queueName] = new QueueIDB(queueName, options, testing);
     const q:QueueIDB | undefined = queueDbs[queueName];
     if( !q ) throw new Error("noop - queue should be there");
     if( q.isTestingIdb()!==(!!testing?.idb) ) throw new Error("Must be consistent in using 'testing' on a queue name");

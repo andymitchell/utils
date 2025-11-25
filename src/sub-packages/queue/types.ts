@@ -37,7 +37,7 @@ export type OnRun<T = any> = (queueItem:PublicQueueItem) => T | PromiseLike<T>
  * @param halt A mechanism to stop the job from running, externally 
  * @param enqueuedCallback Callback after successfully added to the queue
  */
-export type QueueFunction = <T>(queueName: string, onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing) => Promise<T>;
+export type QueueFunction = <T>(queueName: string, onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, options?: QueueConstructorOptions, testing?: Testing) => Promise<T>;
 
 
 export interface IQueue {
