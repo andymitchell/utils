@@ -6,6 +6,7 @@
 import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import { uid } from "../../uid/uid.ts";
 import { calculateTimings } from "../common/calculateTimings.ts";
+import { descriptorTextForError } from "../common/descriptorTextForError.ts";
 import preventCompletionFactory from "../common/preventCompletionFactory.ts";
 import { MAX_RUNTIME_MS } from "../consts.ts";
 import type { HaltPromise, IQueue, JobItem, OnRun, QueueConstructorOptions, QueueEvents, QueueTimings } from "../types.ts";
@@ -161,9 +162,9 @@ export class QueueMemory implements IQueue {
         }
 
         if( error instanceof Error ) {
-            error.message += ` [descriptor: ${q.descriptor}]`;
+            error.message += descriptorTextForError(q.descriptor);
         } else if( typeof error==='string' ) {
-            error += ` [descriptor: ${q.descriptor}]`
+            error += descriptorTextForError(q.descriptor);
         }
     
         error? q.reject(error) : q.resolve(output);

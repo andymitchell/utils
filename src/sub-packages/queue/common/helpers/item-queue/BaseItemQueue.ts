@@ -7,6 +7,7 @@ import { promiseWithTrigger } from "../../../../../main/misc.ts";
 import { MAX_RUNTIME_MS } from "../../../consts.ts";
 import { calculateTimings } from "../../calculateTimings.ts";
 import { TypedCancelableEventEmitter } from "../../../../typed-cancelable-event-emitter/index.ts";
+import { descriptorTextForError } from "../../descriptorTextForError.ts";
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
 
@@ -233,9 +234,9 @@ export class BaseItemQueue implements IQueue {
         if( job ) {
             if( error ) {
                 if( error instanceof Error ) {
-                    error.message += ` [descriptor: ${item.descriptor}]`;
+                    error.message += descriptorTextForError(item.descriptor);
                 } else if( typeof error==='string' ) {
-                    error += ` [descriptor: ${item.descriptor}]`
+                    error += descriptorTextForError(item.descriptor);
                 }
                 job.reject(error);
             } else {
