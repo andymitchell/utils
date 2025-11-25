@@ -1,9 +1,16 @@
+import type { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
 
 export type Testing = { suppress_long_running_warning?: boolean};
 
 export type HaltPromise = Promise<void>;
 
+
+
+
+export type QueueConstructorOptions = {
+    max_run_time_ms?: number
+}
 
 
 type PublicQueueItem = {
@@ -34,6 +41,7 @@ export type QueueFunction = <T>(queueName: string, onRun: OnRun<T>, descriptor?:
 
 
 export interface IQueue {
+    emitter: TypedCancelableEventEmitter<QueueEvents>;
     enqueue<T>(onRun: OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):PromiseLike<T>,
     /**
      * The number of active jobs in the queue
@@ -43,13 +51,35 @@ export interface IQueue {
 }
 
 
+export type QueueTimings = {
+    max_runtime_ms: number,
+    check_timeout_interval_ms: number
+}
 
-export type JobItem = {
+/**
+ * Intended to be serialisable, and just sufficient for a logger. 
+ * 
+ */
+export type BaseItem = {
     job_id: string,
     created_at: number,
+    started_at?: number,
+    descriptor?: string
+}
+
+
+/**
+ * JobItem is in memory only, even if using a serialisable data store, as it contains the callback functions. 
+ * 
+ * A serialiable store will typically maintain two Item definitions that derive from BaseItem: the serialisable meta data (how many runs, completed, etc.) and the in-memory version
+ */
+export type JobItem = BaseItem & {
 	resolve: Function,
 	reject: Function,
     onRun: OnRun,
     running?: boolean,
-    descriptor?: string
 };
+
+export type QueueEvents<J extends BaseItem = BaseItem> = {
+    'RUNNING_TOO_LONG': (event:{job:J}) => void;
+}

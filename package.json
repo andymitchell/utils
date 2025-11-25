@@ -123,6 +123,10 @@
         "./queue-testing": {
             "types": "./dist/queue-testing.d.ts",
             "default": "./dist/queue-testing.js"
+        },
+        "./queue-base": {
+            "types": "./dist/queue-base.d.ts",
+            "default": "./dist/queue-base.js"
         }
     },
     "types": "./dist/index.d.ts",

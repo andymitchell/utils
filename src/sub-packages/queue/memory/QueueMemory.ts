@@ -3,9 +3,12 @@
  */
 
 
+import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import { uid } from "../../uid/uid.ts";
+import { calculateTimings } from "../common/calculateTimings.ts";
 import preventCompletionFactory from "../common/preventCompletionFactory.ts";
-import type { HaltPromise, IQueue, JobItem, OnRun } from "../types.ts";
+import { MAX_RUNTIME_MS } from "../consts.ts";
+import type { HaltPromise, IQueue, JobItem, OnRun, QueueConstructorOptions, QueueEvents, QueueTimings } from "../types.ts";
 
 
 
@@ -13,6 +16,7 @@ type QueueItem = JobItem & {
     attempts: number,
 	running: boolean,
     halted?: boolean,
+    started_at?: number,
     start_after_ts?: number
 };
 
@@ -21,17 +25,40 @@ type QueueItem = JobItem & {
 const emptyFunction = () => {};
 
 
+
 export class QueueMemory implements IQueue {
+
+    emitter = new TypedCancelableEventEmitter<QueueEvents>();
     private queue:QueueItem[];
     private id:string;
     private disposed:boolean;
     private client_id:string;
+    private timings:QueueTimings;
+    private unloaders: Function[] = [];
 
-    constructor(id:string) {
+    constructor(id:string, options?: QueueConstructorOptions) {
         this.id = id;
         this.queue = [];
         this.disposed = false;
         this.client_id = uid();
+
+        this.timings = calculateTimings(options);
+
+        
+
+        const timeoutId = setInterval(() => {
+            this.#checkTimeout();
+        }, this.timings.check_timeout_interval_ms)
+        this.unloaders.push(() => clearInterval(timeoutId));
+    }
+
+    #checkTimeout() {
+        const startedCutoff = Date.now()-this.timings.max_runtime_ms;
+        const longRunning = this.queue.find(x => x.running && x.started_at && x.started_at<startedCutoff);
+
+        if( longRunning ) {
+            this.emitter.emit('RUNNING_TOO_LONG', {job: longRunning});
+        }
     }
 
     async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):Promise<T> {
@@ -69,6 +96,8 @@ export class QueueMemory implements IQueue {
     async dispose() {
         this.disposed = true;
 
+        this.unloaders.forEach(x => x());
+
         const queue = [...this.queue];
         this.queue = [];
         queue.forEach(q => {
@@ -90,6 +119,7 @@ export class QueueMemory implements IQueue {
         if( this.disposed ) return;
 
         q.running = true;
+        q.started_at = Date.now();
 
         const delay = (delayMs:number) => {
             q.running = false;
@@ -125,6 +155,12 @@ export class QueueMemory implements IQueue {
         
         if( !q.halted && this.queue[0]!==q ) {
             throw new Error("Something went wrong in queue");
+        }
+
+        if( error instanceof Error ) {
+            error.message += ` [descriptor: ${q.descriptor}]`;
+        } else if( typeof error==='string' ) {
+            error += ` [descriptor: ${q.descriptor}]`
         }
     
         error? q.reject(error) : q.resolve(output);

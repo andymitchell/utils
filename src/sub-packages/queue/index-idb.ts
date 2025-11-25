@@ -1,5 +1,5 @@
 
-import { BaseItemQueue } from "./common/helpers/item-queue/BaseItemQueue.ts";
+
 import { disposeAllGlobalQueuesIDB, queueIDB, registerTestFileUsingGlobalQueuesIDB } from "./idb/global-queue.ts"
 import { QueueIDB } from "./idb/QueueIDB.ts"
 import { QueueWorkspaceIDB } from "./idb/QueueWorkspaceIDB.ts"
@@ -11,8 +11,7 @@ export {
     QueueIDB,
     QueueWorkspaceIDB,
     registerTestFileUsingGlobalQueuesIDB,
-    disposeAllGlobalQueuesIDB,
-    BaseItemQueue
+    disposeAllGlobalQueuesIDB
 }
 
 export * from './index-types.ts';

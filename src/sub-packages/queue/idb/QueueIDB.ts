@@ -10,16 +10,16 @@
  */
 
 import { Dexie, type Subscription, liveQuery } from "dexie";
-import type { IQueue, Testing } from "../types.ts";
+import type { BaseItem, IQueue, QueueConstructorOptions, QueueEvents, Testing } from "../types.ts";
 
 
 import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import { BaseItemQueue } from "../common/helpers/item-queue/BaseItemQueue.ts";
-import type { IQueueIo, QueueIoEvents, QueueItemDB } from "../common/helpers/item-queue/types.ts";
+import type { IQueueIo, QueueIoEvents, BaseItemDurable } from "../common/helpers/item-queue/types.ts";
 import type { FakeIdb } from "../../fake-idb/types.ts";
 import { uid } from "../../uid/index.ts";
-import { getGlobal, promiseWithTrigger, sleep } from "../../../main/misc.ts";
-import type { ZodStringCheck } from "zod";
+import { getGlobal, sleep } from "../../../main/misc.ts";
+
 
 
 
@@ -29,15 +29,14 @@ export type TestingIDB = Testing & {idb?:FakeIdb, idb_with_multiple_clients?: bo
 
 export class QueueIDB extends BaseItemQueue implements IQueue {
     
-    
 
-    constructor(id:string, testing?: TestingIDB) {
+    constructor(id:string, options?:QueueConstructorOptions, testing?: TestingIDB) {
 
         if( !getGlobal().indexedDB && !testing?.idb ) {
             throw new Error("QueueIDB cannot find IndexedDB to use. Either use a supporting browser, or if in a Node env provide a custom indexedDb (e.g. fake-indexeddb");
         }
 
-        super(id, new QueueIoIdb(id, testing))
+        super(id, new QueueIoIdb(id, testing), options)
 
 
         
@@ -55,7 +54,7 @@ export class QueueIDB extends BaseItemQueue implements IQueue {
 class QueueIoIdb extends Dexie implements IQueueIo {
     emitter: TypedCancelableEventEmitter<QueueIoEvents> = new TypedCancelableEventEmitter();
     #id: string;
-    #queue: Dexie.Table<QueueItemDB, number>;
+    #queue: Dexie.Table<BaseItemDurable, number>;
     #dexieSubscription?: Subscription;
     //#testing?: Testing;
     #testing_idb: boolean
@@ -106,7 +105,7 @@ class QueueIoIdb extends Dexie implements IQueueIo {
         
     }
 
-    async addItem(item:QueueItemDB):Promise<QueueItemDB> {
+    async addItem(item:BaseItemDurable):Promise<BaseItemDurable> {
         const id = await this.#queue.add(item);
         
         item = {
@@ -122,8 +121,8 @@ class QueueIoIdb extends Dexie implements IQueueIo {
 
     async nextItem(clientId:string) {
         const run_id = uid();
-        let items:QueueItemDB[] | undefined;
-        let firstIncompleteItem:QueueItemDB | undefined;
+        let items:BaseItemDurable[] | undefined;
+        let firstIncompleteItem:BaseItemDurable | undefined;
         let markedStarted:boolean = false;
         await this.transaction('rw', this.#queue, async () => {
 
@@ -153,7 +152,7 @@ class QueueIoIdb extends Dexie implements IQueueIo {
 
     }
 
-    async updateItem(itemId: number, changes:Partial<QueueItemDB>) {
+    async updateItem(itemId: number, changes:Partial<BaseItemDurable>) {
         const changed = (await this.#queue.update(itemId, changes))>0;
         return changed;
     }
@@ -171,8 +170,8 @@ class QueueIoIdb extends Dexie implements IQueueIo {
         await this.#queue.delete(itemId);
     }
 
-    async completeItem(item:QueueItemDB, force?: boolean) {
-        let latestItem: QueueItemDB | undefined;
+    async completeItem(item:BaseItemDurable, force?: boolean) {
+        let latestItem: BaseItemDurable | undefined;
         let markedComplete:boolean = false;
         await this.transaction('rw', this.#queue, async () => {
             latestItem = await this.#queue.get(item.id);
@@ -202,6 +201,7 @@ class QueueIoIdb extends Dexie implements IQueueIo {
             this.#dexieSubscription.unsubscribe();
         }
 
+        this.emitter.removeAllListeners();
 
         await this.#queue.where('client_id').equals(clientId).delete();
 

@@ -2,7 +2,7 @@
 
 import { sleep } from "../../../index-browser.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
-import type { HaltPromise, Testing } from "../types.ts";
+import type { HaltPromise, QueueConstructorOptions, Testing } from "../types.ts";
 import { QueueMemory } from "./QueueMemory.ts";
 import {v4 as uuidV4} from 'uuid';
 
@@ -16,10 +16,10 @@ afterAll(async () => {
     queues = {};
 }, 1000*10)
 
-function newQueue(queueName:string, testing?: Testing):QueueMemory {
+function newQueue(queueName:string, options?: QueueConstructorOptions, testing?: Testing):QueueMemory {
     if( queues[queueName] ) return queues[queueName]!;
 
-    const queueMemory = new QueueMemory(queueName);
+    const queueMemory = new QueueMemory(queueName, options);
     queues[queueName] = queueMemory;
     return queueMemory;
 }
@@ -30,14 +30,14 @@ describe('QueueMemory class test', () => {
     standardQueueTests(
         test, 
         expect, 
-        () => {
+        (options) => {
             return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: Testing) => {
-                const queueMemory = newQueue(queueName, testing);
+                const queueMemory = newQueue(queueName, options, testing);
                 return await queueMemory.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
             })
         },
-        async () => {
-            return newQueue(uuidV4());
+        async (options) => {
+            return newQueue(uuidV4(), options);
         }
     );
     

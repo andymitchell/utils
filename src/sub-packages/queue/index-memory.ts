@@ -13,7 +13,7 @@ export {
     QueueWorkspace,
     registerTestFileUsingGlobalQueues,
     disposeAllGlobalQueues,
-    BaseItemQueue
+    
     
 }
 

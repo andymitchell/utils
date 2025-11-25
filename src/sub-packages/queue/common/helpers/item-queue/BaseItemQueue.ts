@@ -1,9 +1,12 @@
 
 import preventCompletionFactory from "../../preventCompletionFactory.ts";
-import type { HaltPromise, IQueue, JobItem, OnRun } from "../../../types.ts";
-import type { IQueueIo, QueueItemDB } from "./types.ts";
+import type { HaltPromise, IQueue, JobItem, OnRun, QueueConstructorOptions, QueueEvents, QueueTimings } from "../../../types.ts";
+import type { IQueueIo, BaseItemDurable } from "./types.ts";
 import { uid } from "../../../../uid/uid.ts";
 import { promiseWithTrigger } from "../../../../../main/misc.ts";
+import { MAX_RUNTIME_MS } from "../../../consts.ts";
+import { calculateTimings } from "../../calculateTimings.ts";
+import { TypedCancelableEventEmitter } from "../../../../typed-cancelable-event-emitter/index.ts";
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
 
@@ -12,19 +15,28 @@ type LockingRequest = {id: string, details: string, promise:Promise<void>};
  */
 export class BaseItemQueue implements IQueue {
     
+
+    emitter = new TypedCancelableEventEmitter<QueueEvents>;
+
     protected id:string;
     protected queueIo:IQueueIo;
     protected clientId:string = uid();
     protected jobs:Record<string, JobItem> = {};
     protected nextTimeout?: number | NodeJS.Timeout;
-    protected maxRunTimeMs:number = 1000*60*5;
+    protected timings:QueueTimings;
+    
     protected lockingRequests:LockingRequest[] = [];
     protected disposers: Function[] = [];
     protected disposed:boolean;
 
-    constructor(id:string, queueIo: IQueueIo) {
+    constructor(id:string, queueIo: IQueueIo, options?:QueueConstructorOptions) {
         this.queueIo = queueIo;
-        
+        this.timings = calculateTimings(options);
+
+
+        this.queueIo.emitter.addListener('RUNNING_TOO_LONG', event => 
+            this.emitter.emit('RUNNING_TOO_LONG', event)
+        )
         
         this.disposers.push(
             this.queueIo.emitter.onCancelable('MODIFIED', () => {
@@ -51,23 +63,25 @@ export class BaseItemQueue implements IQueue {
                 resolve,
                 reject,
                 onRun,
-                descriptor
+                descriptor,
+                
             };
 
-            let item:QueueItemDB;
+            let item:BaseItemDurable;
             const clearRequest = this.request('run');
             try {
                 item = {
-                    // @ts-ignore IDB will fill 'id' in
-                    id: undefined,
+                    
                     attempts: 0,
-                    ts: Date.now(),
+                    created_at: Date.now(),
                     client_id: this.clientId, 
                     client_id_job_count: Object.values(this.jobs).length,
                     job_id,
                     descriptor,
                     start_after_ts: 0,
-                    completed_at: 0
+                    completed_at: 0,
+                    // @ts-ignore the implementor (e.g. IDB) will fill 'id' in
+                    id: undefined,
                 }
                 
                 item = await this.queueIo.addItem(item);
@@ -148,7 +162,7 @@ export class BaseItemQueue implements IQueue {
     }
 
 
-    private async runItem(item:QueueItemDB):Promise<{delayed_until_ts?: number} | void> {
+    private async runItem(item:BaseItemDurable):Promise<{delayed_until_ts?: number} | void> {
         if( this.disposed ) return;
 
         const job = this.jobs[item.job_id];
@@ -193,7 +207,7 @@ export class BaseItemQueue implements IQueue {
 
     }
 
-    private async completeItem(item:QueueItemDB, output:unknown, error:unknown, force?: boolean) {
+    private async completeItem(item:BaseItemDurable, output:unknown, error:unknown, force?: boolean) {
         const job = this.jobs[item.job_id];
 
         try {
@@ -216,6 +230,11 @@ export class BaseItemQueue implements IQueue {
         
         if( job ) {
             if( error ) {
+                if( error instanceof Error ) {
+                    error.message += ` [descriptor: ${item.descriptor}]`;
+                } else if( typeof error==='string' ) {
+                    error += ` [descriptor: ${item.descriptor}]`
+                }
                 job.reject(error);
             } else {
                 job.resolve(output);
@@ -227,14 +246,19 @@ export class BaseItemQueue implements IQueue {
 
     private async checkTimeout(
         notStartedCutoff = Date.now()-(1000*60*60*24),
-        startedCutoff = Date.now()-this.maxRunTimeMs,
+        startedCutoff = Date.now()-this.timings.max_runtime_ms,
         completedCutoff = Date.now()-(1000*60*1)
     ) {
+
+        
         
         const clearRequest = this.request('checkTimeout');
         try {
         
             const items = await this.queueIo.listItems();
+            if( this.disposed ) return;
+            
+            
 
             for( const item of items ) {
                 const clientIdText = this.clientId!==item.client_id? `[Different client ID to item: ${this.clientId}]` : '';
@@ -243,8 +267,9 @@ export class BaseItemQueue implements IQueue {
                     await this.queueIo.deleteItem(item.id);
                 } else if( item.started_at && !item.completed_at && item.started_at<startedCutoff ) {
                     console.warn(`QueueIDB [${this.id}] a started item timed out, which should never happen. ${clientIdText}`, {item});
+                    this.queueIo.emitter.emit('RUNNING_TOO_LONG', {job: item});
                     await this.completeItem(item, undefined, "Started, but timed out", true);
-                } else if( !item.started_at && !item.completed_at && item.ts<notStartedCutoff ) {
+                } else if( !item.started_at && !item.completed_at && item.created_at<notStartedCutoff ) {
                     console.warn(`QueueIDB [${this.id}] an item never started, which should never happen. ${clientIdText}`, {item});
                     await this.completeItem(item, undefined, "Item never started, timed out", true);
                 }
@@ -260,7 +285,7 @@ export class BaseItemQueue implements IQueue {
         if( !this.disposed ) {
             this.nextTimeout = setTimeout(() => {
                 this.checkTimeout();
-            }, 10000);
+            }, this.timings.check_timeout_interval_ms);
         }
     }
 
@@ -268,6 +293,9 @@ export class BaseItemQueue implements IQueue {
     async dispose() {
         this.disposed = true;
 
+        
+
+        this.emitter.removeAllListeners();
 
         if( this.nextTimeout  ) clearTimeout(this.nextTimeout);
 

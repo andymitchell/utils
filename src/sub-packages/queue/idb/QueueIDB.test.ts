@@ -3,7 +3,7 @@ import "fake-indexeddb/auto"; // Not sure why needed... maybe liveQuery?
 import { fakeIdb } from "../../fake-idb/index.ts";
 import { QueueIDB, type TestingIDB } from "./QueueIDB.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
-import type { HaltPromise, Testing } from "../types.ts";
+import type { HaltPromise, QueueConstructorOptions, Testing } from "../types.ts";
 import {v4 as uuidV4} from 'uuid';
 import { promiseWithTrigger, sleep } from "../../../main/misc.ts";
 
@@ -17,12 +17,12 @@ afterAll(async () => {
     queueIDBs = {};
 }, 1000*10)
 
-function newQueueIDB(queueName:string, testing?: TestingIDB):QueueIDB {
+function newQueueIDB(queueName:string, options?: QueueConstructorOptions, testing?: TestingIDB):QueueIDB {
     if( queueIDBs[queueName] ) return queueIDBs[queueName]!;
 
     if( !testing ) testing = {};
     testing.idb = fakeIdb();
-    const queueIDB = new QueueIDB(queueName, testing);
+    const queueIDB = new QueueIDB(queueName, options, testing);
     queueIDBs[queueName] = queueIDB;
     return queueIDB;
 }
@@ -33,14 +33,14 @@ describe('QueueIDB class test', () => {
     standardQueueTests(
         test, 
         expect, 
-        () => {
+        (options) => {
             return (async <T>(queueName:string, onRun:(...args: any[]) => T | PromiseLike<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void,  testing?: Testing) => {
-                const queueIDB = newQueueIDB(queueName, testing);
+                const queueIDB = newQueueIDB(queueName, options, testing);
                 return await queueIDB.enqueue<T>(onRun, descriptor, halt, enqueuedCallback);
             })
         },
-        async () => {
-            return newQueueIDB(uuidV4());
+        async (options) => {
+            return newQueueIDB(uuidV4(), options);
         }
     );
     
@@ -49,8 +49,8 @@ describe('QueueIDB class test', () => {
     test('simulate multi tab', async () => {
         const idb = fakeIdb();
         const QUEUE_NAME = 'QUEUE_MULTITAB_1';
-        const q1 = new QueueIDB(QUEUE_NAME, {idb});
-        const q2 = new QueueIDB(QUEUE_NAME, {idb});
+        const q1 = new QueueIDB(QUEUE_NAME, undefined, {idb});
+        const q2 = new QueueIDB(QUEUE_NAME, undefined, {idb});
         miscQueueIDBs.push(q1);
         miscQueueIDBs.push(q2);
 

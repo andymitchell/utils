@@ -1,8 +1,8 @@
 
 import { promiseWithTrigger, sleep } from "../../../main/misc.ts";
-import type { IQueue, QueueFunction } from "../types.ts";
+import type { IQueue, QueueConstructorOptions, QueueFunction } from "../types.ts";
 
-export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueueFunction: () => QueueFunction, createQueue: () => Promise<IQueue>) {
+export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueueFunction: (options?:QueueConstructorOptions) => QueueFunction, createQueue: (options?:QueueConstructorOptions) => Promise<IQueue>) {
     
     test('Queue basic', async () => {
 
@@ -11,7 +11,6 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         const state = {run1: false, attempt: -1};
         const st = Date.now();
         await queue('TEST_RUN', async (job) => {
-            console.log("Queue run time: "+(Date.now()-st));
             state.run1 = true;
             state.attempt = job.attempt;
         });
@@ -155,7 +154,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
             }
         }
         
-        expect(error!.message).toBe("Bad Test ABC");
+        expect(error!.message).toBe("Bad Test ABC [descriptor: undefined]");
     })
 
 
@@ -187,7 +186,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         expect(state.run2>0).toBe(true);
         expect(state.run2>state.run1).toBe(true);
 
-        expect(error!.message).toBe("Bad Test ABC 2");
+        expect(error!.message).toBe("Bad Test ABC 2 [descriptor: undefined]");
     })
 
     test('Queue throws non-async error', async () => {
@@ -205,7 +204,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
             }
         }
         
-        expect(error!.message).toBe("Bad Test ABC 3");
+        expect(error!.message).toBe("Bad Test ABC 3 [descriptor: undefined]");
     })
     
     
@@ -426,5 +425,87 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         
         
     })
+
+    describe('LONG RUNNING test', () => {
+        it('fires LONG RUNNING event', async () => {
+            const queue = await createQueue({max_run_time_ms: 30});
+
+            const pwt = promiseWithTrigger<void>(200);
+            queue.emitter.addListener('RUNNING_TOO_LONG', event => {
+                pwt.trigger();
+            });
+
+            try {
+                await queue.enqueue(async () => {
+                    await sleep(60);
+                })
+            } catch(e) {
+                // Expected to throw an error due to time out 
+            }
+
+
+            await pwt.promise;
+
+            queue.dispose();
+
+            expect(true).toBe(true);
+            
+
+        })
+
+        it('does NOT fire LONG RUNNING event if timeout not hit', async () => {
+            const queue = await createQueue({max_run_time_ms: 10000});
+
+            const pwt = promiseWithTrigger<void>(400);
+            queue.emitter.addListener('RUNNING_TOO_LONG', event => {
+                pwt.trigger();
+            });
+
+            queue.enqueue(async () => {
+                await sleep(1000);
+            })
+
+
+            let error = false;
+            try {
+                await pwt.promise;
+            } catch(e) {
+                error = true;
+            }
+            expect(error).toBe(true);
+
+            
+            queue.dispose();
+            
+
+        })
+
+        it('does NOT fire LONG RUNNING event if it completes', async () => {
+            const queue = await createQueue({max_run_time_ms: 30});
+
+            const pwt = promiseWithTrigger<void>(400);
+            queue.emitter.addListener('RUNNING_TOO_LONG', event => {
+                pwt.trigger();
+            });
+
+            queue.enqueue(async () => {
+                await sleep(1);
+            })
+
+
+            let error = false;
+            try {
+                await pwt.promise;
+            } catch(e) {
+                error = true;
+            }
+            expect(error).toBe(true);
+
+            queue.dispose();
+            
+
+        })
+    })
+    
 
 }
