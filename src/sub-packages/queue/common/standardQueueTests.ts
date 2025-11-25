@@ -446,7 +446,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
 
             await pwt.promise;
 
-            queue.dispose();
+            
 
             expect(true).toBe(true);
             
@@ -475,7 +475,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
             expect(error).toBe(true);
 
             
-            queue.dispose();
+            
             
 
         })
@@ -501,7 +501,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
             }
             expect(error).toBe(true);
 
-            queue.dispose();
+            
             
 
         })

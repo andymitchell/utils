@@ -3,7 +3,7 @@ import { disposeAllGlobalQueues, queue, registerTestFileUsingGlobalQueues } from
 
 
 
-import type { HaltPromise, QueueFunction } from "../types.ts";
+import type { HaltPromise, QueueConstructorOptions, QueueFunction } from "../types.ts";
 import { standardQueueTests } from "../common/standardQueueTests.ts";
 import { QueueMemory } from "./QueueMemory.ts";
 import { uid } from "../../uid/uid.ts";
@@ -23,12 +23,12 @@ describe('queueMemory global test', () => {
         expect, 
         () => {
             const queueNameSpace = uid();
-            return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, testing?: any) => {
-                return queue(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
+            return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void, options?: QueueConstructorOptions, testing?: any) => {
+                return queue(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, options, testing)
             }) as QueueFunction
         },
-        async () => {
-            return new QueueMemory('');
+        async (options) => {
+            return new QueueMemory('', options);
         }
     );
     

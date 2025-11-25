@@ -34,7 +34,7 @@ export class QueueMemory implements IQueue {
     private disposed:boolean;
     private client_id:string;
     private timings:QueueTimings;
-    private unloaders: Function[] = [];
+    
 
     constructor(id:string, options?: QueueConstructorOptions) {
         this.id = id;
@@ -44,21 +44,25 @@ export class QueueMemory implements IQueue {
 
         this.timings = calculateTimings(options);
 
-        
-
-        const timeoutId = setInterval(() => {
+        if( !options?.testing_disable_check_timeout ) {
             this.#checkTimeout();
-        }, this.timings.check_timeout_interval_ms)
-        this.unloaders.push(() => clearInterval(timeoutId));
+        }
     }
 
     #checkTimeout() {
+        if( this.disposed ) return;
+
         const startedCutoff = Date.now()-this.timings.max_runtime_ms;
         const longRunning = this.queue.find(x => x.running && x.started_at && x.started_at<startedCutoff);
 
         if( longRunning ) {
             this.emitter.emit('RUNNING_TOO_LONG', {job: longRunning});
         }
+
+        setTimeout(() => {
+            console.log("Running", Date.now());
+            this.#checkTimeout();
+        }, this.timings.check_timeout_interval_ms);
     }
 
     async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):Promise<T> {
@@ -96,7 +100,6 @@ export class QueueMemory implements IQueue {
     async dispose() {
         this.disposed = true;
 
-        this.unloaders.forEach(x => x());
 
         const queue = [...this.queue];
         this.queue = [];

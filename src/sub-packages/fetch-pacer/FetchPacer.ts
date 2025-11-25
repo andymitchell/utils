@@ -42,7 +42,7 @@ export default class FetchPacer {
      * @param options 
      */
     constructor(id: string, options?:FetchPacerOptions) {
-        this.#queue = new QueueMemory(id);
+        this.#queue = new QueueMemory(id, {testing_disable_check_timeout: options?.testing_queue_disable_check_timeout});
         this.#options = {
             ...fetchPacerOptionsDefault,
             ...options

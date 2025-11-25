@@ -30,7 +30,7 @@ describe('queueIDB global test', () => {
             return ((queueName:string, onRun:() => void, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void,  options?: QueueConstructorOptions, testing?: any) => {
                 if( !testing ) testing = {};
                 testing.idb = fakeIdb();
-                return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, testing)
+                return queueIDB(queueNameSpace+queueName, onRun, descriptor, halt, enqueuedCallback, options, testing)
             }) as QueueFunction
         },
         async (options) => {

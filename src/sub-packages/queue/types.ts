@@ -9,7 +9,17 @@ export type HaltPromise = Promise<void>;
 
 
 export type QueueConstructorOptions = {
+    /**
+     * How long a job can be executing for before it has an error
+     * 
+     * Defaults to 5 minutes
+     */
     max_run_time_ms?: number
+
+    /**
+     * If true, the timer for the timeout won't run. Useful when using `vi.runAllTimers` which can cause an infinite loop.
+     */
+    testing_disable_check_timeout?: boolean
 }
 
 

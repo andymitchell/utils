@@ -538,7 +538,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
             it('processes fetches sequentially with zero or negative minimum_time_between_fetch', async () => {
                 vi.useFakeTimers();
                 // Test with 0, negative should behave like 0 due to sleep implementation
-                const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: 0 });
+                const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: 0, testing_queue_disable_check_timeout: true });
                 pacer.getMockPaceTracker().getActiveBackOffForMs.mockResolvedValue(undefined);
 
                 const callOrder: string[] = [];
@@ -608,7 +608,7 @@ describe('mode 429_preemptively specific tests', () => {
 describe('mode attempt_recovery specific tests', () => {
     it('waits for the specified back off duration before retrying fetch', async () => {
         vi.useFakeTimers();
-        const pacer = makeTestRecoveryMode();
+        const pacer = makeTestRecoveryMode({testing_queue_disable_check_timeout: true});
         const mockPaceTracker = pacer.getMockPaceTracker();
 
         mockPaceTracker.getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now() + 100); // Pause for 100ms

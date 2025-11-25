@@ -120,6 +120,14 @@ export type FetchPacerOnlyOptions = {
         timeout_ms?: number
     }
 
+
+    
+    /**
+     * Control the `QueueConstructorOptions.testing_disable_check_timeout` settings 
+     */
+    testing_queue_disable_check_timeout?: boolean
+    
+
 }
 export type FetchPacerOptions = PaceTrackerOptions & FetchPacerOnlyOptions;
 

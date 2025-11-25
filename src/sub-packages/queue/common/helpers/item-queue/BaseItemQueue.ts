@@ -47,7 +47,9 @@ export class BaseItemQueue implements IQueue {
         this.id = id;
         this.disposed = false;
         
-        this.checkTimeout();
+        if( !options?.testing_disable_check_timeout ) {
+            this.checkTimeout();
+        }
         
     }
 
