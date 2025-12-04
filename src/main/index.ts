@@ -2,7 +2,9 @@ import {  type PromiseWithTrigger, convertArrayToRecord, dLog, dLogDebug, dLogWa
 
 
 import type { EnsureAllMethodsAreAsync } from "./types/EnsureAllMethodsAreAsync.ts"
-import isTypeEqual, {isTypeEqualIgnoringPartials} from "./types/isTypeEqual.ts"
+import isTypeEqual, {isTypeEqualStrictOptionality} from "./types/isTypeEqual.ts"
+import isTypeEqualKeys from "./types/isTypeEqualKeys.ts"
+import isTypeEqualLooseFunctions from "./types/isTypeEqualLooseFunctions.ts"
 import isTypeExtended from "./types/isTypeExtended.ts"
 import typeHasKeys from "./types/typeHasKeys.ts"
 import { applyPlaceholderToTemplateStringFunction, convertPlaceholderToTemplateStringsArray } from "./convert-placeholder-to-template-strings-array/index.ts"
@@ -29,7 +31,9 @@ export {
 
 export {
     isTypeEqual,
-    isTypeEqualIgnoringPartials,
+    isTypeEqualStrictOptionality,
+    isTypeEqualKeys,
+    isTypeEqualLooseFunctions,
     isTypeExtended,
     typeHasKeys,
     isPropertyRequired,

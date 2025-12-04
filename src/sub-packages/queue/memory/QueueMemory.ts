@@ -61,7 +61,6 @@ export class QueueMemory implements IQueue {
         }
 
         setTimeout(() => {
-            console.log("Running", Date.now());
             this.#checkTimeout();
         }, this.timings.check_timeout_interval_ms);
     }

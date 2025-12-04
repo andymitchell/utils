@@ -1,10 +1,25 @@
 /**
- * @example isTypeExtended<IClass, BaseClass>(true); // The true will flag as a type error if T1 is no longer a descendant of T2
- * @example isTypeExtended<'a', 'a' | 'b'>(true); // Ok
- * @example isTypeExtended<'a' | 'b', 'a' | 'b'>(true); // Ok
- * @example isTypeExtended<'c', 'a' | 'b'>(true); // Error
- * @example isTypeExtended<'a' | 'c', 'a' | 'b'>(true); // Error
- * @example isTypeExtended<'c', 'a' | 'b'>(true); // Error
+ * **Checks if the first type is a valid subset of the second type.**
+ * 
+ * Use this to verify that `T1` fits within the definition of `T2`.
+ * It passes if `T1` is "assignable to" `T2` (e.g. `T1` is a child class of `T2`, 
+ * or `T1` is a specific option within the union `T2`).
+ * 
+ * @example
+ * // ✅ OK: 'a' is allowed in 'a' | 'b'
+ * isTypeExtended<'a', 'a' | 'b'>(true);
+ * 
+ * @example
+ * // ✅ OK: Child class extends Base class
+ * isTypeExtended<ChildClass, BaseClass>(true);
+ * 
+ * @example
+ * // ❌ Error: 'c' is not allowed in 'a' | 'b'
+ * isTypeExtended<'c', 'a' | 'b'>(true);
+ * 
+ * @example
+ * // ❌ Error: 'a' | 'c' contains 'c', which is not allowed in 'a' | 'b'
+ * isTypeExtended<'a' | 'c', 'a' | 'b'>(true);
  */
 export default function isTypeExtended<T1, T2>(value: [T1] extends [T2] ? true : false) {}
 
