@@ -18,6 +18,7 @@ describe('', () => {
     // @ts-expect-error
     isTypeEqualLooseFunctions<a, b>(true)
 
+    test('', () => {});
 })
 
 
@@ -51,6 +52,7 @@ describe('', () => {
     // @ts-expect-error
     isTypeEqualLooseFunctions<c, c2SchemaType>(true)
 
+    test('', () => {});
 })
 
 
@@ -81,6 +83,7 @@ describe('can nest', () => {
 
     isTypeEqualLooseFunctions<T1Upper, z.infer<typeof T1UpperSchema>>(true)
     
+    test('', () => {});
 })
 
 
@@ -120,7 +123,8 @@ describe('can nest deep', () => {
 
     isTypeEqualLooseFunctions<T1UpperUpperUpper, z.infer<typeof T1UpperUpperSchema>>(true)
     
+
+    test('', () => {});
 })
 
 
-test('', () => {});
