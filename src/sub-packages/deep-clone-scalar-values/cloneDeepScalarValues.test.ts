@@ -289,21 +289,48 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
                 expect({}.polluted).toBe(undefined);
             });
 
-            test('should not crash on circular references (denial of service)', () => {
-                const obj: { a: string, self?: any } = { a: 'hello' };
-                obj.self = obj; // Create a circular reference.
+            describe('circular', () => {
+                test('should not crash on circular references (denial of service)', () => {
+                    const obj: { a: string, self?: any } = { a: 'hello' };
+                    obj.self = obj; // Create a circular reference.
 
-                // The original function would throw "Maximum call stack size exceeded".
-                // A robust function should handle this gracefully. We expect it to not throw.
-                let output: any;
-                expect(() => {
-                    output = cloneFunc(obj);
-                }).not.toThrow();
+                    // The original function would throw "Maximum call stack size exceeded".
+                    // A robust function should handle this gracefully. We expect it to not throw.
+                    let output: any;
+                    expect(() => {
+                        output = cloneFunc(obj);
+                    }).not.toThrow();
 
-                // The cloned self-reference shouldn't be a copy of the object,
-                // as that would re-introduce the circular ref. It should be stripped.
-                expect(output.self).toBe(undefined);
-            });
+                    // The cloned self-reference shouldn't be a copy of the object,
+                    // as that would re-introduce the circular ref. It should be stripped.
+                    expect(output.self.a).toBe('hello');
+                });
+
+                it('should handle an object appearing twice in different locations (not circular) [regression]', () => {
+                    const item1 = {"id":"2","name":"Alice","updated_at":1764929505905,"owner_email":"mockuser@gmail.com"};
+                    const item2 = {"id":"2","name":"Alice","updated_at":1764929016780,"owner_email":"mockuser@gmail.com"};
+                    const context = {
+                        "all":
+                            [
+                                item1,
+                                item2
+                            ],
+                        "items":[
+                            item2
+                        ]
+                    }
+                    
+
+                    const output = cloneFunc(context, true, false);
+
+                    expect(context.items[0]).toBeTruthy();
+                    expect(output.items[0]).toBeTruthy();
+
+
+                })
+
+            })
+
 
             test('should not crash on a getter that throws an error', () => {
                 const maliciousObject = {
@@ -325,6 +352,7 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
                 // The property that threw should be omitted.
                 expect(output.b).toBe(undefined);
             });
+            
 
             test('should correctly handle an object that overrides hasOwnProperty', () => {
                 const maliciousObject = {

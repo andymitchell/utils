@@ -55,32 +55,33 @@ export function cloneDeepScalarValues<T extends object | Array<any>>(obj: T, str
     return internalCloneDeepScalarValues<T>(obj, stripSensitiveInfo, allowSensitiveInDangerousProperties);
 }
 
+
 function internalCloneDeepScalarValues<T extends object>(
     obj: T,
     stripSensitiveInfo?: boolean,
     allowSensitiveInDangerousProperties?: boolean,
-    visited: WeakSet<object> = new WeakSet(), // circular reference tracking
+    // Store original:clone
+    antiCircularMap: WeakMap<object, any> = new WeakMap(), 
     allowGetters = false
 ): ClonedDeepScalarValues<T> {
 
-    // Handle circular references
-    if (visited.has(obj)) {
-        // If we've seen this object before, return undefined instead of recursing
-        return undefined as any; 
+    // 1. Check if we have already cloned this specific object
+    if (antiCircularMap.has(obj)) {
+        return antiCircularMap.get(obj);
     }
-    // Add the current object to the set of visited objects.
-    visited.add(obj);
 
-    // Handle top-level arrays 
+    // 2. Prepare the container
     const safeVersion: any = Array.isArray(obj) ? [] : {};
+    
+    // 3. CRITICAL: Register the clone BEFORE recursion
+    // This handles the cycle. If a child references 'obj', 
+    // step 1 will catch it and return 'safeVersion'.
+    antiCircularMap.set(obj, safeVersion);
 
-    const keys = Reflect.ownKeys(obj); // This gets all property keys, including non-enumerable and symbol properties
+    const keys = Reflect.ownKeys(obj);
 
     for (const key of keys) {
-
-        if (typeof key === 'string' && unsafeKeys.includes(key)) {
-            continue; // Skip potentially malicious keys like `__proto__`
-        }
+        if (typeof key === 'string' && unsafeKeys.includes(key)) continue;
 
         let value;
         if( allowGetters ) {
@@ -109,26 +110,25 @@ function internalCloneDeepScalarValues<T extends object>(
             // Now we know it's a data property, we can safely access its value.
             value = descriptor.value;
         }
-        
-        
-        
 
-        
-        
-        
-        
-        const keyAsString = String(key); // For use with string-based checks
+
+        const keyAsString = String(key); 
 
         if (typeof value === 'object' && value !== null) {
-            // Recursively call, passing the `visited` set along.
-            safeVersion[key] = internalCloneDeepScalarValues(value, stripSensitiveInfo, allowSensitiveInDangerousProperties, visited);
+            // Recurse passing the antiCircularMap
+            safeVersion[key] = internalCloneDeepScalarValues(
+                value, 
+                stripSensitiveInfo, 
+                allowSensitiveInDangerousProperties, 
+                antiCircularMap, 
+                allowGetters
+            );
         } else if (isScalar(value)) {
             if ( shouldStripSensitiveInfo(value, stripSensitiveInfo, allowSensitiveInDangerousProperties, keyAsString) ) {
                 value = simplePrivateDataReplacer(value);
             }
             safeVersion[key] = value;
         }
-        // Non-scalar, non-object values (like functions) are implicitly skipped.
     }
 
     return safeVersion as ClonedDeepScalarValues<T>;
@@ -138,49 +138,3 @@ function shouldStripSensitiveInfo(x: unknown, stripSensitiveInfo?: boolean, allo
     return (typeof x === 'string' || typeof x === 'number') && stripSensitiveInfo && !(allowSensitiveInDangerousProperties && key?.startsWith('_dangerous'))
 }
 
-/*
-export function cloneDeepScalarValues<T extends object | Array<any>>(obj: T, stripSensitiveInfo?: boolean, allowSensitiveInDangerousProperties?: boolean): ClonedDeepScalarValues<T> {
-
-
-    let safeVersion: Partial<T> = {};
-
-    const keys = Reflect.ownKeys(obj); // This gets all property keys, including non-enumerable and symbol properties (the only way to get 'message' on an Error)
-
-    function isKeyOfT(x: unknown): x is keyof T {
-        return typeof x === 'string';
-    }
-
-    
-
-    for (const key of keys) {
-        if (isKeyOfT(key) && typeof key === 'string') {
-            if (obj.hasOwnProperty(key)) {
-                if( unsafeKeys.includes(key) ) continue; // Skip these potentially malicious keys
-
-
-                let value = obj[key];
-                if (typeof value === 'object' && !!value) {
-                    if (Array.isArray(value)) {
-                        safeVersion[key] = value.map(x => {
-                            if (isScalar(x)) return x;
-                            return cloneDeepScalarValues(x, stripSensitiveInfo, allowSensitiveInDangerousProperties)
-                        }) as T[typeof key];
-                    } else {
-                        // Object
-                        safeVersion[key] = cloneDeepScalarValues(value, stripSensitiveInfo, allowSensitiveInDangerousProperties) as T[typeof key];
-                    }
-                } else if (isScalar(value)) {
-                    if ((typeof value === 'string' || typeof value === 'number') && stripSensitiveInfo && !(allowSensitiveInDangerousProperties && key.startsWith('_dangerous'))) {
-                        value = simplePrivateDataReplacer(value) as T[typeof key];
-                    }
-                    safeVersion[key] = value;
-                }
-
-            }
-        }
-    }
-
-    return safeVersion as ClonedDeepScalarValues<T>;
-
-}
-*/
