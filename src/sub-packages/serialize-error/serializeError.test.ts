@@ -10,13 +10,19 @@ describe('serializeError', () => {
         error.stack = 'Error: Something went wrong\n    at <anonymous>:1:7';
 
         const serialized = serializeError(error);
+        delete serialized.raw;
 
         expect(serialized).toEqual({
             message: 'Something went wrong',
             name: 'CustomError',
             stack: error.stack,
-            cause: {},
-            originalFormat: 'Error'
+            cause: {
+                message: "undefined",
+                raw: undefined,
+                type: "undefined"
+            },
+            cause_raw: {},
+            type: 'Error'
         });
     });
 
@@ -26,17 +32,17 @@ describe('serializeError', () => {
         const error = new Error('Main error', { cause });
 
         const serialized = serializeError(error);
-
-        console.log(serialized);
+        delete serialized.raw;
 
         expect(serialized).toEqual({
             message: 'Main error',
             name: 'Error',
             stack: error.stack,
-            cause: {
+            cause: serializeError(cause),
+            cause_raw: {
                 message: cause.message
             },
-            originalFormat: 'Error'
+            type: 'Error'
         });
     });
 
@@ -47,7 +53,8 @@ describe('serializeError', () => {
 
         expect(serialized).toEqual({
             message: errorMessage,
-            originalFormat: 'string'
+            raw: errorMessage,
+            type: 'string'
         });
     });
 
@@ -61,13 +68,15 @@ describe('serializeError', () => {
         };
 
         const serialized = serializeError(errorObject);
+        delete serialized.raw;
+        delete serialized.cause;
 
         expect(serialized).toEqual({
             message: 'Error from object',
             name: 'ObjectError',
             stack: 'stack trace',
-            cause: { reason: 'some dependency failed' },
-            originalFormat: 'object'
+            cause_raw: { reason: 'some dependency failed' },
+            type: 'object'
         });
     });
 
@@ -140,6 +149,6 @@ describe('serializeError', () => {
         });
 
         const serialized = serializeError(nonSerializable);
-        expect(serialized.message).toContain('An unknown error occurred that could not be serialized');
+        expect(serialized.message).toContain('An error occurred that could not be serialized');
     });
 });

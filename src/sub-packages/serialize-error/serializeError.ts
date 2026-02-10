@@ -48,16 +48,24 @@ import type { SerializableError } from "./types.ts";
  * ```
  */
 export function serializeError(error: unknown): SerializableError {
+    return _serializeError(error);
+}
+
+function _serializeError(error: unknown, canRecurseOnError = true): SerializableError {
     try {
         if (error instanceof Error) {
             return {
                 name: error.name,
                 message: error.message,
                 stack: error.stack,
-                cause: cloneDeepScalarValues(error.cause ?? {}, false),
-                originalFormat: 'Error'
+                cause_raw: cloneDeepScalarValues(error.cause ?? {}, false),
+                cause: _serializeError(error.cause),
+                raw: cloneDeepScalarValues(error, false),
+                type: 'Error'
             };
-        } else if (typeof error === 'object' && error !== null) {
+        } 
+        
+        if (typeof error === 'object' && error !== null) {
             const serializable: Partial<SerializableError> = {};
             if ('message' in error && typeof (error as any).message === 'string') {
                 serializable.message = (error as any).message;
@@ -69,7 +77,8 @@ export function serializeError(error: unknown): SerializableError {
                 }
             }
             if ('cause' in error) {
-                serializable.cause = cloneDeepScalarValues((error as any).cause, false);
+                serializable.cause_raw = cloneDeepScalarValues((error as any).cause, false);
+                serializable.cause = _serializeError(error.cause);
             }
             if ('stack' in error && typeof (error as any).stack === 'string') {
                 serializable.stack = (error as any).stack;
@@ -77,34 +86,69 @@ export function serializeError(error: unknown): SerializableError {
             if ('name' in error && typeof (error as any).name === 'string') {
                 serializable.name = (error as any).name;
             }
-            serializable.originalFormat = 'object';
+            serializable.raw = cloneDeepScalarValues(error, false);
+            serializable.type = 'object';
             return serializable as SerializableError;
-        } else if (typeof error === 'string') {
-            return {
-                message: error,
-                originalFormat: 'string'
-            };
-        } else if( error===undefined ) {
-            return {
-                message: 'undefined',
-                originalFormat: 'undefined'
-            }
-        } else {
-            return {
-                message: JSON.stringify(error),
-                originalFormat: 'other'
-            };
         }
         
-    } catch(e) {
-        let reason: string = "no additional info";
-        try {
-            reason = (e as Error).message;
-        } catch {}
+        const errorType = typeof error;
+        if (
+            errorType === "string" ||
+            errorType === "number" ||
+            errorType === "boolean"
+        ) {
+            return {
+                type: errorType,
+                message: String(error),
+                raw: error,
+            };
+        } 
+        
+        if( error===undefined ) {
+            return {
+                message: 'undefined',
+                raw: undefined,
+                type: 'undefined'
+            }
+        }
+        
+        if( error===null ) {
+            return {
+                message: 'null',
+                raw: null,
+                type: 'null'
+            }
+        }
 
         return {
-            message: `An unknown error occurred that could not be serialized (${reason}).`,
-            originalFormat: 'internal-error'
+            raw: String(error),
+            message: String(error),
+            type: 'other'
         };
+        
+        
+    } catch(e) {
+        if( canRecurseOnError ) {
+            const se = _serializeError(e, false);
+            return {
+                internal_error: se,
+                message: `An error occurred that could not be serialized`,
+                type: 'internal-error',
+            }
+        } else {
+            let reason: string = "no additional info";
+            try {
+                reason = (e as Error).message;
+            } catch {}
+
+            return {
+                message: `An error occurred that could not be serialized`,
+                type: 'internal-error',
+                internal_error: {
+                    message: `Unable to analyse own internal error. Only clue: ${reason}.`,
+                }
+            };
+        }
     }
 }
+
