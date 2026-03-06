@@ -127,6 +127,10 @@
         "./queue-base": {
             "types": "./dist/queue-base.d.ts",
             "default": "./dist/queue-base.js"
+        },
+        "./sql-parameters": {
+            "types": "./dist/sql-parameters.d.ts",
+            "default": "./dist/sql-parameters.js"
         }
     },
     "types": "./dist/index.d.ts",

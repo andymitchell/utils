@@ -42,6 +42,8 @@ export default defineConfig({
     'queue-idb': "src/sub-packages/queue/index-idb.ts",
     'queue-base': "src/sub-packages/queue/index-base.ts",
     'queue-testing': "src/sub-packages/queue/index-testing.ts",
+
+    'sql-parameters': "src/sub-packages/sql-parameters/index.ts",
   },
   publicDir: false,
   clean: true,
