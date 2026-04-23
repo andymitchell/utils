@@ -3,9 +3,52 @@ import { rebaseSqlParametersPg } from './postgres/rebaseSqlParameters.ts';
 import { rebaseSqlParametersSqlite } from './sqlite/rebaseSqlParameters.ts';
 
 /**
- * Shift parameter indexes in `sql` so the lowest becomes `rebase`.
+ * Shift every `$N` parameter index in `sql` so the lowest becomes `startAt`.
+ *
+ * For most callers — composing parameterised fragments into a WHERE — prefer
+ * {@link appendSqlParameters}, which reindexes AND concatenates argument
+ * arrays in one call. Use `reindexSqlParameters` directly only when the
+ * parameter array has already been merged.
+ *
+ * Note: `startAt === 1` is a no-op for `'pg'` because Postgres parameters
+ * already start at `$1`. If you want to reserve `$1` for a payload and push
+ * an existing fragment above it, pass `2`. For `'sqlite'` all values are
+ * no-ops — `?` placeholders are positional.
  *
  * Why: Enables composing multiple parameterised fragments regardless of dialect.
+ *
+ * @example
+ * reindexSqlParameters("age > $1 AND name = $2", 3, 'pg')
+ * // => "age > $3 AND name = $4"
+ *
+ * @example
+ * reindexSqlParameters("age > ? AND name = ?", 3, 'sqlite')
+ * // => "age > ? AND name = ?"  (no-op — positional)
+ */
+export function reindexSqlParameters(sql: string, startAt: number, dialect: SqlDialect): string {
+    switch (dialect) {
+        case 'pg':
+            return rebaseSqlParametersPg(sql, startAt);
+        case 'sqlite':
+            return rebaseSqlParametersSqlite(sql, startAt);
+    }
+}
+
+/**
+ * @deprecated Renamed to {@link reindexSqlParameters} for clarity — `rebase`
+ * was ambiguous (it means "start at this index", not "shift by this many"
+ * — so `rebase=1` is a silent no-op on pg). Same behaviour; switch the
+ * import when convenient.
+ *
+ * Shift every `$N` parameter index in `sql` so the lowest becomes `startAt`.
+ *
+ * For most callers — composing parameterised fragments into a WHERE — prefer
+ * {@link appendSqlParameters}, which reindexes AND concatenates argument
+ * arrays in one call. Use this directly only when the parameter array has
+ * already been merged.
+ *
+ * Note: `startAt === 1` is a no-op for `'pg'`. Pass `2` to push existing
+ * fragments above a reserved `$1`. For `'sqlite'` all values are no-ops.
  *
  * @example
  * rebaseSqlParameters("age > $1 AND name = $2", 3, 'pg')
@@ -15,14 +58,7 @@ import { rebaseSqlParametersSqlite } from './sqlite/rebaseSqlParameters.ts';
  * rebaseSqlParameters("age > ? AND name = ?", 3, 'sqlite')
  * // => "age > ? AND name = ?"  (no-op — positional)
  */
-export function rebaseSqlParameters(sql: string, rebase: number, dialect: SqlDialect): string {
-    switch (dialect) {
-        case 'pg':
-            return rebaseSqlParametersPg(sql, rebase);
-        case 'sqlite':
-            return rebaseSqlParametersSqlite(sql, rebase);
-    }
-}
+export const rebaseSqlParameters = reindexSqlParameters;
 
 /**
  * Rebase `appending`'s SQL to sit above `existingParameters`, then merge.
@@ -38,7 +74,7 @@ export function appendSqlParameters(
     appending: SqlFragment,
     dialect: SqlDialect,
 ): AppendSqlParametersResult {
-    const sql = rebaseSqlParameters(appending.sql, existingParameters.length + 1, dialect);
+    const sql = reindexSqlParameters(appending.sql, existingParameters.length + 1, dialect);
     return {
         sql,
         parameters: appending.parameters,

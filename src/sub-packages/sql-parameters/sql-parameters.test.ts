@@ -1,18 +1,28 @@
 import { describe, test, expect } from 'vitest';
-import { rebaseSqlParameters, appendSqlParameters, concatSqlParameters } from './sql-parameters.ts';
+import {
+    reindexSqlParameters,
+    rebaseSqlParameters,
+    appendSqlParameters,
+    concatSqlParameters,
+} from './sql-parameters.ts';
 
 describe('sql-parameters', () => {
 
     describe('pg dialect', () => {
 
-        test('rebase shifts $N indexes to start from the given base', () => {
-            expect(rebaseSqlParameters('age > $1 AND name = $2', 2, 'pg'))
+        test('reindex shifts $N indexes to start from the given base', () => {
+            expect(reindexSqlParameters('age > $1 AND name = $2', 2, 'pg'))
                 .toBe('age > $2 AND name = $3');
         });
 
-        test('rebase preserves relative gaps between indexes', () => {
-            expect(rebaseSqlParameters('age > $1 AND name = $4', 2, 'pg'))
+        test('reindex preserves relative gaps between indexes', () => {
+            expect(reindexSqlParameters('age > $1 AND name = $4', 2, 'pg'))
                 .toBe('age > $2 AND name = $5');
+        });
+
+        test('reindex with startAt=1 is a no-op on pg (parameters already start at $1)', () => {
+            expect(reindexSqlParameters('age > $1 AND name = $2', 1, 'pg'))
+                .toBe('age > $1 AND name = $2');
         });
 
         test('append rebases SQL above existing parameters', () => {
@@ -54,8 +64,8 @@ describe('sql-parameters', () => {
 
     describe('sqlite dialect', () => {
 
-        test('rebase is a no-op for positional ? parameters', () => {
-            expect(rebaseSqlParameters('age > ? AND name = ?', 5, 'sqlite'))
+        test('reindex is a no-op for positional ? parameters', () => {
+            expect(reindexSqlParameters('age > ? AND name = ?', 5, 'sqlite'))
                 .toBe('age > ? AND name = ?');
         });
 
@@ -111,6 +121,18 @@ describe('sql-parameters', () => {
             );
             expect(result.sql).toBe('age > $1');
             expect(result.parameters).toEqual([5]);
+        });
+    });
+
+    describe('deprecated alias `rebaseSqlParameters`', () => {
+
+        test('behaves identically to reindexSqlParameters', () => {
+            expect(rebaseSqlParameters('age > $1 AND name = $2', 3, 'pg'))
+                .toBe(reindexSqlParameters('age > $1 AND name = $2', 3, 'pg'));
+        });
+
+        test('is the same function reference (zero-overhead alias)', () => {
+            expect(rebaseSqlParameters).toBe(reindexSqlParameters);
         });
     });
 });
