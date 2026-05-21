@@ -1,7 +1,7 @@
 import { isTypeEqual } from "../../index-browser.ts";
 
 export function isScalar(x: unknown): x is Scalar {
-    return typeof x==='number' || typeof x==='boolean' || typeof x==='string';
+    return x===null || typeof x==='number' || typeof x==='boolean' || typeof x==='string';
 }
 
 export type Scalar = string | number | boolean | null;
@@ -21,8 +21,26 @@ export type ClonedDeepScalarValues<T> = T extends Function
 
 
 /**
- * A serializable representation of any value. 
- * 
+ * Options for `cloneDeepScalarValues` / `cloneDeepScalarValuesAny`.
+ * Every field is optional and defaults to `false`.
+ */
+export type CloneDeepScalarValuesOptions = {
+    /** Mask sensitive-looking scalar values such as tokens, emails and long digit sequences. @default false */
+    strip_sensitive_info?: boolean;
+    /** When `strip_sensitive_info` is on, leave values of properties whose key starts with `_dangerous` unmasked. @default false */
+    allow_sensitive_in_dangerous_properties?: boolean;
+    /** Omit a property whose value points back to one of its own ancestors, instead of recreating the cycle in the clone. @default false */
+    skip_circular?: boolean;
+    /** Omit Symbol-keyed properties from the clone. Symbol keys have no JSON representation. @default false */
+    skip_symbols?: boolean;
+    /** Read property values defined by getters. Getters can execute arbitrary code with side effects, so they are skipped by default; a getter that throws is always skipped. @default false */
+    allow_getters?: boolean;
+};
+
+
+/**
+ * A serializable representation of any value.
+ *
  */
 export type JsonValue =
   | Scalar

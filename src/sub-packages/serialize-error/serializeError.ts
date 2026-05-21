@@ -58,9 +58,9 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
                 name: error.name,
                 message: error.message,
                 stack: error.stack,
-                cause_raw: cloneDeepScalarValues(error.cause ?? {}, false),
+                cause_raw: cloneDeepScalarValues(error.cause ?? {}, { skip_circular: true }),
                 cause: _serializeError(error.cause),
-                raw: cloneDeepScalarValues(error, false),
+                raw: cloneDeepScalarValues(error, { skip_circular: true }),
                 type: 'Error'
             };
         } 
@@ -77,7 +77,7 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
                 }
             }
             if ('cause' in error) {
-                serializable.cause_raw = cloneDeepScalarValues((error as any).cause, false);
+                serializable.cause_raw = cloneDeepScalarValues((error as any).cause, { skip_circular: true });
                 serializable.cause = _serializeError(error.cause);
             }
             if ('stack' in error && typeof (error as any).stack === 'string') {
@@ -86,7 +86,7 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
             if ('name' in error && typeof (error as any).name === 'string') {
                 serializable.name = (error as any).name;
             }
-            serializable.raw = cloneDeepScalarValues(error, false);
+            serializable.raw = cloneDeepScalarValues(error, { skip_circular: true });
             serializable.type = 'object';
             return serializable as SerializableError;
         }

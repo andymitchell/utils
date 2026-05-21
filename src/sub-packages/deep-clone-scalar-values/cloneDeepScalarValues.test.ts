@@ -1,6 +1,8 @@
 
 
 import { cloneDeepScalarValues, cloneDeepScalarValuesAny } from "./cloneDeepScalarValues.ts"
+import { isScalar } from "./types.ts"
+import { z } from "zod"
 
 function getInput() {
     return {
@@ -92,11 +94,29 @@ function getNonScalarArrayInput() {
                 {}
             ],
             undefined,
-            undefined,
+            null,
             "this works"
         ]
     }
 }
+
+describe('isScalar', () => {
+    it('treats null as a scalar', () => {
+        expect(isScalar(null)).toBe(true);
+    })
+    it('treats string, number and boolean as scalars', () => {
+        expect(isScalar('hello')).toBe(true);
+        expect(isScalar(0)).toBe(true);
+        expect(isScalar(false)).toBe(true);
+    })
+    it('does not treat objects, arrays, functions or undefined as scalars', () => {
+        expect(isScalar({})).toBe(false);
+        expect(isScalar([])).toBe(false);
+        expect(isScalar(() => {})).toBe(false);
+        expect(isScalar(undefined)).toBe(false);
+    })
+})
+
 
 describe('cloneDeepScalarValuesAny', () => {
 
@@ -115,11 +135,14 @@ describe('cloneDeepScalarValuesAny', () => {
             it('handles boolean', () => {
                 expect(cloneDeepScalarValuesAny(true)).toBe(true);
             })
+            it('handles null', () => {
+                expect(cloneDeepScalarValuesAny(null)).toBe(null);
+            })
         })
 
         describe('security', () => {
             it('masks string', () => {
-                expect(cloneDeepScalarValuesAny('abcdefghijklmnopqrst', true)).toBe('abc...rst');
+                expect(cloneDeepScalarValuesAny('abcdefghijklmnopqrst', { strip_sensitive_info: true })).toBe('abc...rst');
             })
         })
 
@@ -135,8 +158,17 @@ describe('cloneDeepScalarValuesAny', () => {
         it('handles undefined', () => {
             expect(cloneDeepScalarValuesAny(undefined)).toBe(undefined);
         })
-        it('handles null', () => {
-            expect(cloneDeepScalarValuesAny(null)).toBe(undefined);
+    })
+
+    describe('boxed primitives', () => {
+        it('unwraps a top-level boxed Number to its primitive', () => {
+            expect(cloneDeepScalarValuesAny(new Number(5))).toBe(5);
+        })
+        it('unwraps a top-level boxed String to its primitive', () => {
+            expect(cloneDeepScalarValuesAny(new String('hi'))).toBe('hi');
+        })
+        it('unwraps a top-level boxed Boolean to its primitive', () => {
+            expect(cloneDeepScalarValuesAny(new Boolean(false))).toBe(false);
         })
     })
 
@@ -201,7 +233,7 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
 
                     test('strip sensitive info', () => {
                         const arr = getArrayInput();
-                        const output = cloneFunc(arr.input, true);
+                        const output = cloneFunc(arr.input, { strip_sensitive_info: true });
 
                         expect(output).toEqual(arr.expectStripped);
                     })
@@ -217,7 +249,7 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
 
                     test('strip sensitive info', () => {
                         const input = getNonScalarArrayInput();
-                        const output = cloneFunc(input.input, true);
+                        const output = cloneFunc(input.input, { strip_sensitive_info: true });
 
                         expect(output).toEqual(input.expected);
                     })
@@ -227,9 +259,75 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
 
         })
 
+        describe('null is preserved', () => {
+            test('a null property keeps its key with a null value', () => {
+                const output = cloneFunc({ a: null, b: 1 });
+                expect(output).toEqual({ a: null, b: 1 });
+                expect('a' in output).toBe(true);
+                expect(output.a).toBe(null);
+            })
+            test('a null array element is kept as null', () => {
+                const output = cloneFunc([1, null, 3]);
+                expect(output).toEqual([1, null, 3]);
+                expect(output[1]).toBe(null);
+            })
+        })
+
+        describe('boxed primitives', () => {
+            test('a boxed Number value is unwrapped to its primitive', () => {
+                const output: any = cloneFunc({ n: new Number(5) });
+
+                expect(output.n).toBe(5);
+                expect(typeof output.n).toBe('number');
+            })
+            test('a boxed String value is unwrapped to its primitive', () => {
+                const output: any = cloneFunc({ s: new String('hi') });
+
+                expect(output.s).toBe('hi');
+                expect(typeof output.s).toBe('string');
+            })
+            test('a boxed Boolean value is unwrapped to its primitive', () => {
+                const output: any = cloneFunc({ t: new Boolean(true), f: new Boolean(false) });
+
+                expect(output.t).toBe(true);
+                expect(output.f).toBe(false);
+                expect(typeof output.t).toBe('boolean');
+            })
+            test('a boxed zero is unwrapped, not dropped', () => {
+                const output: any = cloneFunc({ n: new Number(0) });
+
+                expect(output.n).toBe(0);
+            })
+            test('the unwrapped clone serializes the same as its primitive form', () => {
+                expect(JSON.stringify(cloneFunc({ n: new Number(5) }))).toBe(JSON.stringify({ n: 5 }));
+            })
+            test('a Number subclass instance is unwrapped to its primitive', () => {
+                class BigBox extends Number {}
+                const output: any = cloneFunc({ n: new BigBox(7) });
+
+                expect(output.n).toBe(7);
+            })
+            test('a Date value is not treated as a boxed primitive', () => {
+                const output: any = cloneFunc({ d: new Date(0) });
+
+                expect(output.d).toEqual({});
+            })
+            test('a forged boxed primitive does not run its valueOf and is omitted', () => {
+                let valueOfCalls = 0;
+                const forged = { valueOf() { valueOfCalls++; return 5; } };
+                Object.setPrototypeOf(forged, Number.prototype);
+
+                const output: any = cloneFunc({ e: forged, ok: 1 });
+
+                expect(valueOfCalls).toBe(0);
+                expect('e' in output).toBe(false);
+                expect(output.ok).toBe(1);
+            })
+        })
+
         test('private data removed', () => {
             const input = getInput();
-            const output = cloneFunc(input, true);
+            const output = cloneFunc(input, { strip_sensitive_info: true });
 
 
             expect(output.request.email).toBe('b...@...ail.com');
@@ -248,7 +346,7 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
 
         test('private data removed, except dangerous', () => {
             const input = getInput();
-            const output = cloneFunc(input, true, true);
+            const output = cloneFunc(input, { strip_sensitive_info: true, allow_sensitive_in_dangerous_properties: true });
 
 
             expect(output.request.email).toBe('b...@...ail.com');
@@ -321,12 +419,86 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
                     }
                     
 
-                    const output = cloneFunc(context, true, false);
+                    const output = cloneFunc(context, { strip_sensitive_info: true, allow_sensitive_in_dangerous_properties: false });
 
                     expect(context.items[0]).toBeTruthy();
                     expect(output.items[0]).toBeTruthy();
 
 
+                })
+
+                describe('skip_circular', () => {
+                    test('by default a self-referential property is recreated as a cycle in the clone', () => {
+                        const obj: { a: string, self?: any } = { a: 'hello' };
+                        obj.self = obj;
+
+                        const output: any = cloneFunc(obj);
+
+                        expect(output.self).toBe(output);
+                    })
+                    test('a self-referential property is omitted', () => {
+                        const obj: { a: string, self?: any } = { a: 'hello' };
+                        obj.self = obj;
+
+                        const output: any = cloneFunc(obj, { skip_circular: true });
+
+                        expect('self' in output).toBe(false);
+                        expect(output.a).toBe('hello');
+                    })
+                    test('the clone of a circular input can be JSON.stringified', () => {
+                        const obj: { a: string, self?: any } = { a: 'hello' };
+                        obj.self = obj;
+
+                        const output = cloneFunc(obj, { skip_circular: true });
+
+                        expect(() => JSON.stringify(output)).not.toThrow();
+                        expect(JSON.parse(JSON.stringify(output))).toEqual({ a: 'hello' });
+                    })
+                    test('a mutual cycle is broken and the clone can be JSON.stringified', () => {
+                        const a: { name: string, b?: any } = { name: 'a' };
+                        const b: { name: string, a?: any } = { name: 'b' };
+                        a.b = b;
+                        b.a = a;
+
+                        const output: any = cloneFunc(a, { skip_circular: true });
+
+                        expect(output.name).toBe('a');
+                        expect(output.b.name).toBe('b');
+                        expect('a' in output.b).toBe(false);
+                        expect(() => JSON.stringify(output)).not.toThrow();
+                    })
+                    test('a circular array element is omitted', () => {
+                        const arr: any[] = [1, 2];
+                        arr.push(arr);
+
+                        const output: any = cloneFunc(arr, { skip_circular: true });
+
+                        expect(() => JSON.stringify(output)).not.toThrow();
+                        expect(output[0]).toBe(1);
+                        expect(output[1]).toBe(2);
+                        expect(output[2]).toBeUndefined();
+                    })
+                    test('a shared but non-circular object is still cloned in every position', () => {
+                        const shared = { value: 42 };
+                        const root = { first: shared, second: shared };
+
+                        const output = cloneFunc(root, { skip_circular: true });
+
+                        expect(output.first).toEqual({ value: 42 });
+                        expect(output.second).toEqual({ value: 42 });
+                    })
+                    test('a shared-and-cyclic object keeps the shared edges and omits only the cyclic edge', () => {
+                        const child: { name: string, parent?: any } = { name: 'child' };
+                        const root: { a: any, b: any } = { a: child, b: child };
+                        child.parent = root;
+
+                        const output: any = cloneFunc(root, { skip_circular: true });
+
+                        expect(output.a.name).toBe('child');
+                        expect(output.b.name).toBe('child');
+                        expect('parent' in output.a).toBe(false);
+                        expect(() => JSON.stringify(output)).not.toThrow();
+                    })
                 })
 
             })
@@ -379,6 +551,23 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
                 // We will later change this expectation.
                 expect(output[mySymbol]).toBe('symbol key');
             });
+
+            describe('skip_symbols', () => {
+                test('by default a Symbol-keyed property is cloned', () => {
+                    const key = Symbol('s');
+                    const output: any = cloneFunc({ [key]: 'kept', a: 1 });
+
+                    expect(output[key]).toBe('kept');
+                })
+                test('Symbol-keyed properties are omitted', () => {
+                    const key = Symbol('s');
+                    const output: any = cloneFunc({ [key]: 'dropped', a: 1 }, { skip_symbols: true });
+
+                    expect(output[key]).toBeUndefined();
+                    expect(Reflect.ownKeys(output).some(k => typeof k === 'symbol')).toBe(false);
+                    expect(output).toEqual({ a: 1 });
+                })
+            })
 
             test('should correctly handle a top-level array', () => {
                 const arr = [{ a: 1 }, { b: () => 'function' }, { c: 3 }];
@@ -484,3 +673,126 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
 
 testObjectsAndArrays('cloneDeepScalarValues', cloneDeepScalarValues);
 testObjectsAndArrays('cloneDeepScalarValuesAny', cloneDeepScalarValuesAny as typeof cloneDeepScalarValues);
+
+
+describe('cloneDeepScalarValues with a TreeNode-shaped object', () => {
+    // Mirrors the TreeNode shape from objects/src/dot-prop-paths/zod.ts: regular scalar fields plus
+    // a nested `children` tree, and two non-serializable hazards — a live Zod `schema` instance and
+    // cyclic `parent` back-references (a node's `parent` is an ancestor that already contains it).
+    type TestTreeNode = {
+        name: string;
+        dotprop_path: string;
+        kind: string;
+        children: TestTreeNode[];
+        schema?: unknown;
+        nameless_array_element?: boolean;
+        parent?: TestTreeNode;
+        descended_from_array?: boolean;
+        optional_or_nullable?: boolean;
+    };
+
+    function buildTree(): TestTreeNode {
+        const root: TestTreeNode = {
+            name: 'root',
+            dotprop_path: '',
+            kind: 'ZodObject',
+            descended_from_array: false,
+            optional_or_nullable: false,
+            schema: z.object({ id: z.string(), tags: z.array(z.string()) }),
+            children: [],
+        };
+        const contact: TestTreeNode = {
+            name: 'contact',
+            dotprop_path: 'contact',
+            kind: 'ZodObject',
+            children: [],
+        };
+        const emails: TestTreeNode = {
+            name: 'emails',
+            dotprop_path: 'contact.emails',
+            kind: 'ZodArray',
+            descended_from_array: false,
+            children: [],
+        };
+        const emailElement: TestTreeNode = {
+            name: '',
+            dotprop_path: 'contact.emails',
+            kind: 'ZodString',
+            nameless_array_element: true,
+            descended_from_array: true,
+            optional_or_nullable: true,
+            schema: z.string(),
+            children: [],
+        };
+
+        // Wire up the tree, then the cyclic parent back-references.
+        root.children.push(contact);
+        contact.parent = root;
+        contact.children.push(emails);
+        emails.parent = contact;
+        emails.children.push(emailElement);
+        emailElement.parent = emails;
+
+        return root;
+    }
+
+    it('does not throw and produces a JSON-serializable clone', () => {
+        const output = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+
+        expect(() => JSON.stringify(output)).not.toThrow();
+    })
+
+    it('preserves regular scalar fields and nesting at every depth', () => {
+        const output: any = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+
+        expect(output.name).toBe('root');
+        expect(output.dotprop_path).toBe('');
+        expect(output.kind).toBe('ZodObject');
+        expect(output.descended_from_array).toBe(false);
+        expect(output.optional_or_nullable).toBe(false);
+
+        const contact = output.children[0];
+        expect(contact.name).toBe('contact');
+        expect(contact.dotprop_path).toBe('contact');
+        expect(contact.kind).toBe('ZodObject');
+
+        const emails = contact.children[0];
+        expect(emails.name).toBe('emails');
+        expect(emails.dotprop_path).toBe('contact.emails');
+        expect(emails.kind).toBe('ZodArray');
+
+        const emailElement = emails.children[0];
+        expect(emailElement.name).toBe('');
+        expect(emailElement.kind).toBe('ZodString');
+        expect(emailElement.nameless_array_element).toBe(true);
+        expect(emailElement.descended_from_array).toBe(true);
+        expect(emailElement.optional_or_nullable).toBe(true);
+        expect(emailElement.children).toEqual([]);
+    })
+
+    it('drops the cyclic parent references at every depth', () => {
+        const output: any = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+
+        const contact = output.children[0];
+        const emails = contact.children[0];
+        const emailElement = emails.children[0];
+
+        expect('parent' in contact).toBe(false);
+        expect('parent' in emails).toBe(false);
+        expect('parent' in emailElement).toBe(false);
+    })
+
+    it('reduces Zod schema properties to inert, serializable data', () => {
+        const output: any = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+
+        // The schema is recursed into, not dropped: its functions/getters are stripped, leaving plain data.
+        expect(typeof output.schema).toBe('object');
+        expect(typeof output.schema?.parse).not.toBe('function');
+        expect(() => JSON.stringify(output.schema)).not.toThrow();
+
+        // ...and the same for a schema nested deep in the tree.
+        const emailElement = output.children[0].children[0].children[0];
+        expect(typeof emailElement.schema).toBe('object');
+        expect(typeof emailElement.schema?.parse).not.toBe('function');
+    })
+})

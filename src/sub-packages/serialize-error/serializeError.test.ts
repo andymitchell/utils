@@ -98,6 +98,16 @@ describe('serializeError', () => {
         expect(serialized.message).toBe('Could not serialize the error object.');
     });
 
+    it('produces JSON-serializable output for a circular input', () => {
+        const circularObject: { a: string; b?: any } = { a: 'circular' };
+        circularObject.b = circularObject;
+
+        const serialized = serializeError(circularObject);
+
+        expect(() => JSON.stringify(serialized)).not.toThrow();
+        expect(serialized.raw).toEqual({ a: 'circular' });
+    });
+
     // Test cases for various other inputs
     
     // Test case for null input
