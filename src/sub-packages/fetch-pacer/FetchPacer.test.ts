@@ -292,8 +292,11 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
 
         describe('Concurrent calls', () => {
             it('processes multiple concurrent requests sequentially respecting minimum_time_between_fetch', async () => {
+                // Fake timers: makes Date.now() advance deterministically with the
+                // scheduled delays, so the timing assertions don't flake under build load.
+                vi.useFakeTimers();
                 const min = 30;
-                const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: min });
+                const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: min, testing_queue_disable_check_timeout: true });
                 const mockPaceTracker = pacer.getMockPaceTracker();
                 mockPaceTracker.getActiveBackOffForMs.mockResolvedValue(undefined); // No PaceTracker delay
 
@@ -304,18 +307,20 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                     return mockFetchResponse(200);
                 });
 
-                pacer.fetch('url1');
-                pacer.fetch('url2');
-                await pacer.fetch('url3');
+                const p1 = pacer.fetch('url1');
+                const p2 = pacer.fetch('url2');
+                const p3 = pacer.fetch('url3');
+                await vi.runAllTimersAsync();
+                await Promise.all([p1, p2, p3]);
 
                 expect(fetches.map(x => x.url)).toEqual(['url1', 'url2', 'url3']);
-                
+
 
                 expectBoundGreaterThan(min*1, fetches[0]!.ms, 20);
                 expectBoundGreaterThan(min*2, fetches[1]!.ms, 20);
                 expectBoundGreaterThan(min*3, fetches[2]!.ms, 20);
-                
 
+                vi.useRealTimers();
             });
 
         });
@@ -511,6 +516,9 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
 
             describe('minimum_time_between_fetch', () => {
                 it('enforces minimum_time_between_fetch for sequential fetches', async () => {
+                    // Fake timers: makes Date.now() advance deterministically with the
+                    // scheduled delays, so the timing assertions don't flake under build load.
+                    vi.useFakeTimers();
                     const min = 60;
                     const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: min, testing_queue_disable_check_timeout: true });
                     pacer.getMockPaceTracker().getActiveBackOffForMs.mockResolvedValue(undefined);
@@ -524,13 +532,15 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
 
                     const p1 = pacer.fetch('url1');
                     const p2 = pacer.fetch('url2');
-                    await p2;
+                    await vi.runAllTimersAsync();
+                    await Promise.all([p1, p2]);
 
                     expect(callTimes.length).toBe(2);
 
                     expectBoundGreaterThan(min*1, callTimes[0], 10);
                     expectBoundGreaterThan(min*2, callTimes[1], 10);
-                    
+
+                    vi.useRealTimers();
                 });
 
             });
