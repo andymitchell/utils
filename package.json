@@ -181,7 +181,7 @@
         "vitest": "^3.2.4"
     },
     "dependencies": {
-        "uuid": "^9.0.1"
+        "uuid": "^14.0.0"
     },
     "peerDependencies": {
         "dexie": "^4.2.0",
