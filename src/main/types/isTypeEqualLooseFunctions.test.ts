@@ -1,4 +1,3 @@
-import { z } from "zod";
 import isTypeEqualLooseFunctions from "./isTypeEqualLooseFunctions.ts";
 
 describe('', () => {
@@ -6,7 +5,7 @@ describe('', () => {
 
     // TEST
     type a = {
-        first: string, 
+        first: string,
         last?: string
     }
     type b = {
@@ -29,28 +28,28 @@ describe('', () => {
         start: (name: string) => number
     }
 
-    const cSchema = z.object({
-        id: z.string(),
-        start: z.function()
-    })
-    type cSchemaType = z.infer<typeof cSchema>
-    const c1Schema = z.object({
-        id: z.string(),
-        end: z.function()
-    })
-    type c1SchemaType = z.infer<typeof c1Schema>
-    const c2Schema = z.object({
-        id: z.number(),
-        start: z.function()
-    })
-    type c2SchemaType = z.infer<typeof c2Schema>
+    // Same shape as `c`, but a DIFFERENT function signature — proves function signatures are compared loosely.
+    type cLooseFn = {
+        id: string,
+        start: (flag: boolean) => boolean
+    }
+    // Differs only by a key name (`end` vs `start`).
+    type cWrongKey = {
+        id: string,
+        end: (name: string) => number
+    }
+    // Differs only by a scalar type (`id` is number, not string).
+    type cWrongScalar = {
+        id: number,
+        start: (name: string) => number
+    }
 
 
-    isTypeEqualLooseFunctions<c, cSchemaType>(true)
+    isTypeEqualLooseFunctions<c, cLooseFn>(true)
     // @ts-expect-error
-    isTypeEqualLooseFunctions<c, c1SchemaType>(true)
+    isTypeEqualLooseFunctions<c, cWrongKey>(true)
     // @ts-expect-error
-    isTypeEqualLooseFunctions<c, c2SchemaType>(true)
+    isTypeEqualLooseFunctions<c, cWrongScalar>(true)
 
     test('', () => {});
 })
@@ -65,24 +64,21 @@ describe('can nest', () => {
     }
 
     type T1Upper = {
-        top: number, 
+        top: number,
         a: T1
     }
 
-    const T1Schema = z.object({
-        id: z.string(),
-        start: z.function()
-    })
+    // Mirror of T1Upper with a DIFFERENT nested function signature — loose match.
+    type T1UpperLooseFn = {
+        top: number,
+        a: {
+            id: string,
+            start: (flag: boolean) => boolean
+        }
+    }
 
-    const T1UpperSchema = z.object({
-        top: z.number(), 
-        a: T1Schema
-    })
+    isTypeEqualLooseFunctions<T1Upper, T1UpperLooseFn>(true)
 
-    
-
-    isTypeEqualLooseFunctions<T1Upper, z.infer<typeof T1UpperSchema>>(true)
-    
     test('', () => {});
 })
 
@@ -95,7 +91,7 @@ describe('can nest deep', () => {
     }
 
     type T1Upper = {
-        top: number, 
+        top: number,
         a: T1
     }
 
@@ -104,25 +100,19 @@ describe('can nest deep', () => {
         a: T1Upper
     }
 
-    const T1Schema = z.object({
-        id: z.string(),
-        start: z.function()
-    })
+    // Mirror of T1UpperUpperUpper with a DIFFERENT deeply-nested function signature — loose match.
+    type T1UpperUpperLooseFn = {
+        a: {
+            top: number,
+            a: {
+                id: string,
+                start: (flag: boolean) => boolean
+            }
+        }
+    }
 
-    const T1UpperSchema = z.object({
-        top: z.number(), 
-        a: T1Schema
-    })
+    isTypeEqualLooseFunctions<T1UpperUpperUpper, T1UpperUpperLooseFn>(true)
 
-
-    const T1UpperUpperSchema = z.object({
-        a: T1UpperSchema
-    })
-
-    
-
-    isTypeEqualLooseFunctions<T1UpperUpperUpper, z.infer<typeof T1UpperUpperSchema>>(true)
-    
 
     test('', () => {});
 })
