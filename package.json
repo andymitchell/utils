@@ -1,6 +1,6 @@
 {
     "name": "@andyrmitchell/utils",
-    "version": "0.27.3",
+    "version": "0.28.0",
     "description": "",
     "sideEffects": false,
     "exports": {
@@ -66,9 +66,9 @@
             "types": "./dist/deep-freeze.d.ts",
             "default": "./dist/deep-freeze.js"
         },
-        "./prettify-zod-v3-error": {
-            "types": "./dist/prettify-zod-v3-error.d.ts",
-            "default": "./dist/prettify-zod-v3-error.js"
+        "./prettify-zod-error": {
+            "types": "./dist/prettify-zod-error.d.ts",
+            "default": "./dist/prettify-zod-error.js"
         },
         "./deep-clone-scalar-values": {
             "types": "./dist/deep-clone-scalar-values.d.ts",
@@ -178,7 +178,8 @@
         "ts-jest": "^29.1.2",
         "tsup": "^8.5.0",
         "typescript": "^5.8.3",
-        "vitest": "^3.2.4"
+        "vitest": "^3.2.4",
+        "zod": "4.1.8"
     },
     "dependencies": {
         "uuid": "^14.0.0"
@@ -186,6 +187,6 @@
     "peerDependencies": {
         "dexie": "^4.2.0",
         "eventemitter3": "^5.0.1",
-        "zod": "^3.23.8"
+        "zod": "^4.1.8"
     }
 }

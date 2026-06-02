@@ -1,21 +1,21 @@
 
-import {type ZodSchema} from "zod"
+import { type ZodType } from "zod"
 import type { IKvStorage, IKvStorageNamespaced, KvRawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
-import { prettifyZod3ErrorAsJson } from "../prettify-zod-v3-error/index.ts";
+import { prettifyZodErrorAsJson } from "../prettify-zod-error/index.ts";
 
 
 
 export class TypedStorage<T> implements IKvStorageNamespaced<T> {
     #adapter:IKvStorage;
-    #schema?: ZodSchema<T>;
+    #schema?: ZodType<T>;
     #keyNamespace: string;
     #unsubscribes:Function[] = []
     events = new TypedCancelableEventEmitter<KvRawStorageEventMap<T>>();
 
     constructor(
         adapter:IKvStorage,
-        schema?: ZodSchema<T>,
+        schema?: ZodType<T>,
         namespace = ""
     ) {
         this.#adapter = adapter;
@@ -51,7 +51,7 @@ export class TypedStorage<T> implements IKvStorageNamespaced<T> {
         if( this.#schema ) {
             const result = this.#schema.safeParse(value);
             if( !result.success ) {
-                const schemaFailSummary = prettifyZod3ErrorAsJson(result.error);
+                const schemaFailSummary = prettifyZodErrorAsJson(result.error);
                 throw new Error(`Cannot set value in typed storage, as value does not match schema. Key: ${key}`, {cause: {schemaFailSummary}});
             }
         }

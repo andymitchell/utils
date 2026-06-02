@@ -1,9 +1,9 @@
-import { z, type ZodSchema } from "zod";
+import { z } from "zod";
 import { promiseWithTrigger, sleep } from "../../../index-browser.ts";
 import { MemoryStorage } from "../adapters/MemoryStorage.ts";
 import type { IKvStorage, IKvStorageNamespaced } from "../types.ts";
 
-export function commonNamespacedTypedTests(generator: (namespace?:string, adapter?:IKvStorage, schema?: ZodSchema<any>) => IKvStorageNamespaced, options?: {include_schema?: boolean}) {
+export function commonNamespacedTypedTests(generator: (namespace?:string, adapter?:IKvStorage, schema?: z.ZodType<any>) => IKvStorageNamespaced, options?: {include_schema?: boolean}) {
     test('basic', async () => {
         
         const val = 'val1';

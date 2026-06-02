@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { z, ZodError } from 'zod';
-import { prettifyZod3ErrorAsArray } from './prettifyZod3Error.ts';
+import { prettifyZodErrorAsArray } from './prettifyZodError.ts';
 
-describe('prettifyZod3ErrorAsArray', () => {
+describe('prettifyZodErrorAsArray', () => {
     it('should return an empty array if there are no issues', () => {
         const error = new ZodError([]);
-        expect(prettifyZod3ErrorAsArray(error)).toEqual([]);
+        expect(prettifyZodErrorAsArray(error)).toEqual([]);
     });
 
     it('should handle a simple invalid type error at the root', () => {
         const schema = z.string();
         const result = schema.safeParse(123);
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
-            expect(prettyErrors).toEqual(['✖ Expected string, received number']);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
+            expect(prettyErrors).toEqual(['✖ Invalid input: expected string, received number']);
         }
     });
 
@@ -24,11 +24,11 @@ describe('prettifyZod3ErrorAsArray', () => {
         });
         const result = schema.safeParse({ name: 123, age: '25' });
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
             // Use arrayContaining because Zod issue order is not guaranteed
             expect(prettyErrors).toEqual(expect.arrayContaining([
-                '✖ Expected string, received number\n  → at name',
-                '✖ Expected number, received string\n  → at age',
+                '✖ Invalid input: expected string, received number\n  → at name',
+                '✖ Invalid input: expected number, received string\n  → at age',
             ]));
             expect(prettyErrors.length).toBe(2);
         }
@@ -38,8 +38,8 @@ describe('prettifyZod3ErrorAsArray', () => {
         const schema = z.object({ name: z.string() }).strict();
         const result = schema.safeParse({ name: 'John Doe', extraKey: 'some value' });
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
-            expect(prettyErrors).toEqual(["✖ Unrecognized key(s) in object: 'extraKey'"]);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
+            expect(prettyErrors).toEqual(['✖ Unrecognized key: "extraKey"']);
         }
     });
 
@@ -49,8 +49,8 @@ describe('prettifyZod3ErrorAsArray', () => {
         const result = schema.safeParse({ name: 'John Doe', child: {name: 'Alice',  extraKey: 'some value'} });
         expect(result.success).toBe(false);
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
-            expect(prettyErrors).toEqual(["✖ Unrecognized key(s) in object: 'extraKey'\n  → at child"]);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
+            expect(prettyErrors).toEqual(['✖ Unrecognized key: "extraKey"\n  → at child']);
         }
     });
 
@@ -60,8 +60,8 @@ describe('prettifyZod3ErrorAsArray', () => {
         });
         const result = schema.safeParse({ user: { profile: { name: null } } });
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
-            expect(prettyErrors).toEqual(['✖ Expected string, received null\n  → at user.profile.name']);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
+            expect(prettyErrors).toEqual(['✖ Invalid input: expected string, received null\n  → at user.profile.name']);
         }
     });
 
@@ -69,10 +69,10 @@ describe('prettifyZod3ErrorAsArray', () => {
         const schema = z.object({ favoriteNumbers: z.array(z.number()) });
         const result = schema.safeParse({ favoriteNumbers: [1, 'two', 3, 'four'] });
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
             expect(prettyErrors).toEqual(expect.arrayContaining([
-                '✖ Expected number, received string\n  → at favoriteNumbers[1]',
-                '✖ Expected number, received string\n  → at favoriteNumbers[3]',
+                '✖ Invalid input: expected number, received string\n  → at favoriteNumbers[1]',
+                '✖ Invalid input: expected number, received string\n  → at favoriteNumbers[3]',
             ]));
             expect(prettyErrors.length).toBe(2);
         }
@@ -84,8 +84,8 @@ describe('prettifyZod3ErrorAsArray', () => {
         });
         const result = schema.safeParse({ users: [{ id: 1 }, { id: '2' }] });
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
-            expect(prettyErrors).toEqual(['✖ Expected number, received string\n  → at users[1].id']);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
+            expect(prettyErrors).toEqual(['✖ Invalid input: expected number, received string\n  → at users[1].id']);
         }
     });
 
@@ -93,7 +93,7 @@ describe('prettifyZod3ErrorAsArray', () => {
         const schema = z.string().min(5, 'String must be at least 5 characters long');
         const result = schema.safeParse('test');
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
             expect(prettyErrors).toEqual(['✖ String must be at least 5 characters long']);
         }
     });
@@ -134,16 +134,16 @@ describe('prettifyZod3ErrorAsArray', () => {
 
         const result = complexSchema.safeParse(invalidData);
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
             expect(prettyErrors).toEqual(expect.arrayContaining([
-                '✖ String must contain at least 3 character(s)\n  → at username',
-                '✖ Invalid email\n  → at contact.email',
-                '✖ Unrecognized key(s) in object: \'country\'\n  → at contact.address',
-                '✖ Expected string, received number\n  → at contact.address.city',
-                '✖ Expected number, received string\n  → at contact.address.zip',
-                '✖ Expected number, received string\n  → at tags[1].id',
-                '✖ Expected string, received number\n  → at tags[1].value',
-                '✖ Expected boolean, received string\n  → at matrix[1][1]',
+                '✖ Too small: expected string to have >=3 characters\n  → at username',
+                '✖ Invalid email address\n  → at contact.email',
+                '✖ Unrecognized key: "country"\n  → at contact.address',
+                '✖ Invalid input: expected string, received number\n  → at contact.address.city',
+                '✖ Invalid input: expected number, received string\n  → at contact.address.zip',
+                '✖ Invalid input: expected number, received string\n  → at tags[1].id',
+                '✖ Invalid input: expected string, received number\n  → at tags[1].value',
+                '✖ Invalid input: expected boolean, received string\n  → at matrix[1][1]',
             ]));
             expect(prettyErrors.length).toBe(8);
         }
@@ -162,9 +162,9 @@ describe('prettifyZod3ErrorAsArray', () => {
 
         const result = complexSchema.safeParse(invalidData);
         if (!result.success) {
-            const prettyErrors = prettifyZod3ErrorAsArray(result.error);
+            const prettyErrors = prettifyZodErrorAsArray(result.error);
             expect(prettyErrors).toEqual(expect.arrayContaining([
-                '✖ Expected number, received string\n  → at tags[0].subTags[1].id'
+                '✖ Invalid input: expected number, received string\n  → at tags[0].subTags[1].id'
             ]));
             expect(prettyErrors.length).toBe(1);
         }
