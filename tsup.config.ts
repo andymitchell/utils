@@ -19,7 +19,7 @@ export default defineConfig({
 
     'stable-json-stringify': "src/sub-packages/stable-json-stringify/index.ts",
     
-    'deep-clone-scalar-values': "src/sub-packages/deep-clone-scalar-values/index.ts",
+    'clone-to-json-safe': "src/sub-packages/clone-to-json-safe/index.ts",
     
     'email-helpers': "src/sub-packages/email-helpers/index.ts",
 

@@ -11,5 +11,5 @@ export * from './sub-packages/fetch-pacer/index.js';
 export * from './sub-packages/kv-storage/index.js';
 export * from './sub-packages/typed-cancelable-event-emitter/index.js';
 export * from './sub-packages/logging/index.js';
-export * from './sub-packages/deep-clone-scalar-values/index.js';
+export * from './sub-packages/clone-to-json-safe/index.js';
 */

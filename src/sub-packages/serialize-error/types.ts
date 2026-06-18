@@ -1,4 +1,4 @@
-import type { JsonValueCapped } from "../deep-clone-scalar-values/index.ts";
+import type { JsonValueCapped } from "../clone-to-json-safe/index.ts";
 
 
 /**

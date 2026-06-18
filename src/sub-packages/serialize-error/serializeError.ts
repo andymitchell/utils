@@ -1,4 +1,4 @@
-import { cloneDeepScalarValues } from "../deep-clone-scalar-values/cloneDeepScalarValues.ts";
+import { cloneToJsonSafe } from "../clone-to-json-safe/index.ts";
 import type { SerializableError } from "./types.ts";
 
 
@@ -7,7 +7,7 @@ import type { SerializableError } from "./types.ts";
  *
  * This function handles typical JavaScript `Error` instances, objects with error-like properties,
  * strings, and even non-serializable values. The output is safe to log, send over the wire, or
- * store, since it removes or deep-clones unsafe or circular structures (via `cloneDeepScalarValues`).
+ * store, since it removes or deep-clones unsafe or circular structures (via `cloneToJsonSafe`).
  *
  * ### Supported Inputs
  * - `Error` instances: preserves name, message, stack, and cause.
@@ -58,9 +58,9 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
                 name: error.name,
                 message: error.message,
                 stack: error.stack,
-                cause_raw: cloneDeepScalarValues(error.cause ?? {}, { skip_circular: true }),
+                cause_raw: cloneToJsonSafe(error.cause ?? {}, { skip_circular: true }),
                 cause: _serializeError(error.cause),
-                raw: cloneDeepScalarValues(error, { skip_circular: true }),
+                raw: cloneToJsonSafe(error, { skip_circular: true }),
                 type: 'Error'
             };
         } 
@@ -77,7 +77,7 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
                 }
             }
             if ('cause' in error) {
-                serializable.cause_raw = cloneDeepScalarValues((error as any).cause, { skip_circular: true });
+                serializable.cause_raw = cloneToJsonSafe((error as any).cause, { skip_circular: true });
                 serializable.cause = _serializeError(error.cause);
             }
             if ('stack' in error && typeof (error as any).stack === 'string') {
@@ -86,7 +86,7 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
             if ('name' in error && typeof (error as any).name === 'string') {
                 serializable.name = (error as any).name;
             }
-            serializable.raw = cloneDeepScalarValues(error, { skip_circular: true });
+            serializable.raw = cloneToJsonSafe(error, { skip_circular: true });
             serializable.type = 'object';
             return serializable as SerializableError;
         }

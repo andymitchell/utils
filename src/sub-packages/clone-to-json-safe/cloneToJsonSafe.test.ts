@@ -1,6 +1,6 @@
 
 
-import { cloneDeepScalarValues, cloneDeepScalarValuesAny } from "./cloneDeepScalarValues.ts"
+import { cloneToJsonSafe, cloneToJsonSafeUnknown } from "./cloneToJsonSafe.ts"
 import { isScalar } from "./types.ts"
 import { z } from "zod"
 
@@ -118,31 +118,31 @@ describe('isScalar', () => {
 })
 
 
-describe('cloneDeepScalarValuesAny', () => {
+describe('cloneToJsonSafeUnknown', () => {
 
     describe('scalars', () => {
 
         describe('basic', () => {
             it('handles string', () => {
-                expect(cloneDeepScalarValuesAny('hello')).toBe('hello');
+                expect(cloneToJsonSafeUnknown('hello')).toBe('hello');
             })
             it('handles number', () => {
-                expect(cloneDeepScalarValuesAny(12)).toBe(12);
+                expect(cloneToJsonSafeUnknown(12)).toBe(12);
             })
             it('handles number 0', () => {
-                expect(cloneDeepScalarValuesAny(0)).toBe(0);
+                expect(cloneToJsonSafeUnknown(0)).toBe(0);
             })
             it('handles boolean', () => {
-                expect(cloneDeepScalarValuesAny(true)).toBe(true);
+                expect(cloneToJsonSafeUnknown(true)).toBe(true);
             })
             it('handles null', () => {
-                expect(cloneDeepScalarValuesAny(null)).toBe(null);
+                expect(cloneToJsonSafeUnknown(null)).toBe(null);
             })
         })
 
         describe('security', () => {
             it('masks string', () => {
-                expect(cloneDeepScalarValuesAny('abcdefghijklmnopqrst', { strip_sensitive_info: true })).toBe('abc...rst');
+                expect(cloneToJsonSafeUnknown('abcdefghijklmnopqrst', { strip_sensitive_info: true })).toBe('abc...rst');
             })
         })
 
@@ -150,25 +150,34 @@ describe('cloneDeepScalarValuesAny', () => {
 
     describe('non-scalars', () => {
         it('turns function undefined', () => {
-            expect(cloneDeepScalarValuesAny(() => '')).toBe(undefined);
+            expect(cloneToJsonSafeUnknown(() => '')).toBe(undefined);
         })
-        it('turns Date to an empty object', () => {
-            expect(cloneDeepScalarValuesAny(new Date())).toEqual({});
+        it('drops a top-level Date under the default drop mode', () => {
+            expect(cloneToJsonSafeUnknown(new Date())).toBe(undefined);
+        })
+        it('redacts a top-level Date, blending in its ISO string', () => {
+            expect(cloneToJsonSafeUnknown(new Date('2026-06-18T00:00:00.000Z'), { non_serialisable_handling: 'redact' })).toBe('redact:Date:2026-06-18T00:00:00.000Z');
+        })
+        it('normalises a top-level Date to its ISO string', () => {
+            expect(cloneToJsonSafeUnknown(new Date('2026-06-18T00:00:00.000Z'), { non_serialisable_handling: 'normalise' })).toBe('2026-06-18T00:00:00.000Z');
+        })
+        it('redacts a top-level bigint, blending in its digits', () => {
+            expect(cloneToJsonSafeUnknown(10n, { non_serialisable_handling: 'redact' })).toBe('redact:bigint:10');
         })
         it('handles undefined', () => {
-            expect(cloneDeepScalarValuesAny(undefined)).toBe(undefined);
+            expect(cloneToJsonSafeUnknown(undefined)).toBe(undefined);
         })
     })
 
     describe('boxed primitives', () => {
         it('unwraps a top-level boxed Number to its primitive', () => {
-            expect(cloneDeepScalarValuesAny(new Number(5))).toBe(5);
+            expect(cloneToJsonSafeUnknown(new Number(5))).toBe(5);
         })
         it('unwraps a top-level boxed String to its primitive', () => {
-            expect(cloneDeepScalarValuesAny(new String('hi'))).toBe('hi');
+            expect(cloneToJsonSafeUnknown(new String('hi'))).toBe('hi');
         })
         it('unwraps a top-level boxed Boolean to its primitive', () => {
-            expect(cloneDeepScalarValuesAny(new Boolean(false))).toBe(false);
+            expect(cloneToJsonSafeUnknown(new Boolean(false))).toBe(false);
         })
     })
 
@@ -176,7 +185,7 @@ describe('cloneDeepScalarValuesAny', () => {
 })
 
 
-function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarValues) {
+function testObjectsAndArrays(name: string, cloneFunc: typeof cloneToJsonSafe) {
     describe(`${name} for objects and arrays`, () => {
 
         describe("Can clone correctly", () => {
@@ -307,10 +316,10 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
 
                 expect(output.n).toBe(7);
             })
-            test('a Date value is not treated as a boxed primitive', () => {
-                const output: any = cloneFunc({ d: new Date(0) });
-
-                expect(output.d).toEqual({});
+            test('a Date value is recognised as a Date, not unwrapped like a boxed primitive', () => {
+                // drop (default) omits it; redact proves it was classified as a Date rather than coerced to a number.
+                expect('d' in cloneFunc({ d: new Date(0) })).toBe(false);
+                expect((cloneFunc({ d: new Date(0) }, { non_serialisable_handling: 'redact' }) as any).d).toBe('redact:Date:1970-01-01T00:00:00.000Z');
             })
             test('a forged boxed primitive does not run its valueOf and is omitted', () => {
                 let valueOfCalls = 0;
@@ -536,36 +545,29 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
                 expect(output.a).toBe(1);
             });
 
-            test('should handle Symbol properties', () => {
-                const mySymbol = Symbol('mySymbol');
-                const obj = {
-                    a: 'string key',
-                    [mySymbol]: 'symbol key'
-                };
-
-                const output = cloneFunc(obj);
-                expect(output.a).toBe('string key');
-                // The original function will fail this test because it ignores non-string keys.
-                // A truly safe clone should probably ignore symbols, or handle them explicitly.
-                // For now, let's assert it is undefined to prove the bug, then fix it to be included.
-                // We will later change this expectation.
-                expect(output[mySymbol]).toBe('symbol key');
-            });
-
-            describe('skip_symbols', () => {
-                test('by default a Symbol-keyed property is cloned', () => {
+            describe('allow_symbols', () => {
+                test('by default a Symbol-keyed property is dropped (symbols have no JSON form)', () => {
                     const key = Symbol('s');
-                    const output: any = cloneFunc({ [key]: 'kept', a: 1 });
+                    const output: any = cloneFunc({ [key]: 'dropped', a: 'string key' });
 
-                    expect(output[key]).toBe('kept');
-                })
-                test('Symbol-keyed properties are omitted', () => {
-                    const key = Symbol('s');
-                    const output: any = cloneFunc({ [key]: 'dropped', a: 1 }, { skip_symbols: true });
-
+                    expect(output.a).toBe('string key');
                     expect(output[key]).toBeUndefined();
                     expect(Reflect.ownKeys(output).some(k => typeof k === 'symbol')).toBe(false);
-                    expect(output).toEqual({ a: 1 });
+                    expect(output).toEqual({ a: 'string key' });
+                })
+                test('a Symbol-keyed property is cloned when symbols are allowed', () => {
+                    const key = Symbol('s');
+                    const output: any = cloneFunc({ [key]: 'kept', a: 1 }, { allow_symbols: true });
+
+                    expect(output[key]).toBe('kept');
+                    expect(output.a).toBe(1);
+                })
+                test('a Symbol value is kept as-is when symbols are allowed', () => {
+                    const sym = Symbol('v');
+                    const output: any = cloneFunc({ s: sym, a: 1 }, { allow_symbols: true });
+
+                    expect(output.s).toBe(sym);
+                    expect(output.a).toBe(1);
                 })
             })
 
@@ -653,16 +655,17 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
                 expect(output.constructor).not.toBe(MyClass);
             });
 
-            test('should treat complex objects like Date and RegExp as objects to be cloned', () => {
+            test('drops complex internal-slot objects like Date and RegExp under the default drop mode', () => {
                 const obj = {
-                    d: new Date(), // Has no own scalar properties from Reflect.ownKeys
-                    r: /abc/gi,   // Has a 'lastIndex' own property
+                    d: new Date(), // data lives in an internal slot, not own keys
+                    r: /abc/gi,    // ditto — not cleanly walkable
+                    keep: 'me',
                 };
-                const output = cloneFunc(obj);
+                const output: any = cloneFunc(obj);
 
-                expect(output.d).toEqual({});
-                // A regex object has an own property `lastIndex` which is a number (scalar)
-                expect(output.r).toEqual({ lastIndex: 0 });
+                expect('d' in output).toBe(false);
+                expect('r' in output).toBe(false);
+                expect(output.keep).toBe('me');
             });
         });
 
@@ -671,11 +674,11 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneDeepScalarVal
 
 }
 
-testObjectsAndArrays('cloneDeepScalarValues', cloneDeepScalarValues);
-testObjectsAndArrays('cloneDeepScalarValuesAny', cloneDeepScalarValuesAny as typeof cloneDeepScalarValues);
+testObjectsAndArrays('cloneToJsonSafe', cloneToJsonSafe);
+testObjectsAndArrays('cloneToJsonSafeUnknown', cloneToJsonSafeUnknown as typeof cloneToJsonSafe);
 
 
-describe('cloneDeepScalarValues with a TreeNode-shaped object', () => {
+describe('cloneToJsonSafe with a TreeNode-shaped object', () => {
     // Mirrors the TreeNode shape from objects/src/dot-prop-paths/zod.ts: regular scalar fields plus
     // a nested `children` tree, and two non-serializable hazards — a live Zod `schema` instance and
     // cyclic `parent` back-references (a node's `parent` is an ancestor that already contains it).
@@ -737,13 +740,13 @@ describe('cloneDeepScalarValues with a TreeNode-shaped object', () => {
     }
 
     it('does not throw and produces a JSON-serializable clone', () => {
-        const output = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+        const output = cloneToJsonSafe(buildTree(), { skip_circular: true });
 
         expect(() => JSON.stringify(output)).not.toThrow();
     })
 
     it('preserves regular scalar fields and nesting at every depth', () => {
-        const output: any = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+        const output: any = cloneToJsonSafe(buildTree(), { skip_circular: true });
 
         expect(output.name).toBe('root');
         expect(output.dotprop_path).toBe('');
@@ -771,7 +774,7 @@ describe('cloneDeepScalarValues with a TreeNode-shaped object', () => {
     })
 
     it('drops the cyclic parent references at every depth', () => {
-        const output: any = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+        const output: any = cloneToJsonSafe(buildTree(), { skip_circular: true });
 
         const contact = output.children[0];
         const emails = contact.children[0];
@@ -783,7 +786,7 @@ describe('cloneDeepScalarValues with a TreeNode-shaped object', () => {
     })
 
     it('reduces Zod schema properties to inert, serializable data', () => {
-        const output: any = cloneDeepScalarValues(buildTree(), { skip_circular: true });
+        const output: any = cloneToJsonSafe(buildTree(), { skip_circular: true });
 
         // The schema is recursed into, not dropped: its functions/getters are stripped, leaving plain data.
         expect(typeof output.schema).toBe('object');
@@ -794,5 +797,372 @@ describe('cloneDeepScalarValues with a TreeNode-shaped object', () => {
         const emailElement = output.children[0].children[0].children[0];
         expect(typeof emailElement.schema).toBe('object');
         expect(typeof emailElement.schema?.parse).not.toBe('function');
+    })
+})
+
+
+// A single object carrying one of every JSON-hostile hazard, reused across the three modes so each
+// mode is described by the same surface.
+const SHARED_SYMBOL = Symbol('shared');
+function buildHazards() {
+    return {
+        keepStr: 'hi',
+        keepNum: 42,
+        keepBool: true,
+        keepNull: null,
+        big: 10n,
+        nan: NaN,
+        pInf: Infinity,
+        nInf: -Infinity,
+        fn: () => 1,
+        sym: SHARED_SYMBOL,
+        date: new Date('2026-06-18T00:00:00.000Z'),
+        map: new Map([['a', 1]]),
+        set: new Set([1, 2]),
+        regex: /abc/gi,
+        promise: Promise.resolve(1),
+        typed: new Uint8Array([1, 2, 3]),
+        nested: { big: 5n, ok: 'x' },
+        arr: [1n, 'y', () => 2] as any[],
+    };
+}
+
+describe('non_serialisable_handling', () => {
+
+    describe('drop (default): non-serialisable keys are stripped', () => {
+        test('every non-serialisable leaf drops its key, leaving only clean values', () => {
+            const out: any = cloneToJsonSafe(buildHazards());
+
+            expect(out).toEqual({
+                keepStr: 'hi',
+                keepNum: 42,
+                keepBool: true,
+                keepNull: null,
+                typed: { 0: 1, 1: 2, 2: 3 },
+                nested: { ok: 'x' },
+                arr: [undefined, 'y', undefined],
+            });
+        })
+        test('the default and an explicit drop agree', () => {
+            expect(cloneToJsonSafe(buildHazards())).toEqual(
+                cloneToJsonSafe(buildHazards(), { non_serialisable_handling: 'drop' }),
+            );
+        })
+    })
+
+    describe('normalise: values become what JSON.stringify would produce', () => {
+        test('scalars and dates/maps/sets normalise; functions and symbols drop', () => {
+            const out: any = cloneToJsonSafe(buildHazards(), { non_serialisable_handling: 'normalise' });
+
+            expect(out).toEqual({
+                keepStr: 'hi',
+                keepNum: 42,
+                keepBool: true,
+                keepNull: null,
+                big: null,
+                nan: null,
+                pInf: null,
+                nInf: null,
+                date: '2026-06-18T00:00:00.000Z',
+                map: {},
+                set: {},
+                regex: {},
+                promise: {},
+                typed: { 0: 1, 1: 2, 2: 3 },
+                nested: { big: null, ok: 'x' },
+                arr: [null, 'y', null], // bigint and function array elements become null, as JSON.stringify does
+            });
+        })
+        test('an invalid Date normalises to null, matching JSON.stringify', () => {
+            const out: any = cloneToJsonSafe({ d: new Date('nope') }, { non_serialisable_handling: 'normalise' });
+            expect(out.d).toBe(null);
+        })
+        test('honours toJSON like JSON.stringify (URL → its href string)', () => {
+            const out: any = cloneToJsonSafe({ u: new URL('https://example.com/x?q=1') }, { non_serialisable_handling: 'normalise' });
+            expect(out.u).toBe('https://example.com/x?q=1');
+        })
+    })
+
+    describe('redact: every non-serialisable leaf leaves a redact:<Type> trace, blending a safe value where one exists', () => {
+        test('each hazard is replaced by a typed marker, keeping its key', () => {
+            const out: any = cloneToJsonSafe(buildHazards(), { non_serialisable_handling: 'redact' });
+
+            expect(out).toEqual({
+                keepStr: 'hi',
+                keepNum: 42,
+                keepBool: true,
+                keepNull: null,
+                big: 'redact:bigint:10',
+                nan: 'redact:NaN',
+                pInf: 'redact:Infinity',
+                nInf: 'redact:Infinity',
+                fn: 'redact:Function',
+                sym: 'redact:Symbol',
+                date: 'redact:Date:2026-06-18T00:00:00.000Z',
+                map: 'redact:Map',
+                set: 'redact:Set',
+                regex: 'redact:RegExp:/abc/gi',
+                promise: 'redact:Promise',
+                typed: { 0: 1, 1: 2, 2: 3 },
+                nested: { big: 'redact:bigint:5', ok: 'x' },
+                arr: ['redact:bigint:1', 'y', 'redact:Function'],
+            });
+        })
+    })
+
+    describe('getters interact with allow_getters', () => {
+        const withGetter = () => ({ a: 1, get g() { return 5; } });
+
+        test('an unread getter is dropped by default (drop) and never executed', () => {
+            let calls = 0;
+            const out: any = cloneToJsonSafe({ a: 1, get g() { calls++; return 5; } });
+            expect('g' in out).toBe(false);
+            expect(calls).toBe(0);
+        })
+        test('an unread getter leaves a redact:Getter trace in redact mode, still unexecuted', () => {
+            let calls = 0;
+            const out: any = cloneToJsonSafe({ a: 1, get g() { calls++; return 5; } }, { non_serialisable_handling: 'redact' });
+            expect(out.g).toBe('redact:Getter');
+            expect(calls).toBe(0);
+        })
+        test('allow_getters executes the getter and clones its returned value', () => {
+            const out: any = cloneToJsonSafe(withGetter(), { allow_getters: true });
+            expect(out.g).toBe(5);
+        })
+        test('a getter returning a bigint is reclassified by the mode once executed', () => {
+            const out: any = cloneToJsonSafe({ get g() { return 9n; } }, { allow_getters: true, non_serialisable_handling: 'redact' });
+            expect(out.g).toBe('redact:bigint:9');
+        })
+        test('a getter that throws is treated as unread even when getters are allowed', () => {
+            const out: any = cloneToJsonSafe({ get g() { throw new Error('boom'); } }, { allow_getters: true, non_serialisable_handling: 'redact' });
+            expect(out.g).toBe('redact:Getter');
+        })
+    })
+
+    describe('symbol values follow the mode when symbols are not allowed', () => {
+        test('redact marks a symbol value', () => {
+            const out: any = cloneToJsonSafe({ s: Symbol('x') }, { non_serialisable_handling: 'redact' });
+            expect(out.s).toBe('redact:Symbol');
+        })
+        test('drop omits a symbol value', () => {
+            const out: any = cloneToJsonSafe({ s: Symbol('x'), a: 1 });
+            expect('s' in out).toBe(false);
+            expect(out.a).toBe(1);
+        })
+    })
+
+})
+
+describe('JSON.stringify oracle and metamorphic properties', () => {
+
+    // Enumerable-only, bigint-free input: JSON.stringify never throws on it and is the oracle for normalise.
+    function oracleInput() {
+        return {
+            s: 'hi', n: 42, b: true, nul: null,
+            date: new Date('2026-06-18T00:00:00.000Z'),
+            map: new Map([['a', 1]]),
+            set: new Set([1]),
+            regex: /x/g,
+            fn: () => 1,
+            nested: { a: 1, d: new Date('2020-01-01T00:00:00.000Z'), f: () => 2 },
+            arr: [1, () => 2, new Date('2021-01-01T00:00:00.000Z'), 'z'] as any[],
+            url: new URL('https://example.com/p?x=1'),
+            und: undefined,
+        };
+    }
+
+    test('normalise of a bigint-free input equals JSON.parse(JSON.stringify(input))', () => {
+        const out = cloneToJsonSafe(oracleInput(), { non_serialisable_handling: 'normalise' });
+        expect(out).toEqual(JSON.parse(JSON.stringify(oracleInput())));
+    })
+
+    test('normalise output round-trips through JSON unchanged (always valid JSON)', () => {
+        const out = cloneToJsonSafe(buildHazards(), { non_serialisable_handling: 'normalise' });
+        expect(JSON.parse(JSON.stringify(out))).toEqual(out);
+    })
+
+    test('normalise is idempotent', () => {
+        const once = cloneToJsonSafe(buildHazards(), { non_serialisable_handling: 'normalise' });
+        const twice = cloneToJsonSafe(once as any, { non_serialisable_handling: 'normalise' });
+        expect(twice).toEqual(once);
+    })
+
+    test('drop and redact outputs are also valid JSON (never throw, round-trip)', () => {
+        for (const mode of ['drop', 'redact'] as const) {
+            const out = cloneToJsonSafe(buildHazards(), { non_serialisable_handling: mode });
+            expect(() => JSON.stringify(out)).not.toThrow();
+            expect(JSON.parse(JSON.stringify(out))).toEqual(JSON.parse(JSON.stringify(out)));
+        }
+    })
+
+    test('no bigint survives in any mode (the value JSON.stringify cannot serialise)', () => {
+        for (const mode of ['drop', 'normalise', 'redact'] as const) {
+            const out = cloneToJsonSafe(buildHazards(), { non_serialisable_handling: mode });
+            expect(() => JSON.stringify(out)).not.toThrow();
+        }
+    })
+
+    test('key-set monotonicity: keys(drop) ⊆ keys(normalise) ⊆ keys(redact)', () => {
+        const keysFor = (mode: 'drop' | 'normalise' | 'redact') =>
+            new Set(Object.keys(cloneToJsonSafe(buildHazards(), { non_serialisable_handling: mode }) as any));
+
+        const drop = keysFor('drop');
+        const normalise = keysFor('normalise');
+        const redact = keysFor('redact');
+
+        expect([...drop].every(k => normalise.has(k))).toBe(true);
+        expect([...normalise].every(k => redact.has(k))).toBe(true);
+        // redact strictly keeps more (it traces fn/sym that the others drop)
+        expect(redact.size).toBeGreaterThan(drop.size);
+    })
+})
+
+describe('value-retaining registry types blend a safe value in redact', () => {
+    test('URL: drop omits, normalise gives its href, redact blends the href', () => {
+        const u = () => ({ u: new URL('https://example.com/p?q=1') });
+        expect('u' in cloneToJsonSafe(u())).toBe(false);
+        expect((cloneToJsonSafe(u(), { non_serialisable_handling: 'normalise' }) as any).u).toBe('https://example.com/p?q=1');
+        expect((cloneToJsonSafe(u(), { non_serialisable_handling: 'redact' }) as any).u).toBe('redact:URL:https://example.com/p?q=1');
+    })
+    test('URLSearchParams: normalise gives {} (as JSON does), redact blends the query', () => {
+        const p = () => ({ q: new URLSearchParams('a=1&b=2') });
+        expect((cloneToJsonSafe(p(), { non_serialisable_handling: 'normalise' }) as any).q).toEqual({});
+        expect((cloneToJsonSafe(p(), { non_serialisable_handling: 'redact' }) as any).q).toBe('redact:URLSearchParams:a=1&b=2');
+    })
+    test('RegExp: normalise gives {} (as JSON does), redact blends the pattern', () => {
+        const r = () => ({ r: /ab+c/gi });
+        expect((cloneToJsonSafe(r(), { non_serialisable_handling: 'normalise' }) as any).r).toEqual({});
+        expect((cloneToJsonSafe(r(), { non_serialisable_handling: 'redact' }) as any).r).toBe('redact:RegExp:/ab+c/gi');
+    })
+})
+
+describe('objects carrying an unrecognised toJSON (e.g. Decimal, Luxon)', () => {
+    // A Decimal-like value: own fields are its internals, plus a toJSON yielding the canonical string.
+    class Decimalish {
+        s = 1; e = 0; d = [15000000];
+        toJSON() { return '1.5'; }
+    }
+
+    test('normalise honours toJSON like JSON.stringify — its canonical value, not its internals', () => {
+        const out: any = cloneToJsonSafe({ n: new Decimalish() }, { non_serialisable_handling: 'normalise' });
+        expect(out.n).toBe('1.5');
+    })
+    test('redact traces the constructor name without executing toJSON or leaking internals', () => {
+        const out: any = cloneToJsonSafe({ n: new Decimalish() }, { non_serialisable_handling: 'redact' });
+        expect(out.n).toBe('redact:Decimalish');
+    })
+    test('drop omits it entirely, so its internal {s,e,d} fields never leak', () => {
+        const out: any = cloneToJsonSafe({ n: new Decimalish(), keep: 1 });
+        expect('n' in out).toBe(false);
+        expect(out.keep).toBe(1);
+    })
+    test('a plain class instance WITHOUT toJSON is still walked into its own fields', () => {
+        class Point { x = 1; y = 2; dist() { return 0; } }
+        const out: any = cloneToJsonSafe({ p: new Point() });
+        expect(out.p).toEqual({ x: 1, y: 2 });
+    })
+})
+
+describe('strip_sensitive_info is marker-aware', () => {
+    const longToken = 'abcdefghijklmnopqrstuvwxyz0123456789'; // >20 chars → the token rule would mask it
+
+    test('a redact marker keeps its prefix; only the blended detail is masked', () => {
+        const out: any = cloneToJsonSafe(
+            { u: new URL(`https://example.com/?token=${longToken}`) },
+            { non_serialisable_handling: 'redact', strip_sensitive_info: true },
+        );
+        expect(out.u.startsWith('redact:URL:https://example.com')).toBe(true); // prefix + host intact
+        expect(out.u).not.toContain(longToken);                                // the token inside the href was masked
+    })
+    test('a blended bigint keeps its prefix; only the digits are masked', () => {
+        const out: any = cloneToJsonSafe(
+            { n: 12345678901234567890n },
+            { non_serialisable_handling: 'redact', strip_sensitive_info: true },
+        );
+        expect(out.n.startsWith('redact:bigint:')).toBe(true);
+        expect(out.n).not.toContain('12345678901234567890');
+    })
+    test('an ordinary string that merely looks like a marker with an UNKNOWN type is fully masked', () => {
+        // `reason` is not a known redact tag, so the whole value is treated as ordinary text — no prefix protection.
+        const out: any = cloneToJsonSafe(
+            { x: `redact:reason:${longToken}` },
+            { non_serialisable_handling: 'redact', strip_sensitive_info: true },
+        );
+        expect(out.x).not.toContain(longToken);
+        expect(out.x).not.toBe(`redact:reason:${longToken}`);
+    })
+    test('a real redact marker arriving as input data is protected (prefix kept, detail masked)', () => {
+        const out: any = cloneToJsonSafe(
+            { x: `redact:URL:https://example.com/?token=${longToken}` },
+            { non_serialisable_handling: 'redact', strip_sensitive_info: true },
+        );
+        expect(out.x.startsWith('redact:URL:https://example.com')).toBe(true);
+        expect(out.x).not.toContain(longToken);
+    })
+})
+
+describe('classification never executes user code', () => {
+    const modes = ['drop', 'normalise', 'redact'] as const;
+
+    test('a Symbol.toStringTag getter is never invoked, and the object is not mis-typed', () => {
+        for (const mode of modes) {
+            let ran = false;
+            const branded: any = { a: 1 };
+            Object.defineProperty(branded, Symbol.toStringTag, { get() { ran = true; return 'Map'; } });
+
+            const out: any = cloneToJsonSafe({ x: branded }, { non_serialisable_handling: mode });
+
+            expect(ran).toBe(false);          // the toStringTag accessor was not read
+            expect(out.x).toEqual({ a: 1 });  // treated as a plain object, not dropped as a fake Map
+        }
+    })
+
+    test('a data-property Symbol.toStringTag cannot spoof a built-in into dropping real properties', () => {
+        const branded: any = { a: 1, [Symbol.toStringTag]: 'Map' };
+        expect((cloneToJsonSafe({ x: branded }) as any).x).toEqual({ a: 1 });
+    })
+
+    test('a prototype-spoofed Map is rejected by the internal-slot probe and recursed with its props intact', () => {
+        const fake: any = Object.setPrototypeOf({ a: 1 }, Map.prototype); // `fake instanceof Map` is true
+        expect((cloneToJsonSafe({ x: fake }) as any).x).toEqual({ a: 1 });
+        expect((cloneToJsonSafe({ x: fake }, { non_serialisable_handling: 'redact' }) as any).x.a).toBe(1);
+    })
+
+    test('a genuine Map is still recognised by its internal slot', () => {
+        const out: any = cloneToJsonSafe({ m: new Map([['a', 1]]) }, { non_serialisable_handling: 'redact' });
+        expect(out.m).toBe('redact:Map');
+    })
+
+    test('a toJSON getter is never invoked while detecting toJSON, in any mode', () => {
+        for (const mode of modes) {
+            let ran = false;
+            const obj: any = { a: 1 };
+            Object.defineProperty(obj, 'toJSON', { enumerable: true, get() { ran = true; return () => 'x'; } });
+
+            const out: any = cloneToJsonSafe({ x: obj }, { non_serialisable_handling: mode });
+
+            expect(ran).toBe(false);     // the accessor was inspected by descriptor, not read
+            expect(out.x.a).toBe(1);     // the object is recursed (the toJSON accessor is treated as a getter)
+        }
+    })
+
+    test('a data-property toJSON method is honoured in normalise but not in drop/redact', () => {
+        class Box { v = 5; toJSON() { return this.v; } }
+        expect((cloneToJsonSafe({ b: new Box() }, { non_serialisable_handling: 'normalise' }) as any).b).toBe(5);
+        expect('b' in cloneToJsonSafe({ b: new Box() })).toBe(false);
+        expect((cloneToJsonSafe({ b: new Box() }, { non_serialisable_handling: 'redact' }) as any).b).toBe('redact:Box');
+    })
+
+    test('a constructor getter is never invoked when labelling a redacted toJSON object', () => {
+        let ran = false;
+        const proto: any = {};
+        Object.defineProperty(proto, 'constructor', { get() { ran = true; return function Evil() { }; } });
+        const obj = Object.create(proto);
+        obj.toJSON = () => 'x'; // own data-property method → routed through the toJSON branch
+
+        const out: any = cloneToJsonSafe({ o: obj }, { non_serialisable_handling: 'redact' });
+
+        expect(ran).toBe(false);
+        expect(out.o).toBe('redact:Object');
     })
 })

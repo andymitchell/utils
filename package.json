@@ -70,9 +70,13 @@
             "types": "./dist/prettify-zod-error.d.ts",
             "default": "./dist/prettify-zod-error.js"
         },
+        "./clone-to-json-safe": {
+            "types": "./dist/clone-to-json-safe.d.ts",
+            "default": "./dist/clone-to-json-safe.js"
+        },
         "./deep-clone-scalar-values": {
-            "types": "./dist/deep-clone-scalar-values.d.ts",
-            "default": "./dist/deep-clone-scalar-values.js"
+            "types": "./dist/clone-to-json-safe.d.ts",
+            "default": "./dist/clone-to-json-safe.js"
         },
         "./email-helpers": {
             "types": "./dist/email-helpers.d.ts",

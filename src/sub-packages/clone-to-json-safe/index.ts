@@ -1,28 +1,30 @@
 import {
-  cloneDeepScalarValues,
-  cloneDeepScalarValuesAny,
-} from "./cloneDeepScalarValues.ts";
+  cloneToJsonSafe,
+  cloneToJsonSafeUnknown,
+} from "./cloneToJsonSafe.ts";
 import { JsonValueSchema } from "./schemas.ts";
 import { simplePrivateDataReplacer } from "./simplePrivateDataReplacer.ts";
 import type {
-  ClonedDeepScalarValues,
-  CloneDeepScalarValuesOptions,
+  CloneToJsonSafeOptions,
   DeepSerializable,
+  JsonSafe,
   JsonValue,
   JsonValueCapped,
+  NonSerialisableHandling,
 } from "./types.ts";
 
 export {
-  cloneDeepScalarValues,
-  cloneDeepScalarValuesAny,
+  cloneToJsonSafe,
+  cloneToJsonSafeUnknown,
   simplePrivateDataReplacer,
   JsonValueSchema,
 };
 
 export type {
-  ClonedDeepScalarValues,
-  CloneDeepScalarValuesOptions,
+  CloneToJsonSafeOptions,
   DeepSerializable,
+  JsonSafe,
   JsonValue,
   JsonValueCapped,
+  NonSerialisableHandling,
 };
