@@ -1,4 +1,4 @@
-import { cloneToJsonSafe } from "../clone-to-json-safe/index.ts";
+import { cloneToJsonSafe } from "@andymitchell/clone-to-json-safe";
 import type { SerializableError } from "./types.ts";
 
 

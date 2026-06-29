@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isTypeEqual } from "../../index-browser.ts";
 import type { SerializableCommonError, SerializableError } from './types.ts';
-import { JsonValueSchema } from "../clone-to-json-safe/index.ts";
+import { JsonValueSchema } from "@andymitchell/clone-to-json-safe";
 
 const SerializableErrorTypeSchema = z.enum([
     'Error', 'undefined', 'null', 'string', 'number',

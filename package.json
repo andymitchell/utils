@@ -70,14 +70,6 @@
             "types": "./dist/prettify-zod-error.d.ts",
             "default": "./dist/prettify-zod-error.js"
         },
-        "./clone-to-json-safe": {
-            "types": "./dist/clone-to-json-safe.d.ts",
-            "default": "./dist/clone-to-json-safe.js"
-        },
-        "./deep-clone-scalar-values": {
-            "types": "./dist/clone-to-json-safe.d.ts",
-            "default": "./dist/clone-to-json-safe.js"
-        },
         "./email-helpers": {
             "types": "./dist/email-helpers.d.ts",
             "default": "./dist/email-helpers.js"
@@ -186,6 +178,7 @@
         "zod": "4.1.8"
     },
     "dependencies": {
+        "@andymitchell/clone-to-json-safe": "^0.1.1",
         "uuid": "^14.0.0"
     },
     "peerDependencies": {

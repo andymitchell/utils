@@ -1,4 +1,4 @@
-import type { JsonValueCapped } from "../clone-to-json-safe/index.ts";
+import type { JsonValueCapped } from "@andymitchell/clone-to-json-safe";
 
 
 /**

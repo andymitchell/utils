@@ -19,7 +19,6 @@ export default defineConfig({
 
     'stable-json-stringify': "src/sub-packages/stable-json-stringify/index.ts",
     
-    'clone-to-json-safe': "src/sub-packages/clone-to-json-safe/index.ts",
     
     'email-helpers': "src/sub-packages/email-helpers/index.ts",
 
@@ -53,7 +52,8 @@ export default defineConfig({
   external: [
     'dexie',
     'zod',
-    'eventemitter3'
+    'eventemitter3',
+    '@andymitchell/clone-to-json-safe'
   ],
   dts: true,
   format: ['esm'], // When this changes, update 'type' in package.json 
