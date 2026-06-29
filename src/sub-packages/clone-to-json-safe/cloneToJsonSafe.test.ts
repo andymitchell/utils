@@ -372,6 +372,208 @@ function testObjectsAndArrays(name: string, cloneFunc: typeof cloneToJsonSafe) {
         })
 
 
+        describe('preserve_unmasked_paths keeps known-safe ids at chosen paths, gated by path AND shape', () => {
+
+            const UUID = '550e8400-e29b-41d4-a716-446655440000';
+            const MASKED_UUID = '550....00';
+            const ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
+            test('a UUID at an allowlisted path is kept intact', () => {
+                const output: any = cloneFunc(
+                    { user: { id: UUID } },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] },
+                );
+                expect(output.user.id).toBe(UUID);
+            })
+
+            test('a ULID at an allowlisted path is kept intact', () => {
+                const output: any = cloneFunc(
+                    { trace: { id: ULID } },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'trace.id', shape: 'ulid' }] },
+                );
+                expect(output.trace.id).toBe(ULID);
+            })
+
+            test('a UUID at a path that is not allowlisted is still masked (default-deny)', () => {
+                const output: any = cloneFunc(
+                    { user: { id: UUID } },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'account.id', shape: 'uuid' }] },
+                );
+                expect(output.user.id).toBe(MASKED_UUID);
+            })
+
+            test('a non-UUID value at a UUID-allowlisted path is still masked (drift / confused-deputy guard)', () => {
+                // The path is trusted to hold a UUID, but here it holds an email. Trusting the path alone
+                // would leak it; the shape gate keeps it masked.
+                const output: any = cloneFunc(
+                    { user: { id: 'bob@gmail.com' } },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] },
+                );
+                expect(output.user.id).toBe('b...@...ail.com');
+            })
+
+            test('a value that merely contains a UUID is masked, not preserved (no substring smuggling)', () => {
+                const smuggled = `${UUID} Bearer sk_secret_token_abcdefhij`;
+                const output: any = cloneFunc(
+                    { user: { id: smuggled } },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] },
+                );
+                expect(output.user.id).not.toBe(smuggled);
+                expect(output.user.id).not.toContain('sk_secret_token_abcdefhij');
+            })
+
+            test('only the exact path is exempt; a sibling at a near path is masked', () => {
+                const output: any = cloneFunc(
+                    { a: { b: { c: UUID, d: UUID } } },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'a.b.c', shape: 'uuid' }] },
+                );
+                expect(output.a.b.c).toBe(UUID);
+                expect(output.a.b.d).toBe(MASKED_UUID);
+            })
+
+            test('an allowlisted path addresses array elements by index', () => {
+                const output: any = cloneFunc(
+                    { items: [{ ref: UUID }, { ref: UUID }] },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'items.0.ref', shape: 'uuid' }] },
+                );
+                expect(output.items[0].ref).toBe(UUID);        // exempt
+                expect(output.items[1].ref).toBe(MASKED_UUID); // not exempt
+            })
+
+            test('one instance reached via an allowlisted and a denied path is masked per its own path, regardless of property order', () => {
+                // A shared (aliased) object must not inherit whichever path was cloned first: the allowlisted
+                // edge keeps the UUID, the denied edge masks it — both ways round.
+                const shared = { id: UUID };
+
+                const allowlistedPathFirst: any = cloneFunc(
+                    { user: shared, audit: shared },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] },
+                );
+                expect(allowlistedPathFirst.user.id).toBe(UUID);         // allowlisted edge preserved
+                expect(allowlistedPathFirst.audit.id).toBe(MASKED_UUID); // aliased denied edge masked (no leak)
+
+                const deniedPathFirst: any = cloneFunc(
+                    { audit: shared, user: shared },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] },
+                );
+                expect(deniedPathFirst.user.id).toBe(UUID);          // allowlist still applies when denied edge is first
+                expect(deniedPathFirst.audit.id).toBe(MASKED_UUID);
+            })
+
+            test('a true cycle is still resolved (no infinite loop) while an allowlisted id is preserved', () => {
+                // The re-clone-shared-refs path must not break genuine cycles: obj on the live path resolves
+                // to its in-progress clone rather than re-cloning forever.
+                const node: any = { id: UUID };
+                node.self = node;
+                let output: any;
+                expect(() => {
+                    output = cloneFunc(node, { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'id', shape: 'uuid' }] });
+                }).not.toThrow();
+                expect(output.id).toBe(UUID);
+                expect(output.self).toBe(output); // cycle preserved as a self-reference
+            })
+
+            test('a number at a uuid path is masked (the uuid shape matches strings only)', () => {
+                const output: any = cloneFunc(
+                    { user: { id: 1234567891234567 } },
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] },
+                );
+                expect(output.user.id).toBe('12...67');
+            })
+
+            test('the path+shape and _dangerous exemptions both apply within one clone', () => {
+                const output: any = cloneFunc(
+                    { user: { id: UUID }, _dangerousToken: '123456789123456789' },
+                    {
+                        strip_sensitive_info: true,
+                        allow_sensitive_in_dangerous_properties: true,
+                        preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }],
+                    },
+                );
+                expect(output.user.id).toBe(UUID);
+                expect(output._dangerousToken).toBe('123456789123456789');
+            })
+
+            test('an empty allowlist masks exactly as plain stripping does (regression)', () => {
+                const input = { user: { id: UUID }, secret: 'sk_live_token_aaaaaaaaaaaaaaaaaaaa' };
+                const withEmptyOption: any = cloneFunc(input, { strip_sensitive_info: true, preserve_unmasked_paths: [] });
+                const withoutOption: any = cloneFunc(input, { strip_sensitive_info: true });
+                expect(withEmptyOption).toEqual(withoutOption);
+                expect(withEmptyOption.user.id).toBe(MASKED_UUID);
+            })
+
+            test('an explicitly-undefined allowlist behaves like an absent one (does not crash)', () => {
+                let output: any;
+                expect(() => {
+                    output = cloneFunc(
+                        { user: { id: UUID }, secret: 'sk_live_token_aaaaaaaaaaaaaaaaaaaa' },
+                        { strip_sensitive_info: true, preserve_unmasked_paths: undefined },
+                    );
+                }).not.toThrow();
+                expect(output.user.id).toBe(MASKED_UUID);
+            })
+
+            test('the allowlist is inert unless strip_sensitive_info is on', () => {
+                // With stripping off nothing is masked anyway; the allowlist must not change that.
+                const output: any = cloneFunc(
+                    { user: { id: UUID }, other: 'bob@gmail.com' },
+                    { preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] },
+                );
+                expect(output.user.id).toBe(UUID);
+                expect(output.other).toBe('bob@gmail.com');
+            })
+
+            test('the shape set is closed: an unknown shape is a compile error and fails closed (masks) at runtime', () => {
+                const output: any = cloneFunc(
+                    { user: { id: UUID } },
+                    // @ts-expect-error 'email' is not (yet) a PreservableValueShape
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'email' }] },
+                );
+                expect(output.user.id).toBe(MASKED_UUID);
+            })
+
+            test('a shape name inherited from Object.prototype (toString/constructor) is not a matcher and still masks', () => {
+                // Only own registry entries (uuid/ulid) count. A bracket lookup would otherwise resolve
+                // Object.prototype.toString / the Object constructor and let any string through unmasked.
+                const secret = 'sk_live_supersecrettoken_aaaaaaaa';
+
+                const viaToString: any = cloneFunc(
+                    { user: { id: secret } },
+                    // @ts-expect-error 'toString' is not a PreservableValueShape
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'toString' }] },
+                );
+                expect(viaToString.user.id).not.toBe(secret);
+                expect(viaToString.user.id).not.toContain('supersecrettoken');
+
+                const viaConstructor: any = cloneFunc(
+                    { user: { id: secret } },
+                    // @ts-expect-error 'constructor' is not a PreservableValueShape
+                    { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'constructor' }] },
+                );
+                expect(viaConstructor.user.id).not.toBe(secret);
+                expect(viaConstructor.user.id).not.toContain('supersecrettoken');
+            })
+
+            describe('metamorphic', () => {
+
+                test('preserving is idempotent — re-cloning a preserved output is a no-op', () => {
+                    const options = { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' as const }] };
+                    const once: any = cloneFunc({ user: { id: UUID } }, options);
+                    const twice: any = cloneFunc(once, options);
+                    expect(twice).toEqual(once);
+                    expect(twice.user.id).toBe(UUID);
+                })
+
+                test('a value that is not a whole-value shape match gives the same output whether or not its path is allowlisted', () => {
+                    const input = { user: { id: 'bob@gmail.com' } }; // not a UUID
+                    const allowlisted: any = cloneFunc(input, { strip_sensitive_info: true, preserve_unmasked_paths: [{ path: 'user.id', shape: 'uuid' }] });
+                    const notAllowlisted: any = cloneFunc(input, { strip_sensitive_info: true });
+                    expect(allowlisted).toEqual(notAllowlisted);
+                })
+            })
+        })
+
+
         describe('Security and Edge Case Tests', () => {
 
             test('should not be vulnerable to prototype pollution via a getter', () => {

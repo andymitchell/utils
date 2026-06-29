@@ -11,6 +11,8 @@ import type {
   JsonValue,
   JsonValueCapped,
   NonSerialisableHandling,
+  PreservableValueShape,
+  PreserveUnmaskedPath,
 } from "./types.ts";
 
 export {
@@ -27,4 +29,6 @@ export type {
   JsonValue,
   JsonValueCapped,
   NonSerialisableHandling,
+  PreservableValueShape,
+  PreserveUnmaskedPath,
 };

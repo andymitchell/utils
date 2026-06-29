@@ -33,6 +33,32 @@ export type JsonSafe<T> = T extends Function
 export type NonSerialisableHandling = 'drop' | 'normalise' | 'redact';
 
 /**
+ * The named value-shapes a {@link PreserveUnmaskedPath} can require.
+ *
+ * A "shape" is a whole-value grammar for a value that is non-secret by design (an opaque identifier),
+ * so preserving it unmasked at a chosen path is safe. The set is intentionally closed and named — not an
+ * open RegExp — so every exemption is auditable and a new shape is added deliberately, one reviewed entry
+ * at a time. Extend by adding a member here and a matcher in `valueShapes.ts`.
+ */
+export type PreservableValueShape = 'uuid' | 'ulid';
+
+/**
+ * A single unmask exemption: preserve a scalar UNMASKED only where BOTH conditions hold — its location
+ * matches {@link PreserveUnmaskedPath.path} AND its value is a whole-value match for {@link PreserveUnmaskedPath.shape}.
+ */
+export type PreserveUnmaskedPath = {
+    /**
+     * Exact dot-path from the cloned root to the scalar, e.g. `'user.id'` or `'order.items.0.ref'`.
+     * Array elements use their numeric index. Matching is exact — no wildcards, no prefixes: a path
+     * either names one location or it names nothing. (A property key that literally contains `.` is
+     * ambiguous and cannot be targeted.)
+     */
+    path: string;
+    /** The value-shape the scalar must fully match to be preserved. */
+    shape: PreservableValueShape;
+};
+
+/**
  * Options for `cloneToJsonSafe` / `cloneToJsonSafeUnknown`.
  */
 export type CloneToJsonSafeOptions = {
@@ -75,6 +101,29 @@ export type CloneToJsonSafeOptions = {
      * @default false
      */
     allow_getters?: boolean;
+    /**
+     * Exemptions that keep a scalar UNMASKED, gated by BOTH its dot-path AND its value-shape. Only
+     * consulted when {@link CloneToJsonSafeOptions.strip_sensitive_info} is on. A value is preserved only
+     * where its location matches an entry's `path` AND the value is a whole-value match for that entry's
+     * `shape` (e.g. a UUID at `user.id`). Every other value — including a non-matching value at that same
+     * path — is still masked.
+     *
+     * Why path AND shape, and never a bare "allow any value at this path": a path-only allowlist trusts a
+     * location to forever hold a safe value, but a field's contents drift — a `user.id` that holds a UUID
+     * today may hold an email or token after a refactor. A path-only exemption would silently keep passing
+     * whatever lands there: left wide open on the wrong type, with no signal. Pairing it with a shape makes
+     * the exemption self-validating and fail-closed — the instant the value stops matching the declared
+     * shape it is masked again. (For the same auditability reason `shape` is a closed, named set, not an
+     * arbitrary RegExp, so an over-broad pattern can't be introduced by accident.)
+     *
+     * @default []
+     * @example
+     * cloneToJsonSafe(ctx, { strip_sensitive_info: true, preserve_unmasked_paths: [
+     *     { path: 'user.id',  shape: 'uuid' },
+     *     { path: 'trace.id', shape: 'ulid' },
+     * ]});
+     */
+    preserve_unmasked_paths?: PreserveUnmaskedPath[];
 };
 
 

@@ -1,4 +1,5 @@
 import { simplePrivateDataReplacer } from "./simplePrivateDataReplacer.ts";
+import { matchesValueShape } from "./valueShapes.ts";
 import {
     GETTER_RULE,
     matchRule,
@@ -7,7 +8,7 @@ import {
     resolveNonSerialisable,
 } from "./nonSerialisableRegistry.ts";
 import type { LeafResolution } from "./nonSerialisableRegistry.ts";
-import type { CloneToJsonSafeOptions, JsonSafe, Scalar } from "./types.ts";
+import type { CloneToJsonSafeOptions, JsonSafe, PreserveUnmaskedPath, Scalar } from "./types.ts";
 
 
 const unsafeKeys = Object.freeze(['__proto__', 'constructor', 'prototype']);
@@ -37,11 +38,18 @@ const DEFAULT_OPTIONS: Required<CloneToJsonSafeOptions> = Object.freeze({
     skip_circular: false,
     allow_symbols: false,
     allow_getters: false,
+    preserve_unmasked_paths: [],
 });
 
 /** Applies the caller's options over the defaults, producing a value for every field. */
 function resolveOptions(options?: CloneToJsonSafeOptions): Required<CloneToJsonSafeOptions> {
-    return { ...DEFAULT_OPTIONS, ...options };
+    return {
+        ...DEFAULT_OPTIONS,
+        ...options,
+        // An explicitly-`undefined` list (allowed when `exactOptionalPropertyTypes` is off) must fall back to
+        // the default rather than overwrite it — downstream reads it as an array (`.length`) and would throw.
+        preserve_unmasked_paths: options?.preserve_unmasked_paths ?? DEFAULT_OPTIONS.preserve_unmasked_paths,
+    };
 }
 
 /**
@@ -65,7 +73,7 @@ export function cloneToJsonSafeUnknown<T = any>(obj: T, options?: CloneToJsonSaf
     const resolved = resolveOptions(options);
     const resolution = resolveLeaf(obj, resolved, new WeakMap(), new WeakSet());
     if (resolution.kind === 'drop') return undefined;
-    return maybeStrip(resolution.value, resolved, '') as JsonSafe<T> | Scalar | undefined;
+    return maybeStrip(resolution.value, resolved, '', '') as JsonSafe<T> | Scalar | undefined;
 }
 
 /**
@@ -102,10 +110,15 @@ function internalCloneToJsonSafe<T extends object>(
     antiCircularMap: WeakMap<object, any> = new WeakMap(),
     // Objects on the live recursion path, used to tell a true cycle from a merely-shared reference
     ancestors: WeakSet<object> = new WeakSet(),
+    // Dot-path from the clone root to `obj` ('' = root), so each leaf's full path can gate `preserve_unmasked_paths`.
+    path: string = '',
 ): JsonSafe<T> {
 
-    // 1. Check if we have already cloned this specific object
-    if (antiCircularMap.has(obj)) {
+    // 1. Reuse an already-built clone for a true cycle (obj is on the live recursion path) or when masking
+    //    is path-independent. `preserve_unmasked_paths` makes masking path-dependent, so a merely-shared
+    //    (non-cyclic) reference is re-cloned at its current path instead of inheriting whichever path was
+    //    cloned first — otherwise an allowlisted value could surface at a denied alias (or vice-versa).
+    if (antiCircularMap.has(obj) && (ancestors.has(obj) || options.preserve_unmasked_paths.length === 0)) {
         return antiCircularMap.get(obj);
     }
 
@@ -125,6 +138,7 @@ function internalCloneToJsonSafe<T extends object>(
             if (!options.allow_symbols && typeof key === 'symbol') continue;
 
             const keyAsString = String(key);
+            const childPath = path ? `${path}.${keyAsString}` : keyAsString;
 
             let resolution: LeafResolution;
             if (options.allow_getters) {
@@ -139,18 +153,18 @@ function internalCloneToJsonSafe<T extends object>(
                 }
                 resolution = threw
                     ? resolveNonSerialisable(GETTER_RULE, undefined, mode)
-                    : resolveLeaf(value, options, antiCircularMap, ancestors);
+                    : resolveLeaf(value, options, antiCircularMap, ancestors, 0, childPath);
             } else {
                 const descriptor = Object.getOwnPropertyDescriptor(obj, key);
                 if (!descriptor) continue;
                 // A getter is never executed (it could pollute the prototype or otherwise have side effects).
                 resolution = descriptor.get
                     ? resolveNonSerialisable(GETTER_RULE, undefined, mode)
-                    : resolveLeaf(descriptor.value, options, antiCircularMap, ancestors);
+                    : resolveLeaf(descriptor.value, options, antiCircularMap, ancestors, 0, childPath);
             }
 
             if (resolution.kind === 'value') {
-                safeVersion[key] = maybeStrip(resolution.value, options, keyAsString);
+                safeVersion[key] = maybeStrip(resolution.value, options, keyAsString, childPath);
             } else if (mode === 'normalise' && isArray) {
                 // `JSON.stringify` turns a dropped array element into `null` (it cannot leave a hole).
                 safeVersion[key] = null;
@@ -177,6 +191,7 @@ function resolveLeaf(
     antiCircularMap: WeakMap<object, any>,
     ancestors: WeakSet<object>,
     toJSONDepth = 0,
+    path: string = '',
 ): LeafResolution {
     const mode = options.non_serialisable_handling;
 
@@ -202,10 +217,10 @@ function resolveLeaf(
         // An object carrying a data-property `toJSON` (Decimal, Luxon, …) that JSON.stringify would honour.
         // The method is resolved from descriptors so probing for it never invokes an accessor named `toJSON`.
         const toJSON = getToJSONMethod(obj);
-        if (toJSON) return resolveToJSONObject(obj, toJSON, options, antiCircularMap, ancestors, toJSONDepth);
+        if (toJSON) return resolveToJSONObject(obj, toJSON, options, antiCircularMap, ancestors, toJSONDepth, path);
 
         // Cleanly walkable: plain object, array, class instance, Error, TypedArray.
-        return { kind: 'value', value: internalCloneToJsonSafe(obj, options, antiCircularMap, ancestors) };
+        return { kind: 'value', value: internalCloneToJsonSafe(obj, options, antiCircularMap, ancestors, path) };
     }
 
     if (typeof value === 'symbol' && options.allow_symbols) {
@@ -232,6 +247,7 @@ function resolveToJSONObject(
     antiCircularMap: WeakMap<object, any>,
     ancestors: WeakSet<object>,
     toJSONDepth: number,
+    path: string,
 ): LeafResolution {
     const mode = options.non_serialisable_handling;
     if (mode === 'drop') return { kind: 'drop' };
@@ -240,17 +256,17 @@ function resolveToJSONObject(
     if (toJSONDepth < MAX_TOJSON_DEPTH) {
         try {
             const produced = toJSON.call(obj);
-            return resolveLeaf(produced, options, antiCircularMap, ancestors, toJSONDepth + 1);
+            return resolveLeaf(produced, options, antiCircularMap, ancestors, toJSONDepth + 1, path);
         } catch {
             // A throwing toJSON yields no value, so recurse the object's own keys instead.
         }
     }
-    return { kind: 'value', value: internalCloneToJsonSafe(obj, options, antiCircularMap, ancestors) };
+    return { kind: 'value', value: internalCloneToJsonSafe(obj, options, antiCircularMap, ancestors, path) };
 }
 
 /** Masks a string/number value when stripping is enabled; redact markers keep their prefix and only their detail is masked. */
-function maybeStrip(value: unknown, options: Required<CloneToJsonSafeOptions>, keyAsString: string): unknown {
-    if (!shouldStripSensitiveInfo(value, options, keyAsString)) return value;
+function maybeStrip(value: unknown, options: Required<CloneToJsonSafeOptions>, keyAsString: string, path: string): unknown {
+    if (!shouldStripSensitiveInfo(value, options, keyAsString, path)) return value;
     return typeof value === 'string' ? stripSensitiveText(value) : simplePrivateDataReplacer(value);
 }
 
@@ -267,11 +283,27 @@ function stripSensitiveText(text: string): string {
     return simplePrivateDataReplacer(text);
 }
 
-/** Whether a scalar value should be masked: it is a string or number, stripping is enabled, and it is not an allowed `_dangerous` property. */
-function shouldStripSensitiveInfo(x: unknown, options: Required<CloneToJsonSafeOptions>, key?: string): boolean {
-    return (typeof x === 'string' || typeof x === 'number')
-        && options.strip_sensitive_info
-        && !(options.allow_sensitive_in_dangerous_properties && !!key?.startsWith('_dangerous'));
+/**
+ * Whether a scalar value should be masked: it is a string or number and stripping is enabled, unless an
+ * exemption applies — an allowed `_dangerous`-prefixed key, or a known-safe value-shape at an allowlisted path.
+ */
+function shouldStripSensitiveInfo(x: unknown, options: Required<CloneToJsonSafeOptions>, key?: string, path?: string): boolean {
+    if (!(typeof x === 'string' || typeof x === 'number')) return false;
+    if (!options.strip_sensitive_info) return false;
+    // Escape hatch: a key named `_dangerous*` (value-agnostic).
+    if (options.allow_sensitive_in_dangerous_properties && !!key?.startsWith('_dangerous')) return false;
+    // Escape hatch: a known-safe value-shape at an explicitly allowlisted path (path AND shape both required).
+    if (isPreservedByPathAndShape(x, path, options.preserve_unmasked_paths)) return false;
+    return true;
+}
+
+/** A scalar is preserved (not masked) only where an entry's `path` matches exactly AND its `shape` is a whole-value match — both required, fail-closed. */
+function isPreservedByPathAndShape(value: string | number, path: string | undefined, entries: PreserveUnmaskedPath[]): boolean {
+    if (path === undefined || entries.length === 0) return false;
+    for (const entry of entries) {
+        if (entry.path === path && matchesValueShape(value, entry.shape)) return true;
+    }
+    return false;
 }
 
 /**
