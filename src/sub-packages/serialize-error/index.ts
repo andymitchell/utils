@@ -1,14 +1,20 @@
-import { SerializableCommonErrorSchema, SerializableErrorSchema } from "./schemas.ts";
+import { ForeignSerializedErrorSchema, LaxSerializableCauseSchema, LaxSerializableCommonErrorSchema, SerializableCommonErrorSchema, SerializableErrorSchema } from "./schemas.ts";
 import { serializeError} from "./serializeError.ts";
-import type { SerializableCommonError, SerializableError } from "./types.ts";
+import type { ForeignSerializedError, LaxSerializableCause, LaxSerializableCommonError, SerializableCommonError, SerializableError } from "./types.ts";
 
 export {
     serializeError,
     SerializableCommonErrorSchema,
-    SerializableErrorSchema
+    SerializableErrorSchema,
+    ForeignSerializedErrorSchema,
+    LaxSerializableCauseSchema,
+    LaxSerializableCommonErrorSchema
 }
 
 export type {
     SerializableCommonError,
-    SerializableError
+    SerializableError,
+    ForeignSerializedError,
+    LaxSerializableCause,
+    LaxSerializableCommonError
 }
