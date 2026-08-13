@@ -6,6 +6,7 @@
 import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import { uid } from "../../uid/uid.ts";
 import { calculateTimings } from "../common/calculateTimings.ts";
+import { appendToErrorMessage } from "../common/appendToErrorMessage.ts";
 import { descriptorTextForError } from "../common/descriptorTextForError.ts";
 import preventCompletionFactory from "../common/preventCompletionFactory.ts";
 import { MAX_RUNTIME_MS } from "../consts.ts";
@@ -161,7 +162,9 @@ export class QueueMemory implements IQueue {
         }
 
         if( error instanceof Error ) {
-            error.message += descriptorTextForError(q.descriptor);
+            // Appended defensively: an error thrown while reporting an error would escape before
+            // the job below is ever settled, leaving its caller waiting on it forever.
+            appendToErrorMessage(error, descriptorTextForError(q.descriptor));
         } else if( typeof error==='string' ) {
             error += descriptorTextForError(q.descriptor);
         }

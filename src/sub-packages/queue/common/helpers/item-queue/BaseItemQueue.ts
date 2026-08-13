@@ -7,6 +7,7 @@ import { promiseWithTrigger } from "../../../../../main/misc.ts";
 import { MAX_RUNTIME_MS } from "../../../consts.ts";
 import { calculateTimings } from "../../calculateTimings.ts";
 import { TypedCancelableEventEmitter } from "../../../../typed-cancelable-event-emitter/index.ts";
+import { appendToErrorMessage } from "../../appendToErrorMessage.ts";
 import { descriptorTextForError } from "../../descriptorTextForError.ts";
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
@@ -224,18 +225,20 @@ export class BaseItemQueue implements IQueue {
         } catch(e) {
             const originalErrorText =  error? `[Original Error: ${error instanceof Error? error.message : error}]` : '';
             if( e instanceof Error ) {
-                e.message += ` ${originalErrorText}`;
+                appendToErrorMessage(e, ` ${originalErrorText}`);
                 error = e;
             } else {
                 error = new Error(`Unknown error during complete. ${originalErrorText}`);
             }
         }
 
-        
+
         if( job ) {
             if( error ) {
                 if( error instanceof Error ) {
-                    error.message += descriptorTextForError(item.descriptor);
+                    // Appended defensively: an error thrown while reporting an error would escape
+                    // before the job below is ever settled, leaving its caller waiting forever.
+                    appendToErrorMessage(error, descriptorTextForError(item.descriptor));
                 } else if( typeof error==='string' ) {
                     error += descriptorTextForError(item.descriptor);
                 }
