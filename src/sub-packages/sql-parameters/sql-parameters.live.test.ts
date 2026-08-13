@@ -4,7 +4,9 @@ import { concatSqlParameters } from './sql-parameters.ts';
 describe('sql-parameters live', () => {
 
     describe('PgLite', () => {
-        test('concat produces a valid multi-fragment WHERE clause', async () => {
+        // Instantiating PGlite compiles its WASM bundle, which can exceed the default
+        // timeout on a cold module cache.
+        test('concat produces a valid multi-fragment WHERE clause', { timeout: 30_000 }, async () => {
             const { PGlite } = await import('@electric-sql/pglite');
             const db = new PGlite();
 

@@ -40,7 +40,9 @@ function performanceComparison(nameA: string, nameB:string, a:StableJsonStringif
             return obj;
         };
         
-        test('Beats naive approach', () => {
+        // A deliberate benchmark over thousands of cycles: real work that can exceed
+        // the default timeout on a loaded machine.
+        test('Beats naive approach', { timeout: 30_000 }, () => {
 
             // 10 items wide per array, 5 levels deep, plus dynamic keys
             const complexObj = generateComplexObject(20, 5); 
