@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockChromeStorageArea } from "../kv-storage/index.ts";
 import { ActivityTrackerBrowserLocal } from "./activity-trackers/ActivityTrackerBrowserLocal.ts";
 import FetchPacerMultiClient from "./FetchPacerMultiClient.ts";

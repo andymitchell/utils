@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, test, expect, vi } from 'vitest';
 import { stableJsonStringifyInline } from './stableJsonStringifyInline.ts';
 import { stableJsonStringifyOrderedClone } from './stableJsonStringifyOrderedClone.ts';
 import type { StableJsonStringify } from './types.ts';

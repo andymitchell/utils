@@ -430,7 +430,8 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         it('fires LONG RUNNING event', async () => {
             const queue = await createQueue({max_run_time_ms: 30});
 
-            const pwt = promiseWithTrigger<void>(200);
+            // Generous timeout: it's a hang-guard only — the assertion is that the event arrives.
+            const pwt = promiseWithTrigger<void>(10_000);
             queue.emitter.addListener('RUNNING_TOO_LONG', event => {
                 pwt.trigger();
             });

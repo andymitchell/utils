@@ -157,15 +157,6 @@ class QueueIoIdb extends Dexie implements IQueueIo {
         return changed;
     }
 
-    async incrementAttempts(itemId: number): Promise<boolean> {
-        const result = await this.#queue.get(itemId);
-        if( result ) {
-            const changed = (await this.#queue.update(itemId, {attempts: result.attempts+1}))>0;
-            return changed;
-        }
-        return false;
-    }
-
     async deleteItem(itemId: number) {
         await this.#queue.delete(itemId);
     }

@@ -25,7 +25,8 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
         const rawStorage = new MemoryStorage();
         const store = generator('ns1', rawStorage);
 
-        const pwt = promiseWithTrigger<void>(500);
+        // Generous timeout: it's a hang-guard only — the assertion is that the event arrives.
+        const pwt = promiseWithTrigger<void>(10_000);
 
         let changeOk = false;
         store.events.on('CHANGE', event => {

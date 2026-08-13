@@ -33,7 +33,6 @@ export interface IQueueIo {
     listItems():Promise<BaseItemDurable[]>
     nextItem(clientId:string):Promise<{item:BaseItemDurable, run_id: string} | undefined>
     updateItem(itemId: number, changes:Partial<BaseItemDurable>):Promise<boolean>
-    incrementAttempts(itemId: number):Promise<boolean>
     deleteItem(itemId: number):Promise<void>
     completeItem(item:BaseItemDurable, force?: boolean):Promise<void>
     countItems():Promise<number>

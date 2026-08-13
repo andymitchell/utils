@@ -147,9 +147,10 @@ export class BaseItemQueue implements IQueue {
                 
                 if( result && result.delayed_until_ts ) {
 
-                    
-                    await this.queueIo.updateItem(item.id, {run_id, started_at: undefined, start_after_ts: result.delayed_until_ts});
-                    await this.queueIo.incrementAttempts(item.id);
+                    // Single write: incrementing attempts must be atomic with making the item
+                    // claimable again, otherwise a MODIFIED-triggered re-entrant next() can
+                    // re-claim the item with a stale attempt count.
+                    await this.queueIo.updateItem(item.id, {run_id, started_at: undefined, start_after_ts: result.delayed_until_ts, attempts: item.attempts+1});
 
                     setTimeout(() => this.next(true), (result.delayed_until_ts-Date.now())+1);
                 }

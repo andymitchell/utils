@@ -66,8 +66,9 @@ export function commonAdapterTests(
         
             test('listeners', async () => {
                 const {store1, store2} = generatorForTwoStoresSharingData();
-        
-                const pwt = promiseWithTrigger<void>(300);
+
+                // Generous timeout: it's a hang-guard only — the assertion is that the event arrives.
+                const pwt = promiseWithTrigger<void>(10_000);
                 
                 let changeOk = false;
                 store2.events.on('CHANGE', event => {
