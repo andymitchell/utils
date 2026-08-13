@@ -159,7 +159,7 @@
         "@babel/preset-typescript": "^7.23.3",
         "@electric-sql/pglite": "^0.2.14",
         "@libsql/client": "^0.14.0",
-        "@types/chrome": "^0.0.279",
+        "@types/chrome": "^0.2.5",
         "@types/fs-extra": "^11.0.4",
         "@types/jest": "^29.5.12",
         "@types/lodash-es": "^4.17.12",

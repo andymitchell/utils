@@ -1,4 +1,4 @@
-import type { BackOffResponse, Fetch, FetchOptions, FetchPacerEvents, FetchPacerOptions, FetchURL, PaceResponse } from './types.js';
+import type { BackOffResponse, Fetch, FetchOptionsProvider, FetchPacerEvents, FetchPacerOptions, FetchURL, PaceResponse } from './types.js';
 
 import { type IQueue, QueueMemory } from '../queue/index-memory.js';
 
@@ -6,6 +6,7 @@ import { sleep } from '../../main/index.js';
 import PaceTracker from './PaceTracker.ts';
 import {  TypedCancelableEventEmitter3 } from '../typed-cancelable-event-emitter/index.ts';
 import { isBackOffResponse } from './utils/isBackOffResponse.ts';
+import { parseRetryAfterMs } from './utils/parseRetryAfterMs.ts';
 
 export const fetchPacerOptionsDefault:FetchPacerOptions = {
     mode: {
@@ -56,97 +57,159 @@ export default class FetchPacer {
     /**
      * Run a fetch that will, if necessary, wait before calling over the network in order to not exceed the quota.
      * 
-     * @param url 
-     * @param options 
+     * @param url
+     * @param options The request options, or a function building them. Pass a function when
+     * anything in them can go stale, as it is called afresh for every attempt.
      * @param points The number of units this will consume. Used to rate limit if max_points_per_second is defined.
-     * @returns 
+     * @returns
      */
-    async fetch(url: FetchURL, options?: FetchOptions, points?: number): Promise<PaceResponse | BackOffResponse> {
+    async fetch(url: FetchURL, options?: FetchOptionsProvider, points?: number): Promise<PaceResponse | BackOffResponse> {
         if( this.#options?.max_points_per_second && typeof points!=='number' ) {
             console.debug("FetchPacer request ought to have point stated, as tracking max points / second.", url);
         }
         
 
         
-        const response = await this.#queue.enqueue(async (job) => {
+        try {
+            return await this.#queue.enqueue(async (job) => {
 
-            // Let it know things are actively tracked (in case it wishes to optimise / be lazy when its inactive)
-            if( !(await this.paceTracker.isActive()) ) {
-                this.paceTracker.setActive(true);
-            }
-            
-            await sleep(this.#options.minimum_time_between_fetch!);
-
-            const pauseExceedsMaxTimeout = (pauseForMs:number) => (this.#options.mode.type==='attempt_recovery' && this.#options.mode.timeout_ms && (Date.now()+pauseForMs)>(job.created_at+this.#options.mode.timeout_ms)) as boolean;
-
-            
-            const pauseFor = await this.paceTracker.getActiveBackOffForMs();
-            if( pauseFor!==undefined ) {
-                let will_retry = false;
-                const response = attachBackOffTimeToResponse429(attachAttemptToResponse(createResponse429(), job.attempt), pauseFor);
-                if( this.#options.mode.type==='attempt_recovery' ) {
-                    if( pauseExceedsMaxTimeout(pauseFor) ) {
-                        response.cannot_recover = true;
-                        response.back_off_accumulated_ms = Date.now() - job.created_at;
-                    } else {
-                        // Tell it to retry 
-                        will_retry = true;
-                        job.preventCompletion(pauseFor);
-                    }
+                // Let it know things are actively tracked (in case it wishes to optimise / be lazy when its inactive)
+                if( !(await this.paceTracker.isActive()) ) {
+                    await this.paceTracker.setActive(true);
                 }
 
-                this.emitter.emit('BACKING_OFF', {type_of_429: 'synthetic', attempt: response.pacing_attempt, cannot_recover: response.cannot_recover, will_retry})
-                return response
-            }
+                await sleep(this.#options.minimum_time_between_fetch!);
 
-            //if( this.#options?.verbose ) console.log(`Fetching ${url} [ts: ${Date.now()}]`);
-            const ff = this.#fetchFunction;
-            const response = attachAttemptToResponse(await ff(url, options), job.attempt);
+                const pauseExceedsMaxTimeout = (pauseForMs:number) => (this.#options.mode.type==='attempt_recovery' && this.#options.mode.timeout_ms && (Date.now()+pauseForMs)>(job.created_at+this.#options.mode.timeout_ms)) as boolean;
 
-            if( isBackOffResponse(response) ) {
-                // Update the pacer to know a 429 was issued 
-                await this.paceTracker.logBackOff();
-                
+
                 const pauseFor = await this.paceTracker.getActiveBackOffForMs();
-
-                let will_retry = false;
-                if( pauseFor!==undefined && pauseFor>0 ) {
-                    attachBackOffTimeToResponse429(response, pauseFor);
-
-                    // If want to attempt recovery, tell the queue to try again 
-                    
+                if( pauseFor!==undefined ) {
+                    let will_retry = false;
+                    const response = attachBackOffTimeToResponse(attachAttemptToResponse(createResponse429(), job.attempt), pauseFor);
                     if( this.#options.mode.type==='attempt_recovery' ) {
                         if( pauseExceedsMaxTimeout(pauseFor) ) {
                             response.cannot_recover = true;
                             response.back_off_accumulated_ms = Date.now() - job.created_at;
                         } else {
+                            // Tell it to retry
                             will_retry = true;
                             job.preventCompletion(pauseFor);
                         }
                     }
+
+                    this.emitter.emit('BACKING_OFF', {type_of_429: 'synthetic', attempt: response.pacing_attempt, cannot_recover: response.cannot_recover, will_retry})
+                    return response
                 }
-                this.emitter.emit('BACKING_OFF', {type_of_429: 'real', attempt: response.pacing_attempt, cannot_recover: response.cannot_recover, will_retry})
 
-            } else if( response.status>=200 && response.status<=299 ) {
-                // Nb want to log even if no points, because exponential back off needs to know the most recent successful request 
-                await this.paceTracker.logSuccess(points ?? 0);
+                //if( this.#options?.verbose ) console.log(`Fetching ${url} [ts: ${Date.now()}]`);
+                const ff = this.#fetchFunction;
+
+                // Built here, rather than when the request was first asked for, so that a retry
+                // landing much later carries a credential that is still valid.
+                const attemptOptions = typeof options==='function'? await options() : options;
+
+                const response = attachAttemptToResponse(await ff(url, attemptOptions), job.attempt);
+
+                const refusedForPace = await this.#classifyRefusal(response);
+                if( refusedForPace ) {
+                    // Update the pacer to know it was turned away. A service that named its own
+                    // wait is believed over the calculated guess, which can only be shorter.
+                    await this.paceTracker.logBackOff(refusedForPace.minimumMs);
+
+                    const pauseFor = await this.paceTracker.getActiveBackOffForMs();
+
+                    let will_retry = false;
+                    if( pauseFor!==undefined && pauseFor>0 ) {
+                        attachBackOffTimeToResponse(response, pauseFor);
+
+                        // If want to attempt recovery, tell the queue to try again
+
+                        if( this.#options.mode.type==='attempt_recovery' ) {
+                            if( pauseExceedsMaxTimeout(pauseFor) ) {
+                                response.cannot_recover = true;
+                                response.back_off_accumulated_ms = Date.now() - job.created_at;
+                            } else {
+                                will_retry = true;
+                                job.preventCompletion(pauseFor);
+                            }
+                        }
+                    }
+                    this.emitter.emit('BACKING_OFF', {type_of_429: 'real', attempt: response.pacing_attempt, cannot_recover: response.cannot_recover, will_retry})
+
+                } else if( response.status>=200 && response.status<=299 ) {
+                    // Nb want to log even if no points, because exponential back off needs to know the most recent successful request
+                    await this.paceTracker.logSuccess(points ?? 0);
+                }
+
+
+                return response;
+
+            });
+        } finally {
+            // In a `finally` because a request that throws still leaves tracking switched on,
+            // and an active tracker polls on a timer that would then outlive the whole run.
+            if( (await this.#queue.count())===0 ) {
+                await this.paceTracker.setActive(false);
             }
-
-
-            return response;
-        
-        });
-
-        if( (await this.#queue.count())===0 ) {
-            this.paceTracker.setActive(false);
         }
-    
-        return response;
 
+    }
+
+    /**
+     * Decide whether a response means "you are going too fast", and for how long to wait.
+     *
+     * @returns The refusal and any minimum wait it carries, or `undefined` if the response was
+     * not a refusal for pace at all.
+     */
+    async #classifyRefusal(response: Response): Promise<{ minimumMs?: number } | undefined> {
+
+        const namedWaitMs = parseRetryAfterMs(response.headers.get('Retry-After'));
+
+        // A 429 has already said what it is, leaving a classifier nothing to add.
+        if( isBackOffResponse(response) ) return { minimumMs: namedWaitMs };
+
+        const treatAsBackOff = this.#options.treat_as_back_off;
+        if( !treatAsBackOff ) return undefined;
+
+        // Cloned so that reading the body to classify it does not consume the caller's copy.
+        const verdict = await treatAsBackOff(response.clone());
+        if( !verdict ) return undefined;
+
+        const askedForMs = verdict===true? undefined : verdict.minimumMs;
+        return { minimumMs: Math.max(namedWaitMs ?? 0, askedForMs ?? 0) || undefined };
     }
 
     logPointsManually(points:number) {
         return this.paceTracker.logSuccess(points);
+    }
+
+    /**
+     * Report a refusal this pacer did not carry out itself, so it paces as though it had.
+     *
+     * Not every request a service refuses passes through here. A batch call spends the cost of
+     * many requests in one go, and comes back a success even when individual parts inside it
+     * were turned away for going too fast — leaving the pacer with no reason to slow down, and
+     * the next batch destined to fare the same. Reporting it closes that gap.
+     *
+     * @param minimumBackOffPeriodMs The shortest acceptable wait, when the service named one.
+     * Omit to let the pacer work the wait out from how often it has been refused lately.
+     *
+     * @example
+     * // A part inside a batch reply came back rate limited
+     * await pacer.logBackOff(retryAfterMs);
+     */
+    async logBackOff(minimumBackOffPeriodMs?: number):Promise<void> {
+        return this.paceTracker.logBackOff(minimumBackOffPeriodMs);
+    }
+
+    /**
+     * How much longer requests are being held back for.
+     *
+     * @returns The remaining wait in milliseconds, or `undefined` when requests are free to go.
+     */
+    async getActiveBackOffForMs():Promise<number | undefined> {
+        return this.paceTracker.getActiveBackOffForMs();
     }
 
     /**
@@ -198,10 +261,14 @@ function attachAttemptToResponse(response: Response | PaceResponse | BackOffResp
     return response as PaceResponse | BackOffResponse;
 }
 
-function attachBackOffTimeToResponse429<T extends Response | PaceResponse | BackOffResponse>(response:T, backOffMs?: number):T {
-    if( response.status===429 ) {
-        (response as BackOffResponse).back_off_for_ms = backOffMs ?? 0;
-    }
+/**
+ * Record how long a refused request is being held back for.
+ *
+ * Called only where the response has already been established as a refusal for pace, which a
+ * service may signal with a status other than 429 — so this does not second-guess the status.
+ */
+function attachBackOffTimeToResponse<T extends Response | PaceResponse | BackOffResponse>(response:T, backOffMs?: number):T {
+    (response as PaceResponse).back_off_for_ms = backOffMs ?? 0;
     return response;
 }
 

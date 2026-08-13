@@ -38,7 +38,9 @@ export class ChromeStorage implements IKvStorage {
     }
     async get(key: string): Promise<string | undefined> {
         
-        const dataMap = await this.#storage.get(key)
+        // Named explicitly, because a storage area makes no promise about what it holds and
+        // this adapter only ever writes strings into it.
+        const dataMap = await this.#storage.get<Record<string, string>>(key)
         return dataMap[key]
     }
     async remove(key: string): Promise<void> {

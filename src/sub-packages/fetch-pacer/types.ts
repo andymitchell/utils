@@ -23,6 +23,26 @@ export type Fetch = typeof fetch;
 export type FetchURL = RequestInfo | URL;
 export type FetchOptions = RequestInit;
 
+/**
+ * The options for a request, or a function that builds them when each attempt is about to run.
+ *
+ * A held-back request may be retried long after it was first asked for. Anything inside the
+ * options that goes stale in the meantime — an access token, an abort signal that has already
+ * fired — has to be made again at that point rather than replayed, so pass a function whenever
+ * the options are not simply constant.
+ *
+ * @example
+ * // Constant options: fine as a plain object
+ * pacer.fetch(url, { method: 'GET' });
+ *
+ * // A credential that may expire before the retry happens
+ * pacer.fetch(url, async () => ({
+ *     headers: { Authorization: `Bearer ${await getAccessToken()}` },
+ *     signal: AbortSignal.timeout(30_000)
+ * }));
+ */
+export type FetchOptionsProvider = FetchOptions | (() => FetchOptions | Promise<FetchOptions>);
+
 export type PaceTrackerOptions = {
     /**
      * Used by the pacing calculation.
@@ -32,11 +52,31 @@ export type PaceTrackerOptions = {
     max_points_per_second?: number;
 
     /**
-     * How to calculate the pacing impact of a backoff 429 from the server 
+     * How to calculate the pacing impact of a backoff 429 from the server
      */
     back_off_calculation?: {
         type: 'exponential',
+
+        /**
+         * Vary each calculated pause by up to a fifth, either side of its calculated length.
+         *
+         * Clients that back off at the same moment otherwise return at the same moment, and
+         * hit the service with the very burst the back-off existed to break up. Varying the
+         * pause staggers their return.
+         *
+         * @remarks
+         * The variation runs in both directions, so across many clients the average wait is
+         * still the calculated one. It never applies to a pause the service named itself
+         * (see `logBackOff`'s minimum period), which is followed exactly.
+         */
         jitter?: boolean,
+
+        /**
+         * The longest single pause that may be asked for, in milliseconds. Defaults to 5 minutes.
+         *
+         * Exponential growth reaches unhelpful lengths quickly once a service keeps refusing;
+         * this is the point past which waiting longer stops being useful.
+         */
         max_single_back_off_ms?: number
     },
 
@@ -63,17 +103,16 @@ export type PaceTrackerOptions = {
 export interface PaceResponse extends Response {
     /**
      * The attempt it was on (if running in `attempt_recovery` mode, otherwise always 0).
-     * 
+     *
      * First attempt = 0, then increments.
      */
     pacing_attempt: number
-}
-export interface BackOffResponse extends PaceResponse {
-    status: 429;
-    statusText: "Too Many Requests";
 
     /**
      * The calculated/suggested time to back off for.
+     *
+     * Only present when the request was turned away for going too fast, which a service may
+     * signal with a status other than 429 (see `treat_as_back_off`).
      */
     back_off_for_ms?: number;
 
@@ -84,6 +123,10 @@ export interface BackOffResponse extends PaceResponse {
      * The time since the first request started
      */
     back_off_accumulated_ms?: number
+}
+export interface BackOffResponse extends PaceResponse {
+    status: 429;
+    statusText: "Too Many Requests";
 }
 
 /**
@@ -97,6 +140,40 @@ export type FetchPacerOnlyOptions = {
     custom_fetch_function?: Fetch,
 
     minimum_time_between_fetch?: number,
+
+    /**
+     * Decide whether a response that is not a 429 was nonetheless a refusal for going too fast.
+     *
+     * Not every service says "429" when it means it. Some reply `403` and explain the real
+     * reason in the body, where it is indistinguishable from an ordinary permission failure
+     * without looking. Treating those as hard errors means never backing off, and so being
+     * refused again immediately; treating every `403` as a rate limit means waiting out
+     * failures that waiting cannot fix. This tells the pacer which is which.
+     *
+     * @param response A clone of the response, so reading the body here does not consume the
+     * one handed back to the caller.
+     * @returns `true` to back off for a period the pacer works out, `{minimumMs}` to back off
+     * for at least that long, or `false` to treat the response as it appears.
+     *
+     * @example
+     * treat_as_back_off: async (response) => {
+     *     if( response.status!==403 ) return false;
+     *     const body = await response.json();
+     *     return body?.error?.status==='RESOURCE_EXHAUSTED';
+     * }
+     *
+     * @remarks
+     * A 429 never reaches this, having already said what it is; nor does a response arriving
+     * while the pacer is holding requests back of its own accord.
+     *
+     * The response's own status is left untouched, so a caller still sees what the service
+     * actually sent and can report it accurately.
+     *
+     * A `Retry-After` header is honoured whichever way this answers, and wins over a shorter
+     * `minimumMs`. Throwing from here fails the request rather than being swallowed, since a
+     * classifier that silently stops working would disable rate-limit detection unnoticed.
+     */
+    treat_as_back_off?: (response: Response) => Promise<boolean | { minimumMs?: number }>,
 
 
     /**

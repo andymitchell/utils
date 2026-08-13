@@ -84,14 +84,18 @@ export class ActivityTrackerKvStorage extends BaseActivityTracker implements IAc
 
 
     override async setBackOffUntilTs(ts: number, options?: SetBackOffUntilTsOptions): Promise<void> {
-        if( options?.onlyIfExceedsCurrentTs ) {
-            const backOffUntilTs: number | undefined = await this.#store.get(this.#storageKeyBackOffUntil);
-            if( typeof backOffUntilTs==='number' && backOffUntilTs>ts ) {
-                return;
+        // Read and write together, so that two writers pausing the same resource at once cannot
+        // both see the old value and let the shorter of their two pauses be the one that survives.
+        await this.#transaction.enqueue(async () => {
+            if( options?.onlyIfExceedsCurrentTs ) {
+                const backOffUntilTs: number | undefined = await this.#store.get(this.#storageKeyBackOffUntil);
+                if( typeof backOffUntilTs==='number' && backOffUntilTs>ts ) {
+                    return;
+                }
             }
-        }
 
-        await this.#store.set(this.#storageKeyBackOffUntil, ts);
+            await this.#store.set(this.#storageKeyBackOffUntil, ts);
+        })
 
     }
 

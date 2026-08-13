@@ -127,7 +127,9 @@ export default class PaceTracker implements IPaceTracker {
             const maxPauseMs = msToClearForVariousPeriods.reduce((a, b) => Math.max(a, b), -Infinity);
 
             if( maxPauseMs>0 ) {
-                this.#activityTracker.setBackOffUntilTs(Date.now()+maxPauseMs, {onlyIfExceedsCurrentTs: true});
+                // Awaited so that a caller which sends its next request the moment this resolves
+                // is paced against the quota this one just spent, rather than racing the write.
+                await this.#activityTracker.setBackOffUntilTs(Date.now()+maxPauseMs, {onlyIfExceedsCurrentTs: true});
             }
 
             
@@ -216,17 +218,22 @@ export default class PaceTracker implements IPaceTracker {
         }
         
         if( this.#options.back_off_calculation?.jitter ) {
-            jitter = Math.floor(backOffPeriod * 0.4 * Math.random());
+            // Spread to either side of the calculated pause, so clients that backed off together
+            // do not all return together. Spreading only later would delay every one of them.
+            jitter = Math.round(backOffPeriod * 0.2 * ((Math.random() * 2) - 1));
         }
 
 
-        
 
-        let maxSingleBackOffMs = (this.#options?.back_off_calculation?.max_single_back_off_ms ?? 1000*60*5)-jitter;
-        if( maxSingleBackOffMs<0 ) maxSingleBackOffMs = 0;
+
+        const maxSingleBackOffMs = this.#options?.back_off_calculation?.max_single_back_off_ms ?? 1000*60*5;
         backOffPeriod = Math.min(backOffPeriod+jitter, maxSingleBackOffMs)
+        if( backOffPeriod<0 ) backOffPeriod = 0;
+
+        // Applied last, and never spread: a period the service itself named is an instruction,
+        // where the periods above are this client's own estimate of when to try again.
         backOffPeriod = Math.max(backOffPeriod, forcedBackOffPeriod);
-        
+
         return backOffPeriod;
     
     }
