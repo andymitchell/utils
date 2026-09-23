@@ -31,7 +31,7 @@ The library work is useful either way; only the consumer config differs.
 **Q1 — Is fetch-pacer strictly serial with no possible concurrency?**
 **The library: yes, per instance. The GTDInbox app: no — it already runs Gmail requests concurrently, unpaced.**
 - `FetchPacer` owns one `QueueMemory` (`FetchPacer.ts:46`). `QueueMemory` only ever runs `queue[0]` (`../queue/memory/QueueMemory.ts:112-116`), and a job paused via `preventCompletion` stays at the head, blocking all others. This holds in both 0.15.4 (what GTDInbox ships) and 0.32.1 (this source).
-- In GTDInbox, the legacy `GmailApiSafeFetch` constructs **a new pacer per port, and the legacy client opens one port per request**. So every legacy Gmail request gets its own empty queue: concurrent and effectively unpaced. It runs in parallel with the main singleton pacer's queue. All instances share only a storage log that doesn't prevent overshoot (App. A).
+- In GTDInbox, the legacy `GmailApiSafeFetch` constructs **a new pacer per port, and the legacy client opens one port per request**. So every legacy Gmail request gets its own empty queue: concurrent and effectively unpaced. It runs in parallel with the main singleton pacer's queue. All instances share only a storage log that doesn't prevent overshoot (App. A). ("Effectively unpaced" is 0.15.4; on 0.32.1+ the shared cool-off in §2.3 catches them too, until Phase A.)
 
 **Q2 — Could concurrency spend Gmail quota faster than serial?**
 **Legacy quota: yes, ~2–5× for thread downloads. New quota: no.**
@@ -77,6 +77,12 @@ Discrete-event simulation (App. E2) of a window-exact scheduler that charges poi
 - Fake-clock run of the real class (App. E1: max 200/s, 100 u requests, 200 ms + 800 ms per request): **~24 u/s**.
 - 10 u requests at 300 ms: **~7 u/s**.
 - 0.15.4 for comparison: ~87–100 u/s (latency-bound).
+
+#### Side effects beyond throughput
+- **Shared through the refusal slot.** The cool-off is written with `setBackOffUntilTs`, into the same persisted `<id>.backoff` slot that real refusals use. So one pacer's spend pauses **every** pacer on the same id + storage (other instances; other realms reading the same `chrome.storage`), including ones that have spent nothing.
+- **Indistinguishable from a refusal.** `getActiveBackOffForMs()` reports it; the next fetch emits `BACKING_OFF {type_of_429: 'synthetic'}`; in `429_preemptively` mode the caller receives a 429 after a plain success.
+  - Verified (0.33.0): two `FetchPacer`s on one id + one `MemoryStorage`, max 200/s. The first sends 100 u → 200. The second, having spent nothing, reports a 500 ms back-off and returns **429 with `back_off_for_ms ≈ 300`**.
+  - Consumers that read a 429 or `BACKING_OFF` as "the service is refusing" are misled. Check api-chisel's `hasGivenUpOnBackOff.ts`.
 
 ---
 
@@ -133,7 +139,7 @@ Discrete-event simulation (App. E2) of a window-exact scheduler that charges poi
   - 403 with `error.errors[].reason` of `rateLimitExceeded` or `userRateLimitExceeded` → `rate`
   - 429 whose body contains `concurrent requests` → `concurrency`
 - **Rate refusal:**
-  - Shared pause for everyone (existing `setBackOffUntilTs`).
+  - Shared pause for everyone (existing `setBackOffUntilTs`). **Refusals only**: quota pacing never writes this slot (§2.3 side effects).
   - Exponential back-off starting at **1 s** (today 100 ms, `PaceTracker.ts:212`), with full jitter (`back_off_calculation.jitter` exists), capped.
   - `Retry-After` still wins (exists: `utils/parseRetryAfterMs.ts`).
   - **Opt-in AIMD budget** (`adaptive?: {...}`): on each rate refusal, multiply the effective window limits by ~0.6. Recover additively (e.g. +5 % of configured per 10 s without refusal) up to the configured limit. This lets the pacer find the real quota when config is wrong (e.g. the new Gmail regime).
@@ -196,6 +202,10 @@ Derive the `types.ts` additions from existing types; don't redeclare shapes.
 ### Phase A [ ] Fix the cool-off regression (D6)
 - First, a test: `FakeQuotaServer` (fake timers; `custom_fetch_function`) with 100 u requests and 50 ms latency. Assert steady-state ≥ 90 % of `max_points_per_second` over 60 s, and that no 1 s sliding interval exceeds the max. It fails today at ~12 %.
 - Then remove `PaceTracker.ts:107-134`. Replace it with an interim admission check using a 1 s sliding window at dispatch (subsumed by Phase B).
+- Also pin the §2.3 side effects:
+  - After a success within quota, a second pacer on the same id + storage is not held back, and its `getActiveBackOffForMs()` is `undefined`.
+  - In `429_preemptively` mode, a request within quota straight after a success is not refused.
+  - The `.backoff` slot is written only by refusals: a real 429, a `treat_as_back_off` verdict, or `logBackOff`.
 - Existing `PaceTracker.test.ts` / `FetchPacer.test.ts` "Pacing" tests will encode the old cool-off. Rewrite them to test **intent** (never exceed the window; reach throughput), not the old pause lengths.
 
 ### Phase B [ ] `earliestAdmissibleTs` (D1)
