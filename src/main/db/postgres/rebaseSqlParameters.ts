@@ -6,7 +6,7 @@ import {
 import type { SqlFragment, AppendSqlParametersResult } from '../../../sub-packages/sql-parameters/types.ts';
 
 /**
- * @deprecated Use `rebaseSqlParameters` from `@andyrmitchell/utils/sql-parameters` with `dialect: 'pg'`.
+ * @deprecated Use `rebaseSqlParameters` from `@andymitchell/utils/sql-parameters` with `dialect: 'pg'`.
  *
  * @example
  * rebaseSqlParameters("age > $1 AND name = $2", 2) // => "age > $2 AND name = $3"
@@ -16,7 +16,7 @@ export function rebaseSqlParameters(sql: string, rebase: number): string {
 }
 
 /**
- * @deprecated Use `appendSqlParameters` from `@andyrmitchell/utils/sql-parameters` with `dialect: 'pg'`.
+ * @deprecated Use `appendSqlParameters` from `@andymitchell/utils/sql-parameters` with `dialect: 'pg'`.
  *
  * @example
  * appendSqlParameters(['a', 'b'], { sql: 'age > $1', parameters: [5] })
@@ -26,7 +26,7 @@ export function appendSqlParameters(existingParameters: any[], appending: SqlFra
 }
 
 /**
- * @deprecated Use `concatSqlParameters` from `@andyrmitchell/utils/sql-parameters` with `dialect: 'pg'`.
+ * @deprecated Use `concatSqlParameters` from `@andymitchell/utils/sql-parameters` with `dialect: 'pg'`.
  *
  * @example
  * concatSqlParameters([{ sql: 'age > $1', parameters: [5] }, { sql: 'name = $1', parameters: ['Bob'] }])

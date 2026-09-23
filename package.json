@@ -1,5 +1,5 @@
 {
-    "name": "@andyrmitchell/utils",
+    "name": "@andymitchell/utils",
     "version": "0.32.1",
     "description": "",
     "sideEffects": false,
@@ -137,6 +137,7 @@
         "LICENSE"
     ],
     "publishConfig": {
+        "registry": "https://npm.pkg.github.com",
         "access": "public"
     },
     "scripts": {
