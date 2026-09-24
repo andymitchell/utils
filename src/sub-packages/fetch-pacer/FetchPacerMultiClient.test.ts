@@ -50,7 +50,7 @@ describe('Multiple Clients ', () => {
 
     /**
      * Run a fetch to completion under fake timers, advancing past the default
-     * minimum_time_between_fetch gap the queue enforces before each request.
+     * minimum_time_between_fetch gap that follows each request sent.
      */
     async function fetchAdvancingTime(fetchPacerMultiClient:FetchPacerMultiClient, points:number, clientId:string):Promise<Response | BackOffResponse> {
         const responsePromise = fetchPacerMultiClient.fetch('https://example.com', undefined, points, clientId);
@@ -59,20 +59,31 @@ describe('Multiple Clients ', () => {
     }
 
 
-    test(`the same id will correctly back off`, async () => {
+    test('shares one quota between requests for the same client', async () => {
 
+        const fetchPacerMultiClient = makeMultiClientForTest();
+
+        const response1 = await fetchAdvancingTime(fetchPacerMultiClient, 6, 'abc');
+        const response2 = await fetchAdvancingTime(fetchPacerMultiClient, 6, 'abc');
+
+        expect(response1.status).toBe(200);
+        expect(response2.status).toBe(429);
+        // 6 more on top of 6 would exceed 10 per second until the first 6 leave the window,
+        // 1000ms after they were sent; 200ms of that had passed when the second was checked.
+        expect((response2 as BackOffResponse).back_off_for_ms).toBe(800);
+
+    })
+
+    test('does not hold a request back after a spend that fits', async () => {
 
         const fetchPacerMultiClient = makeMultiClientForTest();
 
         const response1 = await fetchAdvancingTime(fetchPacerMultiClient, 5, 'abc');
         const response2 = await fetchAdvancingTime(fetchPacerMultiClient, 5, 'abc');
 
-
         expect(response1.status).toBe(200);
-        expect(response2.status).toBe(429);
-        // 5 of the 10 points/second spent = a 500ms hold, of which 200ms had already
-        // passed (the enforced gap between fetches) when the second request was refused.
-        expect((response2 as BackOffResponse).back_off_for_ms).toBe(300);
+        expect(response2.status).toBe(200);
+        expect((response2 as BackOffResponse).back_off_for_ms).toBe(undefined);
 
     })
 

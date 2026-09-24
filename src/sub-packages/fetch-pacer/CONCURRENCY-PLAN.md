@@ -9,6 +9,23 @@ A research report and implementation plan for making `fetch-pacer` run requests 
 - **Backwards compatibility:** with no new options set, behaviour must stay "≤1 request in flight". The one deliberate exception is the Phase A bug fix. Other consumer: `~/git/api/api-chisel/src/api-generator/shared-src-template/request/` (`FetchPacerMultiClientDefault.ts`, `resolvePacerConfig.ts`, `hasGivenUpOnBackOff.ts`).
 - House rules: deep modules, barrel-only exports (`index.ts`), JSDoc on every export, files < 400 LOC, errors as values where practical, no mutation of inputs.
 
+## Status (2026-09-24)
+§2.3 was reproduced on 0.33.0 before any change: 24.4 u/s (100 u requests) and 7.1 u/s (10 u), against a 200 u/s cap. A second pacer on the same store that had spent nothing reported a 499 ms back-off, and got a 429 with `back_off_for_ms` 497.
+- **Done** (still one request in flight per pacer):
+  - **D6.** The cool-off is gone, and spend never writes the refusal slot. Phase A.
+  - **D1, single window.** Admission is checked at dispatch by `utils/earliestAdmissibleTs.ts`, over the 1 s window derived from `max_points_per_second`. The function and its property tests are done; the `quota.windows` option is not.
+  - **D2.** A `reserved` charge is made at dispatch. Phase C.
+  - **D7.** Spacing runs between sends, and the first request goes at once. The request options are built before the admission check, so another pacer's spend during a slow build is counted.
+  - **Leaks.** The queue's long-running check timer is off by default. The tracker's change listener and fail-safe poll are removed, along with `failsafe_active_sync_poll_ms`.
+  - **Append-safe shared log.** Each tracker writes only its own segment (`<id>.activities.<uuid>`), and every read lists and merges all the segments. A segment whose entries have all aged out is never written again, so any reader may delete it. This fixes lost writes between trackers sharing a store.
+  - **`back_off_calculation.initial_back_off_ms`** (default 100). D5's 1 s floor is now a configuration choice.
+- **Open:**
+  - `quota.windows`.
+  - D3–D5: the scheduler and `max_concurrency`, the registry and lock, AIMD, refusal kinds, and refusal counting that knows when each request was sent.
+  - D8–D9.
+  - Admission coordination across writers. Two writers can each pass admission within the other's write latency, overshooting by at most one request per writer each time it happens.
+  - kv-storage follow-up: `ChromeStorage.getAllKeys` via `chrome.storage.local.getKeys()`. Today it reads the whole area, and the tracker lists keys on every check.
+
 ---
 
 ## 0. Step zero — which Gmail quota applies?
@@ -199,7 +216,7 @@ Derive the `types.ts` additions from existing types; don't redeclare shapes.
 
 ## 4. Implementation phases
 
-### Phase A [ ] Fix the cool-off regression (D6)
+### Phase A [x] Fix the cool-off regression (D6)
 - First, a test: `FakeQuotaServer` (fake timers; `custom_fetch_function`) with 100 u requests and 50 ms latency. Assert steady-state ≥ 90 % of `max_points_per_second` over 60 s, and that no 1 s sliding interval exceeds the max. It fails today at ~12 %.
 - Then remove `PaceTracker.ts:107-134`. Replace it with an interim admission check using a 1 s sliding window at dispatch (subsumed by Phase B).
 - Also pin the §2.3 side effects:
@@ -207,6 +224,11 @@ Derive the `types.ts` additions from existing types; don't redeclare shapes.
   - In `429_preemptively` mode, a request within quota straight after a success is not refused.
   - The `.backoff` slot is written only by refusals: a real 429, a `treat_as_back_off` verdict, or `logBackOff`.
 - Existing `PaceTracker.test.ts` / `FetchPacer.test.ts` "Pacing" tests will encode the old cool-off. Rewrite them to test **intent** (never exceed the window; reach throughput), not the old pause lengths.
+
+#### Lessons Learnt
+- Shipped with D1's pure function over a single 1 s window rather than an interim check. Throughput pins went from 27 / 9 u/s to ≥ 180 of 200 u/s (`FetchPacer-throughput.test.ts`). E1 now gives 100 u/s, its round-trip ceiling, so "≥ 90 % of max" is measured by the vitest pins instead.
+- The side-effect pins live in `FetchPacer-shared-storage.test.ts`. Only `logBackOff` (real 429, classifier verdict, manual report) writes the `.backoff` slot.
+- Consumer-visible: `back_off_for_ms` on a synthetic 429 now means "when this request fits"; `getActiveBackOffForMs()` reports a refusal pause, or a window over-full after an oversized request.
 
 ### Phase B [ ] `earliestAdmissibleTs` (D1)
 - Pure function with property tests:
@@ -216,9 +238,14 @@ Derive the `types.ts` additions from existing types; don't redeclare shapes.
   - Oversized requests admit once the window is empty.
 - Wire into `FetchPacer` behind `quota.windows`, deriving from `max_points_per_second`.
 
-### Phase C [ ] Reserve at dispatch (D2)
+### Phase C [x] Reserve at dispatch (D2)
 - Tracker schema gains `kind`/`dispatched_at` and still accepts old records.
 - Test: with two jobs admitted back-to-back, the second sees the first's points before the first completes.
+
+#### Lessons Learnt
+- The log gained `type: 'reserved'` entries instead of `kind`/`dispatched_at` on existing ones. A 2xx adds a zero-point `success` marker, old `success` records with points still count, and the refusal count ignores reservations.
+- The charge's time is read synchronously just before `fetch` is called, and the write is awaited after. A slow store therefore neither delays the send nor dates the charge late. A store failure is observed at once and surfaces through that request, and the fetch's own failure wins when both fail.
+- Pinned across two pacers on one store (`FetchPacer-shared-storage.test.ts`, "while one has a request in flight"). Before any concurrency, that was the case where in-flight spend went unseen.
 
 ### Phase D [ ] `PacedScheduler` + `max_concurrency` (D3)
 - All existing `FetchPacer*.test.ts` pass with the default of 1.

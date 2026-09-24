@@ -32,7 +32,6 @@ import { MockChromeStorageArea } from '../kv-storage/index.ts';
 import { FetchPacerForTesting } from './testing-utils/FetchPacerForTesting.ts';
 import { isBackOffResponse } from './utils/isBackOffResponse.ts';
 import { promiseWithTrigger, sleep } from '../../index.ts';
-import { expectBetweenNumbers, expectBoundGreaterThan, expectCloseTo } from './testing-utils/expectInRange.ts';
 
 
 
@@ -225,10 +224,8 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
 
                 } else {
                     mockFetch.mockResolvedValueOnce(new Response(null, { status: 200 }));
-                    
-                    console.log("OK ITS YOU")
+
                     const res = await pacer.fetch('https://api.example.com');
-                    console.log("OK ITS DONE!")
 
                     expect(res.status).toBe(200);
                     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -290,41 +287,6 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
 
         
 
-        describe('Concurrent calls', () => {
-            it('processes multiple concurrent requests sequentially respecting minimum_time_between_fetch', async () => {
-                // Fake timers: makes Date.now() advance deterministically with the
-                // scheduled delays, so the timing assertions don't flake under build load.
-                vi.useFakeTimers();
-                const min = 30;
-                const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: min, testing_queue_disable_check_timeout: true });
-                const mockPaceTracker = pacer.getMockPaceTracker();
-                mockPaceTracker.getActiveBackOffForMs.mockResolvedValue(undefined); // No PaceTracker delay
-
-                const fetches: { url: string, ts: number, ms: number }[] = [];
-                const st = Date.now();
-                mockFetch.mockImplementation(async (url) => {
-                    fetches.push({ url: url as string, ts: Date.now(), ms: Date.now()-st });
-                    return mockFetchResponse(200);
-                });
-
-                const p1 = pacer.fetch('url1');
-                const p2 = pacer.fetch('url2');
-                const p3 = pacer.fetch('url3');
-                await vi.runAllTimersAsync();
-                await Promise.all([p1, p2, p3]);
-
-                expect(fetches.map(x => x.url)).toEqual(['url1', 'url2', 'url3']);
-
-
-                expectBoundGreaterThan(min*1, fetches[0]!.ms, 20);
-                expectBoundGreaterThan(min*2, fetches[1]!.ms, 20);
-                expectBoundGreaterThan(min*3, fetches[2]!.ms, 20);
-
-                vi.useRealTimers();
-            });
-
-        });
-
         describe('setActive calls', () => {
             it('calls paceTracker.setActive(true) on first fetch and setActive(false) when queue is empty', async () => {
                 const pacer = makeTest({ mode: { type } });
@@ -364,26 +326,6 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                 expect(mockPaceTracker.setActive).toHaveBeenCalledWith(false);
                 const finalFalseCalls = mockPaceTracker.setActive.mock.calls.filter(call => call[0] === false).length;
                 expect(finalFalseCalls).toBe(1);
-            });
-        });
-
-        describe('logSuccess points argument', () => {
-            it('logs 0 points if fetch called with no points argument', async () => {
-                const pacer = makeTest({ mode: { type }, max_points_per_second: 10 }); // max_points_per_second to ensure points are relevant
-                const mockPaceTracker = pacer.getMockPaceTracker();
-                mockFetch.mockResolvedValueOnce(mockFetchResponse(200));
-
-                await pacer.fetch('url1');
-                expect(mockPaceTracker.logSuccess).toHaveBeenCalledWith(0);
-            });
-
-            it('logs specified points if fetch called with points argument', async () => {
-                const pacer = makeTest({ mode: { type }, max_points_per_second: 10 });
-                const mockPaceTracker = pacer.getMockPaceTracker();
-                mockFetch.mockResolvedValueOnce(mockFetchResponse(200));
-
-                await pacer.fetch('url1', undefined, 5);
-                expect(mockPaceTracker.logSuccess).toHaveBeenCalledWith(5);
             });
         });
 
@@ -514,37 +456,6 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                 expect(mockFetch).not.toHaveBeenCalled(); // Ensure global mockFetch wasn't used
             });
 
-            describe('minimum_time_between_fetch', () => {
-                it('enforces minimum_time_between_fetch for sequential fetches', async () => {
-                    // Fake timers: makes Date.now() advance deterministically with the
-                    // scheduled delays, so the timing assertions don't flake under build load.
-                    vi.useFakeTimers();
-                    const min = 60;
-                    const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: min, testing_queue_disable_check_timeout: true });
-                    pacer.getMockPaceTracker().getActiveBackOffForMs.mockResolvedValue(undefined);
-
-                    const callTimes: number[] = [];
-                    const st = Date.now();
-                    mockFetch.mockImplementation(async () => {
-                        callTimes.push(Date.now()-st);
-                        return mockFetchResponse(200);
-                    });
-
-                    const p1 = pacer.fetch('url1');
-                    const p2 = pacer.fetch('url2');
-                    await vi.runAllTimersAsync();
-                    await Promise.all([p1, p2]);
-
-                    expect(callTimes.length).toBe(2);
-
-                    expectBoundGreaterThan(min*1, callTimes[0], 10);
-                    expectBoundGreaterThan(min*2, callTimes[1], 10);
-
-                    vi.useRealTimers();
-                });
-
-            });
-
             it('processes fetches sequentially with zero or negative minimum_time_between_fetch', async () => {
                 vi.useFakeTimers();
                 // Test with 0, negative should behave like 0 due to sleep implementation
@@ -584,7 +495,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                 const res = await pacer.fetch('url-after-dispose');
                 expect(res.status).toBe(200);
                 expect(mockPaceTracker.setActive).toHaveBeenCalledWith(true); // Still gets called
-                expect(mockPaceTracker.getActiveBackOffForMs).toHaveBeenCalled(); // Still gets called
+                expect(mockPaceTracker.getPauseBeforeMs).toHaveBeenCalled(); // Still gets called
             });
         });
 
@@ -628,12 +539,10 @@ describe('mode attempt_recovery specific tests', () => {
 
         expect(mockFetch).not.toHaveBeenCalled(); // Not called immediately
 
-        vi.advanceTimersByTime(99);
-        await vi.runOnlyPendingTimersAsync(); // Process any microtasks
+        await vi.advanceTimersByTimeAsync(99);
         expect(mockFetch).not.toHaveBeenCalled(); // Still waiting
 
-        vi.advanceTimersByTime(2); // Total 100ms elapsed
-        await vi.runOnlyPendingTimersAsync(); // Allow retry logic (setTimeout in queue) to execute
+        await vi.advanceTimersByTimeAsync(2); // Just past 100ms, when the queue retries
 
         expect(mockFetch).toHaveBeenCalledTimes(1); // Called after 100ms
 

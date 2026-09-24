@@ -10,6 +10,10 @@ export class MockPaceTracker implements IPaceTracker {
         /* no-op */
     });
 
+    public reservePoints = vi.fn(async (_points: number) => {
+        /* no-op */
+    });
+
     public logBackOff = vi.fn<() => Promise<void>>(async (minimumBackOffMs?: number) => {
         /* no-op */
     });
@@ -19,6 +23,10 @@ export class MockPaceTracker implements IPaceTracker {
     });
 
     getActiveBackOffUntilTs = vi.fn<() => Promise<number | undefined>>(async () => undefined);
+
+    // Answers through `getActiveBackOffForMs`, so a test can steer the pause by stubbing either
+    // that or `getActiveBackOffUntilTs`.
+    public getPauseBeforeMs = vi.fn(async (_points: number) => this.getActiveBackOffForMs());
 
 
     public setActive = vi.fn(async (active: boolean) => {

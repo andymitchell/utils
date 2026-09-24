@@ -1,67 +1,69 @@
-import type {  ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemSuccess } from './types.ts';
+import type {  ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemReserved, StoredActivityItemSuccess } from './types.ts';
 import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.ts';
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.ts';
 import { convertTimestampToMillisecondsFromNow } from './utils/convertTimestampToMillisecondsFromNow.ts';
+import { earliestAdmissibleTs, type QuotaWindow } from './utils/earliestAdmissibleTs.ts';
 
+type BackOffCalculation = NonNullable<PaceTrackerOptions['back_off_calculation']>;
+
+/** What the exponential back-off uses for each setting the caller leaves out. */
+const exponentialBackOffDefaults = Object.freeze({
+    initial_back_off_ms: 100,
+    max_single_back_off_ms: 1000*60*5
+} satisfies Required<Pick<BackOffCalculation, 'initial_back_off_ms' | 'max_single_back_off_ms'>>);
 
 /**
- * Helps manage the rate of fetch requests to
- * respect usage quotas and handle server-indicated (429) rate limits.
+ * Decides how long to hold a request back, so that spending stays within a quota and the
+ * service's refusals are respected.
  *
- * It works by:
- * 1.  **Proactive Pacing (Quota Management)**: If `max_points_per_second` is configured,
- *     it monitors "points" consumed by successful operations. After each success,
- *     it sets a cool-off period to allow the quota usage to return to 0, advising a pause for
- *     future operations until the projected rate is acceptable.
+ * Two things can hold a request back:
+ * 1. **The quota.** With `max_points_per_second` set, each request's cost counts against a
+ *    sliding one-second window from the moment it is sent (`reservePoints`). Before a request
+ *    is sent, `getPauseBeforeMs` works out when enough earlier spend will have left the window
+ *    for it to fit, and waits no longer than that. A request larger than the whole quota is let
+ *    through once the window is empty, so it runs once rather than never.
+ * 2. **A refusal.** When the service turns a request away for going too fast, `logBackOff`
+ *    sets a pause that holds every request back. It can grow exponentially over consecutive
+ *    refusals (`back_off_calculation`), is never shorter than a wait the service named, only
+ *    ever lengthens while in force, and is capped by `max_single_back_off_ms`.
  *
- * 2.  **Reactive Backoff (429 Handling)**: When a server signals a rate limit (a
- *     HTTP 429 error), this event is logged via `logBackOff()`. It then
- *     calculates a back-off duration, potentially using an exponential strategy for
- *     consecutive failures. 
+ * Spending never sets the refusal pause, so a pacer sharing this history that has not been
+ * refused is never told it is backing off.
  *
- * The cool off period (retrievable via `getActiveBackOffUntilTs()`) represents the
- * earliest time the next operation should ideally be attempted. This timestamp is
- * designed to only ever increase or stay the same; successful operations do not
- * reduce an active cool-off or back-off period. A configurable cap
- * (`max_single_back_off_ms`) prevents runaway back-off calculations from causing
- * excessively long pauses.
+ * History is kept by an {@link IActivityTracker}: in memory, in browser extension storage, or
+ * in a custom store. Trackers with the same `id` on the same durable store share one history,
+ * so several pacers (e.g. in different tabs) spend from one quota.
  *
- * Activity history (successes and backoffs) is managed by an `IActivityTracker`
- * implementation, allowing for different storage backends like in-memory,
- * browser localStorage, or a custom solution.
- * 
- * Designed to be used before a fetch request, by calling `getActiveBackOffUntilTs`
- * 
- * ===
- * 
- * **Architecture Note**:
- * Cool-off is applied *after* a request runs, not before.
- * 
- * This design has two advantages:
- * 1. It simplifies the logic, especially when handling burst allowances.
- * 2. It ensures even large requests (that exceed the per-second quota) are allowed to run once,
- *    instead of being blocked forever by a pre-check.
- * 
- * In short, the system reacts to quota overuse *after* the fact (by pausing future requests),
- * rather than trying to predict whether a request should be allowed in advance.
+ * @example
+ * const tracker = new PaceTracker('mail-api:user-1', { max_points_per_second: 250 });
+ * const waitMs = await tracker.getPauseBeforeMs(5);
+ * if( waitMs ) await sleep(waitMs);
+ * const charged = tracker.reservePoints(5);
+ * const response = await fetch(url);
+ * await charged;
+ * if( response.status===429 ) await tracker.logBackOff();
+ * else if( response.ok ) await tracker.logSuccess(0);
  */
 export default class PaceTracker implements IPaceTracker {
     
     #activityTracker:IActivityTracker;
     #options:PaceTrackerOptions;
+    #quotaWindows:readonly QuotaWindow[];
 
 
     constructor(id: string, options?:PaceTrackerOptions) {
-        
+
         this.#options = {
             storage: {
                 type: 'memory'
             },
             ...options
         }
+        const maxPointsPerSecond = this.#options.max_points_per_second;
+        this.#quotaWindows = maxPointsPerSecond? [{ points: maxPointsPerSecond, per_ms: 1000 }] : [];
         if( this.#options.back_off_calculation ) {
             this.#options.back_off_calculation = {
-                max_single_back_off_ms: 1000*60*5,
+                ...exponentialBackOffDefaults,
                 ...this.#options.back_off_calculation
             }
         }
@@ -96,47 +98,39 @@ export default class PaceTracker implements IPaceTracker {
         return convertTimestampToMillisecondsFromNow(await this.getActiveBackOffUntilTs());
     }
 
+    async getPauseBeforeMs(points:number): Promise<number | undefined> {
+        const refusalPauseMs = (await this.getActiveBackOffForMs()) ?? 0;
+        const pauseMs = Math.max(refusalPauseMs, await this.#msUntilQuotaHasRoomFor(points));
+        return pauseMs>0? pauseMs : undefined;
+    }
+
+    async #msUntilQuotaHasRoomFor(points:number): Promise<number> {
+        // Without a quota there is nothing to wait for, so the history need not be read at all.
+        if( this.#quotaWindows.length===0 ) return 0;
+
+        const spends = (await this.#activityTracker.list()).filter((x):x is StoredActivityItemSuccess | StoredActivityItemReserved => x.type==='success' || x.type==='reserved');
+        const now = Date.now();
+        return earliestAdmissibleTs(spends, points, this.#quotaWindows, now) - now;
+    }
+
+    async reservePoints(points:number): Promise<void> {
+        // Read before anything is awaited: the charge dates from the send, not from when it is stored.
+        const timestamp = Date.now();
+        await this.#activityTracker.add({
+            type: 'reserved',
+            timestamp,
+            points
+        })
+    }
+
     async logSuccess(points:number): Promise<void> {
+        // Awaited so that a caller which sends its next request the moment this resolves is
+        // paced against the spend just recorded, rather than racing the write.
         await this.#activityTracker.add({
             type: 'success',
             timestamp: Date.now(),
             points
         })
-
-        
-        const maxPointsPerSecond = this.#options?.max_points_per_second;
-        if( maxPointsPerSecond ) {
-            
-            const activities = await this.#activityTracker.list();
-
-            const calculateMsToDropQuotaToZero = (windowSeconds:number) => {
-                const pace = this.checkPaceInPeriod(windowSeconds, activities);
-                const pcQuotaUsed = pace.pointsInPeriod>0 && pace.maxPointsInPeriod>0? pace.pointsInPeriod / pace.maxPointsInPeriod : 0;
-                const msToClear = pcQuotaUsed * pace.period;
-                return Math.round(msToClear);
-            }
-
-            // Test different moving averages, and use the longest
-            const msToClearForVariousPeriods:number[] = [];
-            for( let windowSeconds = 1; windowSeconds <= 30; windowSeconds++ ) {
-                msToClearForVariousPeriods.push(
-                    calculateMsToDropQuotaToZero(windowSeconds)
-                )
-            }
-
-            const maxPauseMs = msToClearForVariousPeriods.reduce((a, b) => Math.max(a, b), -Infinity);
-
-            if( maxPauseMs>0 ) {
-                // Awaited so that a caller which sends its next request the moment this resolves
-                // is paced against the quota this one just spent, rather than racing the write.
-                await this.#activityTracker.setBackOffUntilTs(Date.now()+maxPauseMs, {onlyIfExceedsCurrentTs: true});
-            }
-
-            
-        }
-
-        
-
     }
 
     async logBackOff(minimumBackOffPeriodMs?:number): Promise<void> {
@@ -157,23 +151,6 @@ export default class PaceTracker implements IPaceTracker {
 
     }
 
-    
-
-    private checkPaceInPeriod(seconds = 1, activities:StoredActivityItem[]): { too_fast: boolean, pointsInPeriod: number, maxPointsInPeriod: number, period: number } {
-        const maxPointsPerSecond = this.#options?.max_points_per_second;
-        if( !maxPointsPerSecond ) return { too_fast: false, pointsInPeriod: 0,  period: 0, maxPointsInPeriod: 0 };
-
-        const period = 1000 * seconds;
-        const after = Date.now() - period;
-        activities = activities.filter(x => x.timestamp > after);
-
-        const pointsInPeriod = activities.filter((x):x is StoredActivityItemSuccess => x.type==='success').reduce((previousValue, currentValue) => previousValue + currentValue.points, 0);
-
-
-        const maxPointsInPeriod = (maxPointsPerSecond * seconds);
-        const too_fast = pointsInPeriod > maxPointsInPeriod;
-        return { too_fast, pointsInPeriod, maxPointsInPeriod, period };
-    }
 
 
     /**
@@ -186,7 +163,8 @@ export default class PaceTracker implements IPaceTracker {
 
         // Only back off if recent failures have been reported
         const lastSuccessIdx = activities.findLastIndex(x => x.type==='success');
-        const sequentialFailures = activities.slice(lastSuccessIdx+1);
+        // Only refusals: a charge made since the last success is a request sent, not one refused.
+        const sequentialFailures = activities.slice(lastSuccessIdx+1).filter(x => x.type==='back_off');
         
         const backoffActivities = activities.filter((x):x is StoredActivityItemBackOff => x.type==='back_off');
 
@@ -206,10 +184,9 @@ export default class PaceTracker implements IPaceTracker {
         if( this.#options.back_off_calculation?.type==='exponential' ) {
 
             if( sequentialFailures.length>0 ) {
-                //console.log({sequentialFailures});
-                
-                // TODO This could be much more intelligently done by knowing how well spaced each one is. I.e. if trying for a while, then grow it. Or based on the previous back off? Actually shouldn't be necessary if fetch is correctly utilising the checkPace.pause_for period.
-                backOffPeriod = (Math.pow(2, sequentialFailures.length-1)) * 100; // 100, 200, 400, 800;
+                // Doubles with each refusal since the last success: e.g. 100, 200, 400, 800
+                const initialMs = this.#options.back_off_calculation.initial_back_off_ms ?? exponentialBackOffDefaults.initial_back_off_ms;
+                backOffPeriod = Math.pow(2, sequentialFailures.length-1) * initialMs;
 
                 // Date it from the last failure
                 backOffPeriod = backOffPeriod - (Date.now()-sequentialFailures[sequentialFailures.length-1]!.timestamp);
@@ -226,7 +203,7 @@ export default class PaceTracker implements IPaceTracker {
 
 
 
-        const maxSingleBackOffMs = this.#options?.back_off_calculation?.max_single_back_off_ms ?? 1000*60*5;
+        const maxSingleBackOffMs = this.#options?.back_off_calculation?.max_single_back_off_ms ?? exponentialBackOffDefaults.max_single_back_off_ms;
         backOffPeriod = Math.min(backOffPeriod+jitter, maxSingleBackOffMs)
         if( backOffPeriod<0 ) backOffPeriod = 0;
 

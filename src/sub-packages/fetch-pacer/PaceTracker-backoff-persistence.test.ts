@@ -2,26 +2,26 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import PaceTracker from './PaceTracker.ts';
 import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.ts';
-import type { SetBackOffUntilTsOptions } from './types.ts';
+import type { ActivityItem } from './types.ts';
 
 /**
- * Records when a pause finished being written, and takes long enough doing it that a caller
+ * Records when spend finished being written, and takes long enough doing it that a caller
  * which forgot to wait would be seen carrying on without it.
  */
-class SlowPauseWriteTracker extends ActivityTrackerMemory {
+class SlowSpendWriteTracker extends ActivityTrackerMemory {
 
-    /** Whether the most recently requested pause has actually been stored. */
-    pauseStored = false;
+    /** Whether the most recently recorded spend has actually been stored. */
+    spendStored = false;
 
-    override async setBackOffUntilTs(ts: number, options?: SetBackOffUntilTsOptions): Promise<void> {
-        this.pauseStored = false;
+    override async add(activity: ActivityItem): Promise<void> {
+        this.spendStored = false;
         for (let turn = 0; turn < 5; turn++) await Promise.resolve();
-        await super.setBackOffUntilTs(ts, options);
-        this.pauseStored = true;
+        await super.add(activity);
+        this.spendStored = true;
     }
 }
 
-describe('storing the pause that a request earned', () => {
+describe('storing the spend that a request made', () => {
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -32,10 +32,10 @@ describe('storing the pause that a request earned', () => {
         vi.useRealTimers();
     });
 
-    it('has stored the pause by the time the request is reported as logged', async () => {
+    it('has stored the spend by the time the request is reported as logged', async () => {
         // A caller that sends its next request the moment this resolves would otherwise
         // race the write, and be waved through against a quota it had already spent.
-        const activityTracker = new SlowPauseWriteTracker('test');
+        const activityTracker = new SlowSpendWriteTracker('test');
         const paceTracker = new PaceTracker('test', {
             max_points_per_second: 100,
             storage: { type: 'custom', activity_tracker: () => activityTracker }
@@ -43,11 +43,11 @@ describe('storing the pause that a request earned', () => {
 
         await paceTracker.logSuccess(200);
 
-        expect(activityTracker.pauseStored).toBe(true);
+        expect(activityTracker.spendStored).toBe(true);
     });
 
-    it('reports the pause to the very next caller that asks', async () => {
-        const activityTracker = new SlowPauseWriteTracker('test');
+    it('holds the very next caller back on the strength of it', async () => {
+        const activityTracker = new SlowSpendWriteTracker('test');
         const paceTracker = new PaceTracker('test', {
             max_points_per_second: 100,
             storage: { type: 'custom', activity_tracker: () => activityTracker }
@@ -55,7 +55,7 @@ describe('storing the pause that a request earned', () => {
 
         await paceTracker.logSuccess(200);
 
-        expect(await paceTracker.getActiveBackOffUntilTs()).toBe(2000);
+        expect(await paceTracker.getPauseBeforeMs(1)).toBe(1000);
     });
 
 });

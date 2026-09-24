@@ -16,6 +16,29 @@ Requires **`zod` `^4`** as a peer dependency (since **v0.28.0**). Projects still
 `FetchPacer` and `FetchPacerMultiClient` pace requests against a quota and back off when a
 service refuses one.
 
+### Pacing against a quota
+
+- A request's `points` are charged the moment it is sent and count against
+  `max_points_per_second` for the next second. A request waits only until enough of that spend
+  has dropped out for it to fit; one larger than the whole quota goes once nothing else is in
+  the window. A refused or failed request keeps its charge, as the service may have metered it.
+- `minimum_time_between_fetch` (default 200 ms) is the gap from one send to the next. The first
+  request goes at once, and time already spent waiting counts towards the gap.
+- `back_off_calculation: { type: 'exponential', initial_back_off_ms }` sets the pause after the
+  first refusal (default 100 ms), doubling with each further refusal until a success.
+- Several pacers can share one durable store for the same resource
+  (`storage: { type: 'browser-local' }`, or `ActivityTrackerKvStorage` through
+  `storage: { type: 'custom' }`). Each writes its own log segment and reads the others' on
+  every check, so none loses another's spend. On `chrome.storage` a check reads the whole
+  storage area.
+
+> Previously a success paused every request until all spend of the last 30 s had drained, and
+> other pacers sharing the store saw that pause as a refusal. Now a request within quota is
+> never answered with a synthetic 429, `back_off_for_ms` on a synthetic 429 is when that request
+> fits, and `getActiveBackOffForMs()` reports refusal pauses (plus a window over-full after an
+> oversized request) only. `ActivityTrackerKvStorage` no longer takes
+> `failsafe_active_sync_poll_ms`: every check reads the store afresh.
+
 ### Reacting to a refusal
 
 - **`Retry-After` is honoured.** When a service names how long to wait — either as a count of

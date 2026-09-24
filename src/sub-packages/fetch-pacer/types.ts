@@ -1,22 +1,6 @@
-export type ActivityItemSuccess = {
-    type: 'success';
-    timestamp: number;
-    points: number;
-}
-type ActivityItemBackOff = {
-    type: 'back_off',
-    timestamp: number;
-    force_back_off_until_at_least_ts?: number
-}
-export type ActivityItem = ActivityItemSuccess | ActivityItemBackOff;
+import type { ActivityTrackerOptions, IActivityTracker } from "./tracker-types.ts";
 
-type BaseStoredActivityItem = {
-    id: string;
-}
-export type StoredActivityItemSuccess = ActivityItemSuccess & BaseStoredActivityItem;
-export type StoredActivityItemBackOff = ActivityItemBackOff & BaseStoredActivityItem;
-
-export type StoredActivityItem = StoredActivityItemSuccess | StoredActivityItemBackOff;
+export type { ActivityItem, ActivityItemReserved, ActivityItemSuccess, ActivityTrackerOptions, IActivityTracker, IPaceTracker, SetBackOffUntilTsOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemReserved, StoredActivityItemSuccess } from "./tracker-types.ts";
 
 export type Fetch = typeof fetch;
 
@@ -30,6 +14,9 @@ export type FetchOptions = RequestInit;
  * options that goes stale in the meantime — an access token, an abort signal that has already
  * fired — has to be made again at that point rather than replayed, so pass a function whenever
  * the options are not simply constant.
+ *
+ * A function is called once per attempt, just before the pacer decides whether that attempt may
+ * go, so an attempt that is then held back has still called it once.
  *
  * @example
  * // Constant options: fine as a plain object
@@ -45,17 +32,38 @@ export type FetchOptionsProvider = FetchOptions | (() => FetchOptions | Promise<
 
 export type PaceTrackerOptions = {
     /**
-     * Used by the pacing calculation.
-     * 
-     * If omitted there will be no pacing. 
+     * The quota: the most points that may be spent within any one second.
+     *
+     * A request's points count from the moment it is sent until one second later. A request
+     * waits only until enough earlier spend has dropped out of that second for it to fit; one
+     * larger than the whole quota goes once nothing else is in the window.
+     *
+     * If omitted, requests are never held back for their cost, only while a refusal pause is
+     * in force.
      */
     max_points_per_second?: number;
 
     /**
-     * How to calculate the pacing impact of a backoff 429 from the server
+     * How long to pause every request after the service refuses one for going too fast.
+     *
+     * Without it, each refusal pauses for 200ms. A longer wait named by the service
+     * (`Retry-After`, or `minimumMs` from `treat_as_back_off`) is always followed.
      */
     back_off_calculation?: {
+        /** Start at `initial_back_off_ms`, and double with each refusal until the next success. */
         type: 'exponential',
+
+        /**
+         * The pause after the first refusal in a run, in milliseconds. Defaults to 100.
+         *
+         * Each further refusal before the next success doubles it: from the default, 100, then
+         * 200, then 400, and so on.
+         *
+         * @remarks
+         * A longer wait named by the service is still followed, and the pause never grows past
+         * `max_single_back_off_ms`.
+         */
+        initial_back_off_ms?: number,
 
         /**
          * Vary each calculated pause by up to a fifth, either side of its calculated length.
@@ -100,6 +108,10 @@ export type PaceTrackerOptions = {
 
 
 
+/**
+ * A pacer's answer to a request: the service's own response, or a synthetic 429 when the pacer
+ * held the request back, with pacing details attached.
+ */
 export interface PaceResponse extends Response {
     /**
      * The attempt it was on (if running in `attempt_recovery` mode, otherwise always 0).
@@ -109,10 +121,12 @@ export interface PaceResponse extends Response {
     pacing_attempt: number
 
     /**
-     * The calculated/suggested time to back off for.
+     * How long, in ms, this request is being held back for.
      *
-     * Only present when the request was turned away for going too fast, which a service may
-     * signal with a status other than 429 (see `treat_as_back_off`).
+     * Present only when the request was held back, or turned away for going too fast (which a
+     * service may signal with a status other than 429, see `treat_as_back_off`). It is the later
+     * of the end of any refusal pause and the moment the quota has room for this request: the
+     * earliest the pacer would send it, if nothing else is spent meanwhile.
      */
     back_off_for_ms?: number;
 
@@ -124,6 +138,7 @@ export interface PaceResponse extends Response {
      */
     back_off_accumulated_ms?: number
 }
+/** A 429: sent by the service, or made by the pacer in place of a request it held back. */
 export interface BackOffResponse extends PaceResponse {
     status: 429;
     statusText: "Too Many Requests";
@@ -139,6 +154,19 @@ export type FetchPacerOnlyOptions = {
      */
     custom_fetch_function?: Fetch,
 
+    /**
+     * The shortest gap, in ms, between one request being sent and the next. Defaults to 200.
+     *
+     * Measured from when the previous request was sent, so the very first request goes at once,
+     * and time already spent waiting (for quota, or out a refusal) counts towards the gap rather
+     * than being added to it.
+     *
+     * @remarks
+     * A pacer sends one request at a time and waits for its answer, so when an answer takes
+     * longer than the gap, the next request goes as soon as that answer arrives. Measuring from
+     * the answer instead would guarantee idle time after every response, at the cost of repeating
+     * waits already served.
+     */
     minimum_time_between_fetch?: number,
 
     /**
@@ -200,102 +228,22 @@ export type FetchPacerOnlyOptions = {
 
     
     /**
-     * Control the `QueueConstructorOptions.testing_disable_check_timeout` settings 
+     * Whether the request queue skips its periodic check for requests that run too long.
+     * Defaults to `true`.
+     *
+     * The pacer never acts on that check's warning, so leaving it on only keeps a timer running,
+     * which can hold a script or worker open after its work is done. Set `false` only to observe
+     * the warning while debugging.
      */
     testing_queue_disable_check_timeout?: boolean
     
 
 }
+/**
+ * Everything a pacer can be set up with: the quota, the back-off and where history is kept
+ * (shared with its tracker), plus how requests are sent and retried.
+ */
 export type FetchPacerOptions = PaceTrackerOptions & FetchPacerOnlyOptions;
-
-
-export type CheckPaceResponse = { too_fast: boolean, pause_for: number, points_in_last_second?: number };
-
-export type SetBackOffUntilTsOptions = {
-    /**
-     * Only set the value if it exceeds the current value 
-     */
-    onlyIfExceedsCurrentTs?: boolean
-}
-
-export interface IActivityTracker {
-    /**
-     * Adds an activity item (success or backoff)
-     * @param activity 
-     */
-    add(activity: ActivityItem): Promise<void>;
-
-    /**
-     * Activates or deactivates polling/processing.
-     * @param active 
-     */
-    setActive(active: boolean): Promise<void>;
-
-    isActive():Promise<boolean>;
-
-    /**
-     * Set the time it's backing off until
-     * @param ts 
-     * @param options 
-     */
-    setBackOffUntilTs(ts: number, options?: SetBackOffUntilTsOptions): Promise<void>;
-
-    getBackOffUntilTs(): Promise<number | undefined>;
-
-
-    list(): Promise<StoredActivityItem[]>
-
-    /**
-     * Disposes resources and removes event listeners.
-     */
-    dispose(): Promise<void>;
-}
-
-export type ActivityTrackerOptions = {
-    clear_activities_older_than_ms?: number
-}
-
-
-
-export interface IPaceTracker {
-    /**
-     * Returns the timestamp (in ms) until which fetching is currently paused.
-     * A future timestamp if pacing is active, or `undefined` if no pause is set.
-     */
-    getActiveBackOffUntilTs(): Promise<number | undefined>;
-
-    /**
-     * Returns the period (in ms) for which fetching is currently paused.
-     * The milliseconds until fetching can run again, or `undefined`.
-     */
-    getActiveBackOffForMs(): Promise<number | undefined>;
-
-    /**
-     * Logs a successful request and updates the pacing cooldown.
-     * @param points The cost of the successful request, in points.
-     */
-    logSuccess(points: number): Promise<void>;
-
-    /**
-     * Logs a server-side 429 error and applies an exponential backoff cooldown.
-     * @param minimumBackOffPeriodMs Optional minimum backoff period in ms.
-     */
-    logBackOff(minimumBackOffPeriodMs?: number): Promise<void>;
-
-    /**
-     * Enable or disable pacing altogether.
-     * @param active `true` to enable, `false` to disable.
-     */
-    setActive(active: boolean): Promise<void>;
-
-    isActive(): Promise<boolean>;
-
-    /**
-     * Clean up any resources (e.g. storage handles).
-     */
-    dispose(): Promise<void>;
-}
-
 
 export type BackingOffEvent = {type_of_429: 'synthetic' | 'real', attempt: number, will_retry?: boolean, cannot_recover?: boolean};
 export type FetchPacerEvents = {

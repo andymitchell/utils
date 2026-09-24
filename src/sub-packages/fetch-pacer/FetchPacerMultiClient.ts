@@ -6,13 +6,19 @@ import FetchPacer from './FetchPacer.js';
 
 
 /**
- * Proactively rate-limit and retry on server 429s, for smooth request handling. 
- * 
- * Protect the server health
- * - Avoid 429s by applying points to each request, and blocking it if it has exceeded a maximum points/second rate. 
- * 
- * Simplify retry handling 
- * - Optionally automatically retry blocked requests for a time period. 
+ * Paces requests to one resource separately for each of its clients, e.g. a Gmail API quota
+ * that is counted per user.
+ *
+ * Keeps one {@link FetchPacer} per client, made on first use with the same options and paced
+ * under the id `<resourceId>:<clientId>`. Each client has its own quota, refusal pause and
+ * queue, so requests for different clients never wait on each other.
+ *
+ * @example
+ * const gmail = new FetchPacerMultiClient('gmail-api', {
+ *     mode: { type: 'attempt_recovery' },
+ *     max_points_per_second: 250
+ * });
+ * const response = await gmail.fetch(url, undefined, 5, userId);
  */
 export default class FetchPacerMultiClient {
 
@@ -23,9 +29,8 @@ export default class FetchPacerMultiClient {
 
 
     /**
-     * 
-     * @param resourceId A resource is the primary thing you're rate limiting, e.g. the Gmail API 
-     * @param options 
+     * @param resourceId A resource is the primary thing you're rate limiting, e.g. the Gmail API
+     * @param options How to pace each client (see {@link FetchPacerOptions}).
      */
     constructor(resourceId: string, options?:FetchPacerOptions) {        
         this.#resourceId = resourceId;
@@ -41,13 +46,18 @@ export default class FetchPacerMultiClient {
     }
 
     /**
-     * 
-     * @param url
+     * Sends a request for one client once that client's quota and any refusal pause allow it
+     * (see {@link FetchPacer.fetch}).
+     *
+     * @param url Where to send it.
      * @param options The request options, or a function building them. Pass a function when
      * anything in them can go stale, as it is called afresh for every attempt.
-     * @param points The number of units this will consume. Used to rate limit if max_points_per_second is defined.
+     * @param points What the request costs against the client's `max_points_per_second`.
+     * Charged the moment it is sent, and kept whether the service accepts it, refuses it or
+     * fails, since it may have been metered either way.
      * @param clientId Track the pace for a given user/device/client id of this resource. (E.g. the Gmail API has a quota of 250 points per user per second... so the resourceId is the Gmail API, and the client id is the user)
-     * @returns
+     * @returns As {@link FetchPacer.fetch}: the service's response, or a synthetic 429 when the
+     * request had to wait.
      */
     async fetch(url: FetchURL, options?: FetchOptionsProvider, points?: number, clientId?:string): Promise<Response | BackOffResponse> {
 
@@ -57,6 +67,13 @@ export default class FetchPacerMultiClient {
     }
 
 
+    /**
+     * Charges one client's spend that did not go through the pacer, so its later requests are
+     * paced around it (see {@link FetchPacer.logPointsManually}).
+     *
+     * @param points What was spent. It counts against the client's quota for the next second.
+     * @param clientId Which user/device of this resource spent it.
+     */
     logPointsManually(points:number, clientId?:string) {
         const fetchPacer = this.#getFetchPacer(clientId);
         return fetchPacer.logPointsManually(points);
@@ -85,7 +102,11 @@ export default class FetchPacerMultiClient {
     }
 
     /**
-     * How much longer requests for a given client are being held back for.
+     * How much longer every request for a client is being held back for, whatever it costs
+     * (see {@link FetchPacer.getActiveBackOffForMs}).
+     *
+     * A request with a cost can still wait when this is `undefined`, until the client's quota
+     * has room for it.
      *
      * @param clientId Which user/device of this resource to ask about.
      * @returns The remaining wait in milliseconds, or `undefined` when requests are free to go.
@@ -96,6 +117,7 @@ export default class FetchPacerMultiClient {
     }
     
 
+    /** Releases every client's pacer (see {@link FetchPacer.dispose}). */
     async dispose():Promise<void> {
         const fetchPacers = Object.values(this.#clients);
         for( const fetchPacer of fetchPacers ) {

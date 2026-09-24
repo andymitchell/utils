@@ -13,7 +13,7 @@ const mockFetchResponse = (status: number, body: any = null, headers: Record<str
 };
 
 
-import {expect, vi } from 'vitest';
+import { afterEach, expect, vi } from 'vitest';
 import type {  FetchPacerOnlyOptions, FetchPacerOptions, PaceTrackerOptions } from './types.ts';
 
 
@@ -21,6 +21,8 @@ import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTracker
 import { MockChromeStorageArea } from '../kv-storage/index.ts';
 import { isBackOffResponse } from './utils/isBackOffResponse.ts';
 import FetchPacer from './FetchPacer.ts';
+import { expectBetweenNumbers } from './testing-utils/expectInRange.ts';
+import { settle } from './testing-utils/settle.ts';
 
 
 
@@ -48,7 +50,12 @@ beforeEach(() => {
     mockFetch.mockRestore();
     vi.clearAllMocks();
     vi.resetModules();
-    
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+})
+
+afterEach(() => {
+    vi.useRealTimers();
 })
 
 function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type'], pointsPerRequest: number = 12, maxPointsPerSecond: number = 10) {
@@ -64,41 +71,46 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type'], pointsP
                 if( type==='429_preemptively' ) {
                     if( pacingReason==='synthetic' ) {
                         mockFetch.mockResolvedValueOnce(mockFetchResponse(200));
-                        const res = await pacer.fetch('https://api.example.com', undefined, pointsPerRequest);
+                        await settle(pacer.fetch('https://api.example.com', undefined, pointsPerRequest));
                     } else {
                         mockFetch.mockResolvedValueOnce(new Response(null, { status: 429 }));
-                        const res = await pacer.fetch('https://api.example.com');
+                        await settle(pacer.fetch('https://api.example.com'));
                     }
 
-                    const st = Date.now();
                     mockFetch.mockResolvedValueOnce(mockFetchResponse(200));
-                    const res = await pacer.fetch('https://api.example.com');
-                    
+                    const res = await settle(pacer.fetch('https://api.example.com'));
 
                     // Expect synthetic 429
                     expect(res.status).toBe(429); if( !isBackOffResponse(res) ) throw new Error("noop - typeguard");
-                    expect(res.back_off_for_ms).toBeGreaterThan(100);
+                    if( pacingReason==='synthetic' ) {
+                        // The first request was larger than the whole quota, so the window stays over-full until it leaves
+                        expectBetweenNumbers(800, 1000, res.back_off_for_ms);
+                    } else {
+                        expect(res.back_off_for_ms).toBeGreaterThan(100);
+                    }
                 } else {
                     let expectedMinDuration:number;
                     if( pacingReason==='synthetic' ) {
                         mockFetch.mockResolvedValueOnce(mockFetchResponse(200));
                         pacer.fetch('https://api.example.com', undefined, pointsPerRequest);
-                        expectedMinDuration = (pointsPerRequest/maxPointsPerSecond)*1000; // The time for the first request to cool off
+                        expectedMinDuration = 1000; // The first request is larger than the whole quota, so this one waits for it to leave the window
                     } else {
                         mockFetch.mockResolvedValueOnce(mockFetchResponse(429)).mockResolvedValueOnce(mockFetchResponse(200));
-                        expectedMinDuration = 100; // Time for back off on first pass
+                        // The refused attempt still counts as spent (the service may have metered it), and
+                        // being larger than the whole quota, the retry waits for it to leave the window.
+                        expectedMinDuration = 1000;
                         //const res = pacer.fetch('https://api.example.com');
                         // Let it pass the 429
                     }
 
                     const st = Date.now();
                     mockFetch.mockResolvedValueOnce(mockFetchResponse(200));
-                    const res = await pacer.fetch('https://api.example.com', undefined, pointsPerRequest);
+                    const res = await settle(pacer.fetch('https://api.example.com', undefined, pointsPerRequest));
 
                     expect(res.status).toBe(200);
                     // Prove it had to retry 
                     expect(res.pacing_attempt).toBeGreaterThanOrEqual(1);
-                    expect(Date.now()-st).toBeGreaterThanOrEqual(expectedMinDuration);
+                    expectBetweenNumbers(expectedMinDuration, expectedMinDuration+250, Date.now()-st);
                 }
 
             })

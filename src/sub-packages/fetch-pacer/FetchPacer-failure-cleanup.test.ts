@@ -37,8 +37,8 @@ function failsAfterTheFirstRequest(): typeof fetch {
 describe('a request that fails outright', () => {
 
     it('leaves nothing tracking in the background', async () => {
-        // An idle tracker holds no polling timer, so a run that never winds down keeps one
-        // alive for the life of the process — long after the request that started it is gone.
+        // A tracker may do less while its pacer is idle, so a failed request must not leave it
+        // believing requests are still under way.
         const activityTracker = new ActivityTrackerMemory('test');
         const pacer = makePacer(activityTracker, failsAfterTheFirstRequest());
 

@@ -66,6 +66,15 @@ describe('reporting a refusal the pacer did not see itself', () => {
         expectCloseTo(30_000, await pacer.getActiveBackOffForMs(), 200);
     });
 
+    it('reads back the wait a spend earned, not only a refusal', async () => {
+        // 200 points against 100 per second leaves the window over-full until they leave it.
+        const pacer = new FetchPacerMultiClient('resource', { ...baseConfig, max_points_per_second: 100 });
+
+        await pacer.logPointsManually(200, 'user-a');
+
+        expectCloseTo(1000, await pacer.getActiveBackOffForMs('user-a'), 50);
+    });
+
     it('lets the wait be read back on a single pacer too', async () => {
         const pacer = new FetchPacer('resource', baseConfig);
 
