@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { TypedCancelableEventEmitter } from '../../typed-cancelable-event-emitter/index.ts';
-import type { IKvStorage, KvRawStorageEventMap } from '../../kv-storage/types.ts';
+import type { IKvStorage, KvRawStorageEventMap } from '../../kv-storage/index-types.ts';
 import { ActivityTrackerKvStorage } from './ActivityTrackerKvStorage.ts';
 
 /**

@@ -1,4 +1,4 @@
-import type { IKvStorage, KvRawStorageEventMap } from '../../kv-storage/types.ts';
+import type { IKvStorage, KvRawStorageEventMap } from '../../kv-storage/index-types.ts';
 import { MemoryStorage } from '../../kv-storage/index-node.ts';
 import { TypedCancelableEventEmitter } from '../../typed-cancelable-event-emitter/index.ts';
 

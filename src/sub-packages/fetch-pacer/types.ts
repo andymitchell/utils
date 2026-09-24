@@ -1,6 +1,25 @@
-import type { ActivityTrackerOptions, IActivityTracker } from "./tracker-types.ts";
+import type { PaceTrackerOptions } from "./pace-tracker-types.ts";
 
-export type { ActivityItem, ActivityItemReserved, ActivityItemSuccess, ActivityTrackerOptions, IActivityTracker, IPaceTracker, SetBackOffUntilTsOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemReserved, StoredActivityItemSuccess } from "./tracker-types.ts";
+export type {
+    ActivityItem,
+    ActivityItemBackOff,
+    ActivityItemReserved,
+    ActivityItemSuccess,
+    ActivityTrackerOptions,
+    IActivityTracker,
+    SetBackOffUntilTsOptions,
+    StoredActivityItem,
+    StoredActivityItemBackOff,
+    StoredActivityItemReserved,
+    StoredActivityItemSuccess
+} from "./activity-tracker-types.ts";
+
+export type {
+    IPaceTracker,
+    PaceTrackerOptions,
+    QuotaSpend,
+    QuotaWindow
+} from "./pace-tracker-types.ts";
 
 export type Fetch = typeof fetch;
 
@@ -29,84 +48,6 @@ export type FetchOptions = RequestInit;
  * }));
  */
 export type FetchOptionsProvider = FetchOptions | (() => FetchOptions | Promise<FetchOptions>);
-
-export type PaceTrackerOptions = {
-    /**
-     * The quota: the most points that may be spent within any one second.
-     *
-     * A request's points count from the moment it is sent until one second later. A request
-     * waits only until enough earlier spend has dropped out of that second for it to fit; one
-     * larger than the whole quota goes once nothing else is in the window.
-     *
-     * If omitted, requests are never held back for their cost, only while a refusal pause is
-     * in force.
-     */
-    max_points_per_second?: number;
-
-    /**
-     * How long to pause every request after the service refuses one for going too fast.
-     *
-     * Without it, each refusal pauses for 200ms. A longer wait named by the service
-     * (`Retry-After`, or `minimumMs` from `treat_as_back_off`) is always followed.
-     */
-    back_off_calculation?: {
-        /** Start at `initial_back_off_ms`, and double with each refusal until the next success. */
-        type: 'exponential',
-
-        /**
-         * The pause after the first refusal in a run, in milliseconds. Defaults to 100.
-         *
-         * Each further refusal before the next success doubles it: from the default, 100, then
-         * 200, then 400, and so on.
-         *
-         * @remarks
-         * A longer wait named by the service is still followed, and the pause never grows past
-         * `max_single_back_off_ms`.
-         */
-        initial_back_off_ms?: number,
-
-        /**
-         * Vary each calculated pause by up to a fifth, either side of its calculated length.
-         *
-         * Clients that back off at the same moment otherwise return at the same moment, and
-         * hit the service with the very burst the back-off existed to break up. Varying the
-         * pause staggers their return.
-         *
-         * @remarks
-         * The variation runs in both directions, so across many clients the average wait is
-         * still the calculated one. It never applies to a pause the service named itself
-         * (see `logBackOff`'s minimum period), which is followed exactly.
-         */
-        jitter?: boolean,
-
-        /**
-         * The longest single pause that may be asked for, in milliseconds. Defaults to 5 minutes.
-         *
-         * Exponential growth reaches unhelpful lengths quickly once a service keeps refusing;
-         * this is the point past which waiting longer stops being useful.
-         */
-        max_single_back_off_ms?: number
-    },
-
-    /**
-     * Where point-usage is stored.
-     * 
-     * Use more durable storage to
-     * - Track pace in volatile environments (like a service worker)
-     * - Track pace across multiple clients 
-     */
-    storage?: {
-        type: 'memory'
-    } | {
-        type: 'browser-local'
-    } | {
-        type: 'custom',
-        activity_tracker: (id: string, options?: ActivityTrackerOptions) => IActivityTracker
-    }
-
-}
-
-
 
 /**
  * A pacer's answer to a request: the service's own response, or a synthetic 429 when the pacer
@@ -205,22 +146,39 @@ export type FetchPacerOnlyOptions = {
 
 
     /**
-     * Define strategy for requests that are hitting the rate limit 
+     * What happens to a request the pacer cannot send yet.
+     *
+     * Once a request has waited out `minimum_time_between_fetch`, it is held back while the
+     * quota has no room for it or a refusal pause is in force. A request the service refuses for
+     * going too fast (a 429, or see `treat_as_back_off`) is handled the same way.
      */
     mode: {
         /**
-         * Preemptive rate limiting mode. Checks current pace to avoid server strain by simulating a 429 response before a fetch attempt.
-         * @type {'429_preemptively'}
+         * Answer instead of waiting. A held-back request comes back unsent as a synthetic 429,
+         * and a refusal comes back as the service sent it; either carries `back_off_for_ms`,
+         * saying how long to wait before trying again. Nothing is retried.
          */
         type: '429_preemptively'
     } | {
         /**
-         * Recovery mode with silent retries, behaving like a regular fetch to the caller.
-         * @type {'attempt_recovery'}
+         * Wait and retry, so the caller sees only the final answer, as from a plain fetch.
+         *
+         * A held-back request, or one the service refuses, is run again once the pause is over.
+         * `pacing_attempt` on the answer says which attempt it came from, 0 for the first. Any
+         * other answer, such as a 500, reaches the caller as it is.
+         *
+         * @remarks
+         * A refusal whose pause is already over by the time it has been recorded reaches the
+         * caller as it is, without a retry.
          */
         type: 'attempt_recovery',
         /**
-         * The period it will attempt to recover for before finally giving up 
+         * How long a request may keep waiting, in ms from when it was first queued. Unset or 0
+         * means no limit.
+         *
+         * Once waiting any longer would pass it, the latest answer (the service's refusal, or a
+         * synthetic 429) goes to the caller marked `cannot_recover`, with `back_off_for_ms` and
+         * `back_off_accumulated_ms` set.
          */
         timeout_ms?: number
     }

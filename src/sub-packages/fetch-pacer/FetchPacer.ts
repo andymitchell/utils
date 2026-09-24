@@ -1,16 +1,23 @@
-import type { BackOffResponse, Fetch, FetchOptionsProvider, FetchPacerEvents, FetchPacerOptions, FetchURL, PaceResponse } from './types.js';
+import type { BackingOffEvent, BackOffResponse, Fetch, FetchOptionsProvider, FetchPacerEvents, FetchPacerOptions, FetchURL, PaceResponse } from './types.ts';
 
-import { type IQueue, QueueMemory } from '../queue/index-memory.js';
+import { type IQueue, QueueMemory } from '../queue/index-memory.ts';
 
-import { sleep } from '../../main/index.js';
+import { sleep } from '../../main/index.ts';
 import PaceTracker from './PaceTracker.ts';
 import {  TypedCancelableEventEmitter3 } from '../typed-cancelable-event-emitter/index.ts';
 import { isBackOffResponse } from './utils/isBackOffResponse.ts';
 import { parseRetryAfterMs } from './utils/parseRetryAfterMs.ts';
 
 /**
- * What a pacer uses for any option it is not given: a request that must wait is answered at
- * once with a synthetic 429, sends are at least 200ms apart, and history is kept in memory.
+ * A job as the queue hands it over to run: when it was queued, which attempt it is on, and how
+ * to ask for another attempt. Derived from the queue's contract, which does not name it.
+ */
+type QueueJob = Parameters<Parameters<IQueue['enqueue']>[0]>[0];
+
+/**
+ * What a pacer uses for any option it is not given: a request still held back after the
+ * minimum gap is answered with a synthetic 429, sends are at least 200ms apart, and history is
+ * kept in memory.
  */
 export const fetchPacerOptionsDefault:FetchPacerOptions = {
     mode: {
@@ -27,15 +34,17 @@ export const fetchPacerOptionsDefault:FetchPacerOptions = {
 /**
  * Sends requests at a pace a rate-limited service will accept, and handles its refusals.
  *
- * Each request states its cost in points. Before sending one, the pacer waits until the last
- * second's spend leaves room for it (`max_points_per_second`), and out any refusal pause in
- * force. Requests go one at a time, in the order they were asked for.
+ * Each request states its cost in points, and is sent only when the last second's spend leaves
+ * room for it (`max_points_per_second`) and no refusal pause is in force. Requests go one at a
+ * time, in the order they were asked for, each at least `minimum_time_between_fetch` after the
+ * previous send.
  *
- * What happens to a request that has to wait depends on `mode`. In `429_preemptively` mode it
- * comes back straight away as a synthetic 429 saying how long to wait, without being sent. In
- * `attempt_recovery` mode it is held and sent once it can go, and a request the service refuses
- * is retried the same way, so the caller sees only the final answer. A refusal pauses every
- * request, for as long as the service named or as `back_off_calculation` works out.
+ * What happens to a request still held back once that gap has passed depends on `mode`. In
+ * `429_preemptively` mode it comes back as a synthetic 429 saying how long to wait, without
+ * being sent. In `attempt_recovery` mode it is held and sent once it can go, and a request the
+ * service refuses is retried the same way, so the caller sees only the final answer. A refusal
+ * pauses every request for as long as `back_off_calculation` works out, and never for less than
+ * a wait the service named.
  *
  * @example
  * const pacer = new FetchPacer('mail-api:user-1', {
@@ -78,8 +87,10 @@ export default class FetchPacer {
     /**
      * Sends a request once the quota and any refusal pause allow it.
      *
-     * Requests are sent one at a time, in the order asked for. Each waits at least
-     * `minimum_time_between_fetch` after the previous send, then until its points fit the quota.
+     * Requests are sent one at a time, in the order asked for. Each first waits out the rest of
+     * `minimum_time_between_fetch` since the previous send. It goes then if its points fit the
+     * quota and no refusal pause is in force; otherwise `mode` decides whether it is answered
+     * with a synthetic 429 or held until it can go.
      *
      * @param url Where to send it.
      * @param options The request options, or a function building them. Pass a function when
@@ -88,9 +99,10 @@ export default class FetchPacer {
      * it is sent, and kept whether the service accepts it, refuses it or fails, since it may have
      * been metered either way.
      * @returns The service's response, with `pacing_attempt` attached, plus `back_off_for_ms` if
-     * it was a refusal. A request that has to wait is answered instead with a synthetic 429
-     * carrying `back_off_for_ms`: at once in `429_preemptively` mode, or in `attempt_recovery`
-     * mode only once waiting any longer would pass `timeout_ms` (then with `cannot_recover`).
+     * it was a refusal. A request held back by the quota or a refusal pause is answered instead
+     * with a synthetic 429 carrying `back_off_for_ms`: in `429_preemptively` mode as soon as the
+     * minimum gap since the previous send has passed, or in `attempt_recovery` mode only once
+     * waiting any longer would pass `timeout_ms` (then with `cannot_recover`).
      * @throws What the underlying fetch throws; or, when the request was sent but its charge
      * could not be stored, that storage failure.
      *
@@ -102,9 +114,9 @@ export default class FetchPacer {
         if( this.#options?.max_points_per_second && typeof points!=='number' ) {
             console.debug("FetchPacer request ought to have point stated, as tracking max points / second.", url);
         }
-        
+        // A request that states no cost is paced as costing nothing.
+        const cost = points ?? 0;
 
-        
         try {
             return await this.#queue.enqueue(async (job) => {
 
@@ -124,30 +136,12 @@ export default class FetchPacer {
                 // held back has still built its request once.
                 const attemptOptions = typeof options==='function'? await options() : options;
 
-                const pauseExceedsMaxTimeout = (pauseForMs:number) => (this.#options.mode.type==='attempt_recovery' && this.#options.mode.timeout_ms && (Date.now()+pauseForMs)>(job.created_at+this.#options.mode.timeout_ms)) as boolean;
-
-
                 // The last thing awaited before the send, so the answer still holds when it goes.
-                const pauseFor = await this.paceTracker.getPauseBeforeMs(points ?? 0);
+                const pauseFor = await this.paceTracker.getPauseBeforeMs(cost);
                 if( pauseFor!==undefined ) {
-                    let will_retry = false;
-                    const response = attachBackOffTimeToResponse(attachAttemptToResponse(createResponse429(), job.attempt), pauseFor);
-                    if( this.#options.mode.type==='attempt_recovery' ) {
-                        if( pauseExceedsMaxTimeout(pauseFor) ) {
-                            response.cannot_recover = true;
-                            response.back_off_accumulated_ms = Date.now() - job.created_at;
-                        } else {
-                            // Tell it to retry
-                            will_retry = true;
-                            job.preventCompletion(pauseFor);
-                        }
-                    }
-
-                    this.emitter.emit('BACKING_OFF', {type_of_429: 'synthetic', attempt: response.pacing_attempt, cannot_recover: response.cannot_recover, will_retry})
-                    return response
+                    return this.#holdBack(attachAttemptToResponse(createResponse429(), job.attempt), pauseFor, job, 'synthetic');
                 }
 
-                //if( this.#options?.verbose ) console.log(`Fetching ${url} [ts: ${Date.now()}]`);
                 const ff = this.#fetchFunction;
 
                 // Nothing is awaited between here and the send, so the gap and the charge are both
@@ -155,8 +149,8 @@ export default class FetchPacer {
                 this.#lastDispatchTs = Date.now();
                 // Observed from the moment it exists: a store that fails while the response is still
                 // on its way must surface through this request, not as an unhandled rejection.
-                const chargeFailure: Promise<{ cause: unknown } | undefined> = (points ?? 0)>0
-                    ? this.paceTracker.reservePoints(points!).then(() => undefined, (cause: unknown) => ({ cause }))
+                const chargeFailure: Promise<{ cause: unknown } | undefined> = cost>0
+                    ? this.paceTracker.reservePoints(cost).then(() => undefined, (cause: unknown) => ({ cause }))
                     : Promise.resolve(undefined);
                 let raw: Response;
                 try {
@@ -174,39 +168,19 @@ export default class FetchPacer {
 
                 const refusedForPace = await this.#classifyRefusal(response);
                 if( refusedForPace ) {
-                    // Update the pacer to know it was turned away. A service that named its own
-                    // wait is believed over the calculated guess, which can only be shorter.
+                    // Update the pacer to know it was turned away. A wait the service named is the least
+                    // the pause lasts; the calculated pause applies only when it is longer.
                     await this.paceTracker.logBackOff(refusedForPace.minimumMs);
+                    return this.#holdBack(response, await this.paceTracker.getPauseBeforeMs(cost), job, 'real');
+                }
 
-                    const pauseFor = await this.paceTracker.getPauseBeforeMs(points ?? 0);
-
-                    let will_retry = false;
-                    if( pauseFor!==undefined && pauseFor>0 ) {
-                        attachBackOffTimeToResponse(response, pauseFor);
-
-                        // If want to attempt recovery, tell the queue to try again
-
-                        if( this.#options.mode.type==='attempt_recovery' ) {
-                            if( pauseExceedsMaxTimeout(pauseFor) ) {
-                                response.cannot_recover = true;
-                                response.back_off_accumulated_ms = Date.now() - job.created_at;
-                            } else {
-                                will_retry = true;
-                                job.preventCompletion(pauseFor);
-                            }
-                        }
-                    }
-                    this.emitter.emit('BACKING_OFF', {type_of_429: 'real', attempt: response.pacing_attempt, cannot_recover: response.cannot_recover, will_retry})
-
-                } else if( response.status>=200 && response.status<=299 ) {
+                if( response.status>=200 && response.status<=299 ) {
                     // The points were charged as the request went; this marks the success itself,
                     // which ends any run of refusals the back-off counts.
                     await this.paceTracker.logSuccess(0);
                 }
 
-
                 return response;
-
             });
         } finally {
             // In a `finally`, so that a request that throws still reports the pacer idle once
@@ -216,6 +190,57 @@ export default class FetchPacer {
             }
         }
 
+    }
+
+    /**
+     * Answers a request that has to wait, and in `attempt_recovery` mode arranges its retry.
+     *
+     * The response is given `back_off_for_ms`. In `attempt_recovery` mode the queue is told to
+     * run the job again once the pause is over, unless waiting that long would pass `timeout_ms`:
+     * then the response is marked `cannot_recover` and reaches the caller as the final answer.
+     *
+     * @param response What the caller would receive: the service's refusal, or a synthetic 429.
+     * @param pauseForMs How long the request must wait; `undefined` when it need not.
+     * @param job The queued job carrying the request.
+     * @param typeOf429 `real` when the service refused the request, `synthetic` when the pacer
+     * held it back unsent.
+     * @returns The same response, with the hold-back details attached.
+     *
+     * @remarks
+     * `BACKING_OFF` is emitted even when no wait is left, so that every refusal is announced. A
+     * refusal with no wait left reaches the caller as it is, without a retry.
+     */
+    #holdBack<T extends PaceResponse>(response: T, pauseForMs: number | undefined, job: QueueJob, typeOf429: BackingOffEvent['type_of_429']): T {
+        let willRetry = false;
+        if( pauseForMs!==undefined && pauseForMs>0 ) {
+            attachBackOffTimeToResponse(response, pauseForMs);
+            if( this.#options.mode.type==='attempt_recovery' ) {
+                if( this.#wouldPassTimeout(job, pauseForMs) ) {
+                    response.cannot_recover = true;
+                    response.back_off_accumulated_ms = Date.now() - job.created_at;
+                } else {
+                    willRetry = true;
+                    job.preventCompletion(pauseForMs);
+                }
+            }
+        }
+        this.emitter.emit('BACKING_OFF', {type_of_429: typeOf429, attempt: response.pacing_attempt, cannot_recover: response.cannot_recover, will_retry: willRetry});
+        return response;
+    }
+
+    /**
+     * Whether waiting `pauseForMs` more would take a request past `timeout_ms`, counted from
+     * when it was first queued.
+     *
+     * @param job The queued job carrying the request.
+     * @param pauseForMs How long the request must wait before its next attempt.
+     * @returns `false` outside `attempt_recovery` mode, and whenever `timeout_ms` is unset or 0,
+     * as the pacer then keeps retrying for as long as it takes.
+     */
+    #wouldPassTimeout(job: QueueJob, pauseForMs: number): boolean {
+        const mode = this.#options.mode;
+        if( mode.type!=='attempt_recovery' || !mode.timeout_ms ) return false;
+        return Date.now() + pauseForMs > job.created_at + mode.timeout_ms;
     }
 
     /**
@@ -291,25 +316,6 @@ export default class FetchPacer {
     async getActiveBackOffForMs():Promise<number | undefined> {
         return this.paceTracker.getPauseBeforeMs(0);
     }
-
-    /**
-     * Can this points request *ever* be handled, or does it exceed quota (including burst)?
-     * 
-     * Use it to know you'd have to break up your fetch request, as it'll never succeed. 
-     * 
-     * **This is guidance only**. It's extremely hard to know what a provider will allow.
-     * For example you might use this to _choose_ to break up a batch request into smaller
-     * parts; but don't let it stop you ever trying if you can't reduce it. The provider may well
-     * let it through. 
-     * 
-     * @param points The points that you want to consume
-     */
-    /*
-    async possiblyExceedsMaxThroughput(points:number):Promise<boolean> {
-        return this.paceTracker.possiblyExceedsMaxThroughput(points);
-    }
-    */
-
 
     /**
      * Releases what the pacer holds. Its recorded history stays in storage, still counted by

@@ -1,8 +1,8 @@
-import type {  ActivityTrackerOptions, IActivityTracker, IPaceTracker, PaceTrackerOptions, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemReserved, StoredActivityItemSuccess } from './types.ts';
+import type { ActivityTrackerOptions, IActivityTracker, StoredActivityItem, StoredActivityItemBackOff, StoredActivityItemReserved, StoredActivityItemSuccess } from './activity-tracker-types.ts';
+import type { IPaceTracker, PaceTrackerOptions, QuotaWindow } from './pace-tracker-types.ts';
 import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.ts';
 import { ActivityTrackerBrowserLocal } from './activity-trackers/ActivityTrackerBrowserLocal.ts';
-import { convertTimestampToMillisecondsFromNow } from './utils/convertTimestampToMillisecondsFromNow.ts';
-import { earliestAdmissibleTs, type QuotaWindow } from './utils/earliestAdmissibleTs.ts';
+import { earliestAdmissibleTs } from './utils/earliestAdmissibleTs.ts';
 
 type BackOffCalculation = NonNullable<PaceTrackerOptions['back_off_calculation']>;
 
@@ -11,6 +11,9 @@ const exponentialBackOffDefaults = Object.freeze({
     initial_back_off_ms: 100,
     max_single_back_off_ms: 1000*60*5
 } satisfies Required<Pick<BackOffCalculation, 'initial_back_off_ms' | 'max_single_back_off_ms'>>);
+
+/** The pause, in milliseconds, that a refusal earns when no `back_off_calculation` is set. */
+const FIXED_BACK_OFF_MS = 200;
 
 /**
  * Decides how long to hold a request back, so that spending stays within a quota and the
@@ -88,29 +91,28 @@ export default class PaceTracker implements IPaceTracker {
         
     }
 
-    async getActiveBackOffUntilTs(): Promise<number | undefined> {
+    async getRefusalPauseUntilTs(): Promise<number | undefined> {
         const ts = await this.#activityTracker.getBackOffUntilTs();
         if( typeof ts==='number' && ts>Date.now() ) return ts;
         return undefined;
     }
 
-    async getActiveBackOffForMs():Promise<number | undefined> {
-        return convertTimestampToMillisecondsFromNow(await this.getActiveBackOffUntilTs());
-    }
-
     async getPauseBeforeMs(points:number): Promise<number | undefined> {
-        const refusalPauseMs = (await this.getActiveBackOffForMs()) ?? 0;
-        const pauseMs = Math.max(refusalPauseMs, await this.#msUntilQuotaHasRoomFor(points));
+        // Each part is read at a different moment, and the store may be slow to answer. A deadline
+        // stays true however long that takes, so only the final one is turned into a wait.
+        const refusedUntilTs = (await this.getRefusalPauseUntilTs()) ?? 0;
+        const quotaFitTs = await this.#earliestQuotaFitTs(points);
+        const pauseMs = Math.max(refusedUntilTs, quotaFitTs) - Date.now();
         return pauseMs>0? pauseMs : undefined;
     }
 
-    async #msUntilQuotaHasRoomFor(points:number): Promise<number> {
+    /** When the quota next has room for `points`; 0 when no quota is set. */
+    async #earliestQuotaFitTs(points:number): Promise<number> {
         // Without a quota there is nothing to wait for, so the history need not be read at all.
         if( this.#quotaWindows.length===0 ) return 0;
 
         const spends = (await this.#activityTracker.list()).filter((x):x is StoredActivityItemSuccess | StoredActivityItemReserved => x.type==='success' || x.type==='reserved');
-        const now = Date.now();
-        return earliestAdmissibleTs(spends, points, this.#quotaWindows, now) - now;
+        return earliestAdmissibleTs(spends, points, this.#quotaWindows, Date.now());
     }
 
     async reservePoints(points:number): Promise<void> {
@@ -140,79 +142,72 @@ export default class PaceTracker implements IPaceTracker {
             force_back_off_until_at_least_ts: minimumBackOffPeriodMs? Date.now()+minimumBackOffPeriodMs : undefined
         });
 
-        const activities = await this.#activityTracker.list();
-        const backoffForMs = this.#calculateBackOffPeriodMs(activities);
-
-        
-        if( backoffForMs>0 ) {
-            
-            await this.#activityTracker.setBackOffUntilTs(Date.now()+backoffForMs, {onlyIfExceedsCurrentTs: true});
+        const pauseMs = this.#calculateBackOffPeriodMs(await this.#activityTracker.list());
+        if( pauseMs>0 ) {
+            await this.#activityTracker.setBackOffUntilTs(Date.now()+pauseMs, {onlyIfExceedsCurrentTs: true});
         }
-
     }
 
-
-
     /**
-     * Return the number of milliseconds to back off for
-     * 
-     * @param activities 
-     * @returns 
+     * Works out how long every request should pause after a refusal.
+     *
+     * The pause is the pacer's own estimate. With an exponential `back_off_calculation` it starts
+     * at `initial_back_off_ms`, doubles with each refusal in the current run (counted across every
+     * pacer sharing the history), and is dated from the latest refusal. Without one it is
+     * {@link FIXED_BACK_OFF_MS}. Jitter, when asked for, varies the estimate by up to a fifth
+     * either way, and `max_single_back_off_ms` caps it.
+     *
+     * The run is every refusal since the last success listed before the latest refusal, so the
+     * latest refusal always counts.
+     *
+     * A wait the service named is applied last, as a floor that is neither capped nor varied: it
+     * is an instruction, where the estimate is only a guess at when to try again.
+     *
+     * @param activities The shared history, oldest first.
+     * @returns The pause in milliseconds from now, never negative; 0 when the history holds no
+     * refusal.
+     *
+     * @remarks
+     * A success listed after the latest refusal does not end the run, even one that another pacer
+     * recorded in the same instant. Each answer is recorded when it comes back, so such a success
+     * was most likely let in before the limit was hit, and does not show that the service has
+     * eased. Where it truly came first, the pause is one doubling longer than it needed to be.
      */
     #calculateBackOffPeriodMs(activities:StoredActivityItem[]):number {
+        const latestRefusalIdx = activities.findLastIndex(x => x.type==='back_off');
+        // Undefined when the history holds no refusal.
+        const latestRefusal = activities[latestRefusalIdx];
+        if( latestRefusal===undefined ) return 0;
 
-        // Only back off if recent failures have been reported
-        const lastSuccessIdx = activities.findLastIndex(x => x.type==='success');
+        // Only a success listed before the latest refusal ends the run: one recorded with it, or
+        // since, was most likely let in before the limit was hit.
+        const lastSuccessIdx = activities.findLastIndex((x, i) => i<latestRefusalIdx && x.type==='success');
         // Only refusals: a charge made since the last success is a request sent, not one refused.
-        const sequentialFailures = activities.slice(lastSuccessIdx+1).filter(x => x.type==='back_off');
-        
-        const backoffActivities = activities.filter((x):x is StoredActivityItemBackOff => x.type==='back_off');
+        const refusalsInRun = activities.slice(lastSuccessIdx+1, latestRefusalIdx+1).filter(x => x.type==='back_off').length;
 
-        const forcedBackOffUntilAtLeastTs = backoffActivities.reduce((prev, cur) => (cur.force_back_off_until_at_least_ts??0)>prev? cur.force_back_off_until_at_least_ts! : prev, 0);
-        let forcedBackOffPeriod = forcedBackOffUntilAtLeastTs-Date.now()
-        if( forcedBackOffPeriod<0 ) forcedBackOffPeriod = 0; 
+        // Every named wait counts, not only those in the run: it holds until it passes.
+        const namedWaitUntilTs = activities
+            .filter((x):x is StoredActivityItemBackOff => x.type==='back_off')
+            .reduce((latest, x) => Math.max(latest, x.force_back_off_until_at_least_ts ?? 0), 0);
+        const namedWaitMs = Math.max(namedWaitUntilTs-Date.now(), 0);
 
-        
-        if( forcedBackOffPeriod===0 && sequentialFailures.length===0 ) {
-            return 0;
-        }
-        
-        
-
-        let backOffPeriod = 200; // Dumb default back off 
-        let jitter = 0;
-        if( this.#options.back_off_calculation?.type==='exponential' ) {
-
-            if( sequentialFailures.length>0 ) {
-                // Doubles with each refusal since the last success: e.g. 100, 200, 400, 800
-                const initialMs = this.#options.back_off_calculation.initial_back_off_ms ?? exponentialBackOffDefaults.initial_back_off_ms;
-                backOffPeriod = Math.pow(2, sequentialFailures.length-1) * initialMs;
-
-                // Date it from the last failure
-                backOffPeriod = backOffPeriod - (Date.now()-sequentialFailures[sequentialFailures.length-1]!.timestamp);
-                if( backOffPeriod<0 ) backOffPeriod = 0;
-            }
-        }
-        
-        if( this.#options.back_off_calculation?.jitter ) {
-            // Spread to either side of the calculated pause, so clients that backed off together
-            // do not all return together. Spreading only later would delay every one of them.
-            jitter = Math.round(backOffPeriod * 0.2 * ((Math.random() * 2) - 1));
+        const calculation = this.#options.back_off_calculation;
+        let estimateMs = FIXED_BACK_OFF_MS;
+        if( calculation?.type==='exponential' ) {
+            // Doubles with each refusal in the run: e.g. 100, 200, 400, 800
+            const initialMs = calculation.initial_back_off_ms ?? exponentialBackOffDefaults.initial_back_off_ms;
+            const sinceLatestRefusalMs = Date.now()-latestRefusal.timestamp;
+            estimateMs = Math.max(Math.pow(2, refusalsInRun-1) * initialMs - sinceLatestRefusalMs, 0);
         }
 
+        // Spread to either side of the calculated pause, so clients that backed off together
+        // do not all return together. Spreading only later would delay every one of them.
+        const jitterMs = calculation?.jitter? Math.round(estimateMs * 0.2 * ((Math.random() * 2) - 1)) : 0;
 
+        const maxSingleBackOffMs = calculation?.max_single_back_off_ms ?? exponentialBackOffDefaults.max_single_back_off_ms;
+        estimateMs = Math.max(Math.min(estimateMs+jitterMs, maxSingleBackOffMs), 0);
 
-
-        const maxSingleBackOffMs = this.#options?.back_off_calculation?.max_single_back_off_ms ?? exponentialBackOffDefaults.max_single_back_off_ms;
-        backOffPeriod = Math.min(backOffPeriod+jitter, maxSingleBackOffMs)
-        if( backOffPeriod<0 ) backOffPeriod = 0;
-
-        // Applied last, and never spread: a period the service itself named is an instruction,
-        // where the periods above are this client's own estimate of when to try again.
-        backOffPeriod = Math.max(backOffPeriod, forcedBackOffPeriod);
-
-        return backOffPeriod;
-    
+        return Math.max(estimateMs, namedWaitMs);
     }
 
     async isActive():Promise<boolean> {

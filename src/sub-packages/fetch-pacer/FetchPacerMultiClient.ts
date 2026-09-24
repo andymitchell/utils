@@ -1,8 +1,8 @@
-import type { BackOffResponse, FetchOptionsProvider, FetchPacerOptions, FetchURL } from './types.js';
+import type { BackOffResponse, FetchOptionsProvider, FetchPacerOptions, FetchURL, PaceResponse } from './types.ts';
 
 
 
-import FetchPacer from './FetchPacer.js';
+import FetchPacer from './FetchPacer.ts';
 
 
 /**
@@ -59,7 +59,7 @@ export default class FetchPacerMultiClient {
      * @returns As {@link FetchPacer.fetch}: the service's response, or a synthetic 429 when the
      * request had to wait.
      */
-    async fetch(url: FetchURL, options?: FetchOptionsProvider, points?: number, clientId?:string): Promise<Response | BackOffResponse> {
+    async fetch(url: FetchURL, options?: FetchOptionsProvider, points?: number, clientId?:string): Promise<PaceResponse | BackOffResponse> {
 
         const fetchPacer = this.#getFetchPacer(clientId);
         return fetchPacer.fetch(url, options, points);

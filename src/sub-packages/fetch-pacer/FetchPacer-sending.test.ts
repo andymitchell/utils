@@ -1,35 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-vi.mock('./PaceTracker.ts', async () => ({
-    default: (await import('./testing-utils/MockPaceTracker.ts')).MockPaceTracker
-}));
-
-import { FetchPacerForTesting } from './testing-utils/FetchPacerForTesting.ts';
+import FetchPacer from './FetchPacer.ts';
+import { FakeQuotaServer } from './testing-utils/FakeQuotaServer.ts';
 import { expectBetweenNumbers, expectBoundGreaterThan } from './testing-utils/expectInRange.ts';
 import { settle } from './testing-utils/settle.ts';
 import type { Fetch, FetchPacerOnlyOptions, FetchPacerOptions } from './types.ts';
 
 const MODES: FetchPacerOnlyOptions['mode']['type'][] = ['429_preemptively', 'attempt_recovery'];
 
-let mockFetch: Mock<Fetch>;
+/** The service a pacer sends to unless a test names another; it answers 200 unless told otherwise. */
+let service: Mock<Fetch>;
+let made: FetchPacer[] = [];
 
 const answered = () => new Response(null, { status: 200 });
+const refused = () => new Response(null, { status: 429 });
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/** A pacer whose tracker is a stand-in, so each test decides what it is told about quota and pauses. */
-function makePacer(options: Partial<FetchPacerOptions>): FetchPacerForTesting {
-    return new FetchPacerForTesting('test', {
+/** A pacer with a history of its own, sending to `service` with no gap between sends unless told otherwise. */
+function makePacer(options: Partial<FetchPacerOptions>): FetchPacer {
+    const pacer = new FetchPacer('test', {
         mode: { type: '429_preemptively' },
-        custom_fetch_function: mockFetch,
+        custom_fetch_function: service,
         minimum_time_between_fetch: 0,
         ...options
     });
+    made = [...made, pacer];
+    return pacer;
 }
 
-/** Records when each request reaches the network. */
+/** Records when each request reaches the service. */
 function recordSendTimes(): number[] {
     const sendTimes: number[] = [];
-    mockFetch.mockImplementation(async () => {
+    service.mockImplementation(async () => {
         sendTimes.push(Date.now());
         return answered();
     });
@@ -39,11 +41,14 @@ function recordSendTimes(): number[] {
 beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
-    mockFetch = vi.fn<Fetch>(async () => answered());
+    service = vi.fn<Fetch>(async () => answered());
 });
 
-afterEach(() => {
+afterEach(async () => {
+    await Promise.all(made.map(pacer => pacer.dispose()));
+    made = [];
     vi.useRealTimers();
+    vi.restoreAllMocks();
 });
 
 describe('sending a request', () => {
@@ -60,70 +65,44 @@ describe('sending a request', () => {
 
                     await settle(Promise.all([pacer.fetch('url1'), pacer.fetch('url2'), pacer.fetch('url3')]), 1);
 
-                    expect(mockFetch.mock.calls.map(([url]) => url)).toEqual(['url1', 'url2', 'url3']);
+                    expect(service.mock.calls.map(([url]) => url)).toEqual(['url1', 'url2', 'url3']);
                     expectBetweenNumbers(0, 20, sendTimes[0]);
                     expectBoundGreaterThan(min, sendTimes[1]! - sendTimes[0]!, 20);
                     expectBoundGreaterThan(min, sendTimes[2]! - sendTimes[1]!, 20);
-                });
-
-                it('keeps at least the minimum gap between one request and the next', async () => {
-                    const min = 60;
-                    const pacer = makePacer({ mode: { type }, minimum_time_between_fetch: min });
-                    const sendTimes = recordSendTimes();
-
-                    await settle(Promise.all([pacer.fetch('url1'), pacer.fetch('url2')]), 1);
-
-                    expect(sendTimes).toHaveLength(2);
-                    expectBetweenNumbers(0, 10, sendTimes[0]);
-                    expectBoundGreaterThan(min, sendTimes[1]! - sendTimes[0]!, 10);
                 });
 
             });
 
             describe('charging for what is sent', () => {
 
-                it('does not bother reserving when a request costs nothing', async () => {
-                    const pacer = makePacer({ mode: { type }, max_points_per_second: 10 });
-                    const mockPaceTracker = pacer.getMockPaceTracker();
+                it('takes no room in the quota for a request that states no cost', async () => {
+                    // The pacer warns that the cost is missing; that is not what is tested here.
+                    vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+                    const server = new FakeQuotaServer(0);
+                    const pacer = makePacer({ mode: { type }, max_points_per_second: 100, custom_fetch_function: server.fetch });
 
-                    await settle(pacer.fetch('url1'));
+                    const responses = await settle(Promise.all([
+                        pacer.fetch('https://svc/'),
+                        pacer.fetch('https://svc/?points=100', undefined, 100)
+                    ]), 1);
 
-                    expect(mockPaceTracker.reservePoints).not.toHaveBeenCalled();
-                    expect(mockPaceTracker.logSuccess).toHaveBeenCalledWith(0);
+                    expect(responses.map(response => response.status)).toEqual([200, 200]);
+                    expect(server.hits.map(hit => hit.points)).toEqual([0, 100]);
+                    expectBetweenNumbers(0, 5, server.hits[1]!.ts);
                 });
 
                 it('keeps the charge when the request itself throws', async () => {
                     // The request may have reached the service before failing, so it may have been metered.
-                    const pacer = makePacer({ mode: { type }, max_points_per_second: 10 });
-                    const mockPaceTracker = pacer.getMockPaceTracker();
-                    mockFetch.mockRejectedValueOnce(new Error('network down'));
+                    const pacer = makePacer({ mode: { type }, max_points_per_second: 100 });
+                    const sendTimes = recordSendTimes();
+                    service.mockRejectedValueOnce(new Error('network down'));
 
-                    await expect(settle(pacer.fetch('url1', undefined, 5))).rejects.toThrow('network down');
-                    expect(mockPaceTracker.reservePoints).toHaveBeenCalledWith(5);
-                    expect(mockPaceTracker.logSuccess).not.toHaveBeenCalled();
-                });
+                    await expect(settle(pacer.fetch('url1', undefined, 100))).rejects.toThrow('network down');
+                    await settle(pacer.fetch('url2', undefined, 100));
 
-                it('charges the points as it sends and marks the success when it returns', async () => {
-                    const pacer = makePacer({ mode: { type }, max_points_per_second: 10 });
-                    const mockPaceTracker = pacer.getMockPaceTracker();
-                    const seenWhileSending: { reserved: unknown[][], succeeded: number }[] = [];
-                    mockFetch.mockImplementationOnce(async () => {
-                        seenWhileSending.push({ reserved: [...mockPaceTracker.reservePoints.mock.calls], succeeded: mockPaceTracker.logSuccess.mock.calls.length });
-                        return answered();
-                    });
-
-                    await settle(pacer.fetch('url1', undefined, 5));
-
-                    expect(seenWhileSending).toEqual([{ reserved: [[5]], succeeded: 0 }]);
-                    expect(mockPaceTracker.logSuccess.mock.calls).toEqual([[0]]);
-                });
-
-                it('asks how long to hold back a request of the size it is about to send', async () => {
-                    const pacer = makePacer({ mode: { type }, max_points_per_second: 10 });
-
-                    await settle(pacer.fetch('url1', undefined, 5));
-
-                    expect(pacer.getMockPaceTracker().getPauseBeforeMs).toHaveBeenCalledWith(5);
+                    // Whether it is answered at once with a 429 or held until it fits, a request
+                    // taking the whole quota is not sent until the failed one's charge has aged out.
+                    expect(sendTimes.filter(ts => ts < 1000)).toEqual([]);
                 });
 
             });
@@ -131,22 +110,49 @@ describe('sending a request', () => {
         });
     }
 
+    describe('ending a run of refusals', () => {
+
+        it('treats the next refusal after a success as the first of a new run', async () => {
+            // Each refusal in a run doubles the pause, so a success that did not end the run
+            // would leave the next refusal waiting twice as long.
+            const pacer = makePacer({ back_off_calculation: { type: 'exponential', initial_back_off_ms: 100 } });
+            service.mockResolvedValueOnce(refused()).mockResolvedValueOnce(answered()).mockResolvedValueOnce(refused());
+
+            const first = await settle(pacer.fetch('url1'), 1);
+            await vi.advanceTimersByTimeAsync(200);
+            await settle(pacer.fetch('url2'), 1);
+            // A success recorded in the same instant as a refusal does not end its run, so the
+            // next answer comes a moment later, as a real service's would.
+            await vi.advanceTimersByTimeAsync(10);
+            const afterSuccess = await settle(pacer.fetch('url3'), 1);
+
+            expect(first.back_off_for_ms).toBe(100);
+            expect(afterSuccess.back_off_for_ms).toBe(100);
+        });
+
+    });
+
     describe('spacing requests that are held back', () => {
 
-        it('does not wait the gap before deciding that a request must be held back', async () => {
-            const pacer = makePacer({ mode: { type: '429_preemptively' }, minimum_time_between_fetch: 200 });
-            pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockResolvedValueOnce(50);
+        it('does not count a request it held back unsent as a send when spacing the next', async () => {
+            // The gap keeps sends apart, and a request that was never sent took no part in that.
+            const pacer = makePacer({ minimum_time_between_fetch: 300 });
+            const sendTimes = recordSendTimes();
+            await pacer.logBackOff(); // With no back-off calculation, every request now waits 200 ms.
 
-            const res = await settle(pacer.fetch('url1'), 1);
+            const heldBack = await settle(pacer.fetch('url1'), 1);
+            await vi.advanceTimersByTimeAsync(200 - Date.now());
+            await settle(pacer.fetch('url2'), 1);
 
-            expect(res.status).toBe(429);
-            expect(Date.now()).toBeLessThan(200);
+            expect(heldBack.status).toBe(429);
+            expect(sendTimes).toHaveLength(1);
+            expectBetweenNumbers(200, 205, sendTimes[0]);
         });
 
         it('measures the gap from the moment the previous request was actually sent', async () => {
             // Building the first request is slow; the second must still leave the full gap after
             // the first actually went, not after the first was asked for.
-            const pacer = makePacer({ mode: { type: '429_preemptively' }, minimum_time_between_fetch: 100 });
+            const pacer = makePacer({ minimum_time_between_fetch: 100 });
             const sendTimes = recordSendTimes();
             let builds = 0;
             const slowOnlyAtFirst = async () => {
@@ -164,14 +170,31 @@ describe('sending a request', () => {
         it('does not add the gap on top of a pause it has already waited out', async () => {
             const pacer = makePacer({ mode: { type: 'attempt_recovery' }, minimum_time_between_fetch: 30 });
             const sendTimes = recordSendTimes();
-            // The first request goes freely; the second finds everything held back until 100.
-            pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockResolvedValueOnce(undefined).mockResolvedValueOnce(100);
 
-            await settle(Promise.all([pacer.fetch('url1'), pacer.fetch('url2')]), 1);
+            await settle(pacer.fetch('url1'), 1);
+            await pacer.logBackOff(300); // Every request now waits until 300.
+            await settle(pacer.fetch('url2'), 1);
 
             expect(sendTimes).toHaveLength(2);
             expectBetweenNumbers(0, 5, sendTimes[0]);
-            expectBetweenNumbers(100, 105, sendTimes[1]);
+            expectBetweenNumbers(300, 305, sendTimes[1]);
+        });
+
+    });
+
+    describe('giving up on a request', () => {
+
+        it('keeps waiting for as long as it takes when the timeout is 0', async () => {
+            // A timeout of 0 sets no limit; it does not mean giving up at once.
+            const pacer = makePacer({ mode: { type: 'attempt_recovery', timeout_ms: 0 } });
+            const sendTimes = recordSendTimes();
+            await pacer.logBackOff(60_000); // Every request now waits a minute.
+
+            const response = await settle(pacer.fetch('url1'), 1000);
+
+            expect(response.status).toBe(200);
+            expect(response.cannot_recover).toBeUndefined();
+            expectBetweenNumbers(60_000, 60_005, sendTimes[0]);
         });
 
     });

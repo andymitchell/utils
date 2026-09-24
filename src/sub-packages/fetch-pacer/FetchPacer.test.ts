@@ -173,7 +173,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                     mockFetch.mockResolvedValueOnce(mockFetchResponse(429));
                     pacer.getMockPaceTracker().logBackOff.mockImplementationOnce(async () => {
                         console.log("Set delay into future");
-                        pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockImplementationOnce(async () => {
+                        pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockImplementationOnce(async () => {
                             console.log("Calling next backoff time on 429 track");
                             return backOffUntilTs
                         })
@@ -182,9 +182,9 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                         return backOffFor;
                     })
                 } else {
-                    // It will log the successful request and consume points (simulated in this case by just immediately setting the getActiveBackOffUntilTs with a delay)
+                    // It will log the successful request and consume points (simulated in this case by just immediately setting the getRefusalPauseUntilTs with a delay)
                     pacer.getMockPaceTracker().logSuccess.mockImplementationOnce(async () => {
-                        pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockImplementationOnce(async () => {
+                        pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockImplementationOnce(async () => {
                             console.log("Calling next backoff time on synth track");
                             return backOffUntilTs
                         })
@@ -204,7 +204,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                 vi.setSystemTime(0); // Date.now() is now frozen (not ticking forward)
 
                 // Set Pace Tracker up to state it would be after something triggered a delay
-                pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockImplementationOnce(async () => Date.now()+100);
+                pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockImplementationOnce(async () => Date.now()+100);
                 
                 if (type === '429_preemptively') {
                     mockFetch.mockResolvedValueOnce(new Response(null, { status: 200 }));
@@ -244,7 +244,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                 vi.setSystemTime(0); // Date.now() is now frozen (not ticking forward)
 
                 // Set Pace Tracker up to state it would be after something triggered a delay
-                pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now()+100);
+                pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockResolvedValueOnce(Date.now()+100);
 
                 vi.setSystemTime(100); // Skip forward so it runs
 
@@ -338,13 +338,13 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                 const pacer = makeTest({ mode: { type }, ...optionalTestConfig});
 
                 pacer.getMockPaceTracker().logBackOff.mockImplementation(async () => {
-                    pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now()+100); // Set it to pause and thus retry 
+                    pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockResolvedValueOnce(Date.now()+100); // Set it to pause and thus retry 
                 });
 
                 if( type_of_429==='real' ) {
                     mockFetch.mockResolvedValue(mockFetchResponse(429));
                 } else {
-                    pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockResolvedValue(Date.now()+100);
+                    pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockResolvedValue(Date.now()+100);
                 }
 
                 const resultPromise = pacer.emitter.onceConditionMet('BACKING_OFF', (event) => true, 500);
@@ -384,13 +384,13 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                     const pacer = makeTest({ mode: { type: 'attempt_recovery', timeout_ms: 100 }, minimum_time_between_fetch: 0, ...optionalTestConfig});
 
                     pacer.getMockPaceTracker().logBackOff.mockImplementation(async () => {
-                        pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now()+10); // Set it to pause and thus retry 
+                        pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockResolvedValueOnce(Date.now()+10); // Set it to pause and thus retry 
                     });
 
                     if( type_of_429==='real' ) {
                         mockFetch.mockResolvedValue(mockFetchResponse(429));
                     } else {
-                        pacer.getMockPaceTracker().getActiveBackOffUntilTs.mockImplementation(async () => Date.now()+10);
+                        pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockImplementation(async () => Date.now()+10);
                     }
 
                     const events:{event:BackingOffEvent, ts: number, ms: number}[] = [];
@@ -460,7 +460,7 @@ function commonTestsForMode(type: FetchPacerOnlyOptions['mode']['type']) {
                 vi.useFakeTimers();
                 // Test with 0, negative should behave like 0 due to sleep implementation
                 const pacer = makeTest({ mode: { type }, minimum_time_between_fetch: 0, testing_queue_disable_check_timeout: true });
-                pacer.getMockPaceTracker().getActiveBackOffForMs.mockResolvedValue(undefined);
+                pacer.getMockPaceTracker().getRefusalPauseUntilTs.mockResolvedValue(undefined);
 
                 const callOrder: string[] = [];
                 mockFetch.mockImplementation(async (url: RequestInfo | URL) => {
@@ -516,7 +516,7 @@ describe('mode 429_preemptively specific tests', () => {
         const pacer = makeTestPreemptiveMode();
         const mockPaceTracker = pacer.getMockPaceTracker();
         vi.setSystemTime(0);
-        mockPaceTracker.getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now() + 200);
+        mockPaceTracker.getRefusalPauseUntilTs.mockResolvedValueOnce(Date.now() + 200);
 
         const res = await pacer.fetch('url1');
         expect(res.status).toBe(429);
@@ -532,7 +532,7 @@ describe('mode attempt_recovery specific tests', () => {
         const pacer = makeTestRecoveryMode({testing_queue_disable_check_timeout: true});
         const mockPaceTracker = pacer.getMockPaceTracker();
 
-        mockPaceTracker.getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now() + 100); // Pause for 100ms
+        mockPaceTracker.getRefusalPauseUntilTs.mockResolvedValueOnce(Date.now() + 100); // Pause for 100ms
         mockFetch.mockResolvedValueOnce(mockFetchResponse(200)); // For the retry
 
         const fetchPromise = pacer.fetch('url1');
@@ -561,7 +561,7 @@ describe('mode attempt_recovery specific tests', () => {
 
             // PaceTracker says to back off for 100ms. Job timeout is 50ms.
             // Date.now() (0) + pauseFor (100) > job.created_at (0) + timeout_ms (50) -> 100 > 50 TRUE
-            mockPaceTracker.getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now() + 100);
+            mockPaceTracker.getRefusalPauseUntilTs.mockResolvedValueOnce(Date.now() + 100);
 
             const res = await pacer.fetch('url1') as BackOffResponse;
 
@@ -589,7 +589,7 @@ describe('mode attempt_recovery specific tests', () => {
                 // And it suggests another 60ms backoff.
                 // Retry would be at 10ms + 60ms = 70ms. Initial job at 0ms. Timeout 50ms. 70 > 50.
                 vi.setSystemTime(Date.now() + 10); // Simulate time taken for the first fetch call
-                mockPaceTracker.getActiveBackOffUntilTs.mockResolvedValue(Date.now() + 60);
+                mockPaceTracker.getRefusalPauseUntilTs.mockResolvedValue(Date.now() + 60);
             });
 
             const fetchPromise = pacer.fetch('url1');
@@ -617,7 +617,7 @@ describe('mode attempt_recovery specific tests', () => {
         const pacer = makeTestRecoveryMode();
         const mockPaceTracker = pacer.getMockPaceTracker();
 
-        mockPaceTracker.getActiveBackOffUntilTs.mockResolvedValueOnce(Date.now() + 50); // Pause for 50ms
+        mockPaceTracker.getRefusalPauseUntilTs.mockResolvedValueOnce(Date.now() + 50); // Pause for 50ms
         mockFetch.mockResolvedValueOnce(mockFetchResponse(200));
 
         const fetchPromise = pacer.fetch('url1');
@@ -642,7 +642,7 @@ describe('mode attempt_recovery specific tests', () => {
             const mockPaceTracker = pacer.getMockPaceTracker();
 
             // PaceTracker keeps suggesting a 10ms backoff
-            mockPaceTracker.getActiveBackOffUntilTs.mockImplementation(async () => Date.now() + 10);
+            mockPaceTracker.getRefusalPauseUntilTs.mockImplementation(async () => Date.now() + 10);
             // Fetch will never succeed, always hit internal backoff then retry
             mockFetch.mockResolvedValue(mockFetchResponse(200)); // If it ever got to fetch
 
@@ -660,13 +660,13 @@ describe('mode attempt_recovery specific tests', () => {
                 // We verify by seeing it does attempt to "retry" (i.e., re-evaluate backoff)
             }
 
-            // At this point, it's still "retrying" by re-checking getActiveBackOffUntilTs
-            // The mockFetch is never called because the preemptive check `getActiveBackOffForMs` always yields a delay
-            // And `pauseExceedsMaxTimeout` is always false without timeout_ms.
+            // At this point, it's still "retrying" by re-checking getRefusalPauseUntilTs
+            // The mockFetch is never called because the preemptive check `getPauseBeforeMs` always yields a delay
+            // And with no `timeout_ms` set, it never gives up.
             expect(mockFetch).not.toHaveBeenCalled();
 
             // To "resolve" the test, we can make PaceTracker stop backing off
-            mockPaceTracker.getActiveBackOffUntilTs.mockResolvedValue(undefined);
+            mockPaceTracker.getRefusalPauseUntilTs.mockResolvedValue(undefined);
             await vi.advanceTimersByTimeAsync(10); // Allow one more retry cycle
 
             const res = await fetchPromise;

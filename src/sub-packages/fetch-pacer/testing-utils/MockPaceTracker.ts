@@ -1,6 +1,6 @@
 
 import { vi } from 'vitest';
-import type { IPaceTracker, PaceTrackerOptions } from '../types.ts';
+import type { IPaceTracker, PaceTrackerOptions } from '../pace-tracker-types.ts';
 import { convertTimestampToMillisecondsFromNow } from '../utils/convertTimestampToMillisecondsFromNow.ts';
 
 
@@ -18,15 +18,10 @@ export class MockPaceTracker implements IPaceTracker {
         /* no-op */
     });
 
-    public getActiveBackOffForMs = vi.fn(async () => {
-        return convertTimestampToMillisecondsFromNow(await this.getActiveBackOffUntilTs());
-    });
+    public getRefusalPauseUntilTs = vi.fn<() => Promise<number | undefined>>(async () => undefined);
 
-    getActiveBackOffUntilTs = vi.fn<() => Promise<number | undefined>>(async () => undefined);
-
-    // Answers through `getActiveBackOffForMs`, so a test can steer the pause by stubbing either
-    // that or `getActiveBackOffUntilTs`.
-    public getPauseBeforeMs = vi.fn(async (_points: number) => this.getActiveBackOffForMs());
+    // Answers from `getRefusalPauseUntilTs`, so a test steers the pause by stubbing that.
+    public getPauseBeforeMs = vi.fn(async (_points: number) => convertTimestampToMillisecondsFromNow(await this.getRefusalPauseUntilTs()));
 
 
     public setActive = vi.fn(async (active: boolean) => {

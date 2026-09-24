@@ -4,12 +4,8 @@ A collection of small helpful functions.
 
 ## Compatibility
 
-Requires **`zod` `^4`** as a peer dependency (since **v0.28.0**). Projects still on zod 3 must upgrade to zod 4 before using this version.
-
-### Breaking changes in v0.28.0 (Zod 4 migration)
-
-- Peer dependency `zod` moved from `^3.23.8` to `^4.1.8`.
-- The `./prettify-zod-v3-error` export is renamed to **`./prettify-zod-error`**; its functions `prettifyZod3Error` / `prettifyZod3ErrorAsArray` / `prettifyZod3ErrorAsJson` are renamed to **`prettifyZodError` / `prettifyZodErrorAsArray` / `prettifyZodErrorAsJson`** and now wrap Zod's native `prettifyError`. Issue **message text** follows Zod 4 defaults (paths are unchanged).
+Requires **`zod` `^4`** as a peer dependency; a project still on zod 3 must upgrade to zod 4
+first. Breaking changes between versions are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Rate limiting (`fetch-pacer`)
 
@@ -24,26 +20,23 @@ service refuses one.
   the window. A refused or failed request keeps its charge, as the service may have metered it.
 - `minimum_time_between_fetch` (default 200 ms) is the gap from one send to the next. The first
   request goes at once, and time already spent waiting counts towards the gap.
+- `mode` decides what happens to a request that the quota or a refusal pause still holds back
+  once that gap has passed. `429_preemptively` answers it with a synthetic 429, unsent, whose
+  `back_off_for_ms` says when it would fit. `attempt_recovery` holds it and sends it once it
+  can go, and retries a refused request the same way, until waiting any longer would pass
+  `timeout_ms`; its answer is then marked `cannot_recover`. Unset or 0, `timeout_ms` sets no limit.
 - `back_off_calculation: { type: 'exponential', initial_back_off_ms }` sets the pause after the
   first refusal (default 100 ms), doubling with each further refusal until a success.
 - Several pacers can share one durable store for the same resource
   (`storage: { type: 'browser-local' }`, or `ActivityTrackerKvStorage` through
   `storage: { type: 'custom' }`). Each writes its own log segment and reads the others' on
-  every check, so none loses another's spend. On `chrome.storage` a check reads the whole
-  storage area.
-
-> Previously a success paused every request until all spend of the last 30 s had drained, and
-> other pacers sharing the store saw that pause as a refusal. Now a request within quota is
-> never answered with a synthetic 429, `back_off_for_ms` on a synthetic 429 is when that request
-> fits, and `getActiveBackOffForMs()` reports refusal pauses (plus a window over-full after an
-> oversized request) only. `ActivityTrackerKvStorage` no longer takes
-> `failsafe_active_sync_poll_ms`: every check reads the store afresh.
+  every check, so none loses another's spend.
 
 ### Reacting to a refusal
 
 - **`Retry-After` is honoured.** When a service names how long to wait — either as a count of
-  seconds or as the moment to resume — that period is used instead of the calculated guess,
-  which can only be shorter. Read it yourself with `parseRetryAfterMs(headerValue)`.
+  seconds or as the moment to resume — the pause lasts at least that long; the calculated
+  pause applies only when it is longer. Read it yourself with `parseRetryAfterMs(headerValue)`.
 - **`treat_as_back_off`** identifies a refusal that does not announce itself as one. Some
   services reply `403` and explain in the body that the real reason was speed, which is
   indistinguishable from a permission failure without looking:
@@ -61,7 +54,9 @@ service refuses one.
 - **`logBackOff(minimumMs?, clientId?)`** reports a refusal the pacer never saw. A batch call
   spends the cost of many requests at once and comes back a success even when parts inside it
   were rate limited, leaving nothing to pace on. **`getActiveBackOffForMs(clientId?)`** reads
-  back how long requests are currently being held.
+  back how long every request is being held: by a refusal pause, or by a window left over-full
+  by a request larger than the whole quota. A request that costs points may wait longer, for
+  room in the quota.
 
 ### Keeping a retried request valid
 
@@ -85,11 +80,24 @@ directions, the average wait across many clients is still the calculated one, an
 `max_single_back_off_ms` still reaches that ceiling. A period the service named itself is never
 varied.
 
-> Previously jitter only ever lengthened a pause, and inverted to shorten it once the pause
-> reached `max_single_back_off_ms` — so a run at the ceiling could wait up to 40% less than
-> configured. Anything relying on those exact timings will now see different ones.
+### Limits
+
+- Only one quota can be set: `max_points_per_second`, over a sliding one-second window. A limit
+  the service sets over a longer period, such as per minute or per day, is not paced against.
+- Each pacer sends one request at a time and waits for its answer, so its throughput is bounded
+  by the service's response time as well as by the quota.
+- Pacers sharing a store do not coordinate their checks. Two can each find room while the
+  other's charge is still being stored, and both send; each such coincidence can overshoot the
+  quota by at most one request per pacer.
+- The configured quota is taken as true. A refusal pauses requests, but never lowers the limit
+  the pacer paces against.
+- A queued request cannot be withdrawn: when its turn comes it is handled as usual, even if its
+  caller no longer wants it. An abort signal in its options makes the send fail, but the
+  request is still charged.
+- With `storage: { type: 'browser-local' }`, every check against the quota lists the resource's
+  keys, which `chrome.storage` does by reading the whole storage area. The more unrelated data
+  that area holds, the slower each check.
 
 ## Building
 
 - `npm run build_release` Will run the lint (failing if it gives any warnings), build it, and deploy with np
-

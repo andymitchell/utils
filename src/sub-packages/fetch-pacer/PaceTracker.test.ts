@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi, type MockedClass, type
 import PaceTracker from './PaceTracker.ts';
 import { ActivityTrackerKvStorage } from './activity-trackers/ActivityTrackerKvStorage.ts';
 import { ActivityTrackerMemory } from './activity-trackers/ActivityTrackerMemory.ts';
+import { storageKeysFor } from './activity-trackers/storageKeys.ts';
 import { MemoryStorage } from '../kv-storage/index-node.ts';
-import type { IKvStorage } from '../kv-storage/types.ts';
+import type { IKvStorage } from '../kv-storage/index-types.ts';
 import type { ActivityItem } from './types.ts';
 
 /** Takes 300ms to store anything, as a slow durable store might. */
@@ -68,7 +69,7 @@ describe('holding requests back to stay within a quota', () => {
         const tracker = new PaceTracker('test', { max_points_per_second: 100 });
         await tracker.logSuccess(200);
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBeUndefined();
+        expect(await tracker.getRefusalPauseUntilTs()).toBeUndefined();
     });
 
     it('holds nothing back when no quota is configured', async () => {
@@ -123,13 +124,13 @@ describe('charging a request when it is sent', () => {
         await tracker.reservePoints(10);
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(100);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(100);
     });
 
     it('still recognises spend recorded by an earlier version', async () => {
         // Earlier versions recorded a request's cost only once it had succeeded.
         const store: IKvStorage = new MemoryStorage();
-        await store.set('fetch_pacer_activity_tracker_test.activities', [{ type: 'success', timestamp: 0, points: 150, id: 'x' }]);
+        await store.set(storageKeysFor('test').logPrefix, [{ type: 'success', timestamp: 0, points: 150, id: 'x' }]);
         const tracker = new PaceTracker('test', {
             max_points_per_second: 200,
             storage: { type: 'custom', activity_tracker: (id, options) => new ActivityTrackerKvStorage(id, store, options) }
@@ -145,7 +146,7 @@ describe('charging a request when it is sent', () => {
         await tracker.logBackOff();
         vi.setSystemTime(300);
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBeUndefined();
+        expect(await tracker.getRefusalPauseUntilTs()).toBeUndefined();
         expect(await tracker.getPauseBeforeMs(150)).toBe(700);
     });
 
@@ -180,13 +181,9 @@ describe('PaceTracker - Reactive Backoff', () => {
             back_off_calculation: { type: 'exponential' },
         });
         await tracker.logBackOff();
-        const ts = await tracker.getActiveBackOffUntilTs();
+        const ts = await tracker.getRefusalPauseUntilTs();
         expect(ts).toBe(100);
     });
-
-
-
-
 
     it('increases backoff for consecutive 429s', async () => {
         const tracker = new PaceTracker('test', {
@@ -200,7 +197,7 @@ describe('PaceTracker - Reactive Backoff', () => {
         // 3rd backoff: (2^2 * 100ms) = 400ms
         await tracker.logBackOff();
 
-        const ts = await tracker.getActiveBackOffUntilTs();
+        const ts = await tracker.getRefusalPauseUntilTs();
         expect(ts).toBe(400);
 
     });
@@ -215,7 +212,7 @@ describe('PaceTracker - Reactive Backoff', () => {
         await tracker.logBackOff();
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(4000);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(4000);
     });
 
 
@@ -228,7 +225,7 @@ describe('PaceTracker - Reactive Backoff', () => {
 
         // Now add 200 from latest system time 
         await tracker.logBackOff();
-        const ts = await tracker.getActiveBackOffUntilTs();
+        const ts = await tracker.getRefusalPauseUntilTs();
         expect(ts).toBe(1200);
     });
 
@@ -243,7 +240,7 @@ describe('PaceTracker - Reactive Backoff', () => {
         // 2nd backoff: (2^1 * 100ms) = 200ms
         await tracker.logBackOff();
 
-        const ts = await tracker.getActiveBackOffUntilTs();
+        const ts = await tracker.getRefusalPauseUntilTs();
         expect(ts).toBe(200);
 
         await tracker.logSuccess(0);
@@ -254,7 +251,7 @@ describe('PaceTracker - Reactive Backoff', () => {
         // 1st backoff: (2^0 * 100ms) = 100ms
         await tracker.logBackOff();
 
-        const ts1 = await tracker.getActiveBackOffUntilTs()!;
+        const ts1 = await tracker.getRefusalPauseUntilTs()!;
         expect(ts1).toBe(newSystemTime+100);
 
 
@@ -266,7 +263,7 @@ describe('PaceTracker - Reactive Backoff', () => {
         
         await tracker.logBackOff();
 
-        const ts = await tracker.getActiveBackOffUntilTs();
+        const ts = await tracker.getRefusalPauseUntilTs();
         expect(ts).toBe(200);
 
     });
@@ -282,7 +279,7 @@ describe('PaceTracker - Reactive Backoff', () => {
         await tracker.logBackOff(); // 2nd back off: 200ms.
         await tracker.logBackOff(); // 3rd back off: 400ms.
 
-        const ts = await tracker.getActiveBackOffUntilTs();
+        const ts = await tracker.getRefusalPauseUntilTs();
         expect(ts).toBe(250);
         
     });
@@ -295,10 +292,10 @@ describe('PaceTracker - Reactive Backoff', () => {
                 back_off_calculation: { type: 'exponential' },
             });
             await tracker.logBackOff();
-            const backoff1 = await tracker.getActiveBackOffUntilTs();
+            const backoff1 = await tracker.getRefusalPauseUntilTs();
             
             await tracker.logSuccess(10);
-            const backoff2 = await tracker.getActiveBackOffUntilTs();
+            const backoff2 = await tracker.getRefusalPauseUntilTs();
             expect(backoff2).toBe(backoff1);
         });
 
@@ -336,7 +333,7 @@ describe('PaceTracker - Reactive Backoff', () => {
                 back_off_calculation: { type: 'exponential', max_single_back_off_ms: 10000 },
             });
             await tracker.logBackOff(5000);
-            const ts = await tracker.getActiveBackOffUntilTs();
+            const ts = await tracker.getRefusalPauseUntilTs();
             expect(ts).toBe(5000);
         });
 
@@ -351,7 +348,7 @@ describe('PaceTracker - Reactive Backoff', () => {
             // Calculated exponential would be 100ms. forcedBackOffPeriod from input is 500ms.
             // Effective backoff period = Max(100, 500) = 500ms.
 
-            const ts = await tracker.getActiveBackOffUntilTs();
+            const ts = await tracker.getRefusalPauseUntilTs();
             expect(ts).toBe(500);
 
         });
@@ -368,17 +365,12 @@ describe('PaceTracker - Reactive Backoff', () => {
             // Calculated exponential is 100ms. forcedBackOffPeriod from input is 50ms.
             // Effective backoff period = Max(100, 50) = 100ms.
 
-            const ts = await tracker.getActiveBackOffUntilTs();
+            const ts = await tracker.getRefusalPauseUntilTs();
             expect(ts).toBe(100);
 
         });
 
-
     })
-
-        
-
-
 
 });
 
@@ -392,9 +384,9 @@ describe('PaceTracker - Edge Cases', () => {
         vi.useRealTimers();
     });
 
-    it('getActiveBackOffUntilTs returns undefined when no backoff is set', async () => {
+    it('reports no refusal pause before anything has been refused', async () => {
         const tracker = new PaceTracker('test');
-        const ts = await tracker.getActiveBackOffUntilTs();
+        const ts = await tracker.getRefusalPauseUntilTs();
         expect(ts).toBeUndefined();
     });
 });

@@ -34,7 +34,7 @@ describe('spreading out when a fleet backs off together', () => {
 
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(80);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(80);
     });
 
     it('can return later than the calculated pause', async () => {
@@ -45,7 +45,7 @@ describe('spreading out when a fleet backs off together', () => {
 
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(120);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(120);
     });
 
     it('lands on the calculated pause when the draw is neutral', async () => {
@@ -56,7 +56,7 @@ describe('spreading out when a fleet backs off together', () => {
 
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(FIRST_BACK_OFF_MS);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(FIRST_BACK_OFF_MS);
     });
 
     it('stays within a fifth of the calculated pause, whichever way it is drawn', async () => {
@@ -72,7 +72,7 @@ describe('spreading out when a fleet backs off together', () => {
             });
 
             await tracker.logBackOff();
-            observed.push((await tracker.getActiveBackOffUntilTs())!);
+            observed.push((await tracker.getRefusalPauseUntilTs())!);
         }
 
         for (const pause of observed) {
@@ -91,7 +91,7 @@ describe('spreading out when a fleet backs off together', () => {
 
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(50);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(50);
     });
 
     it('still reaches the ceiling rather than stopping short of it', async () => {
@@ -104,7 +104,7 @@ describe('spreading out when a fleet backs off together', () => {
 
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(50);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(50);
     });
 
     it('waits exactly as long as the service asked, without spreading that', async () => {
@@ -117,7 +117,7 @@ describe('spreading out when a fleet backs off together', () => {
 
         await tracker.logBackOff(30_000);
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(30_000);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(30_000);
     });
 
     it('leaves the pause alone when spreading was never asked for', async () => {
@@ -128,7 +128,7 @@ describe('spreading out when a fleet backs off together', () => {
 
         await tracker.logBackOff();
 
-        expect(await tracker.getActiveBackOffUntilTs()).toBe(FIRST_BACK_OFF_MS);
+        expect(await tracker.getRefusalPauseUntilTs()).toBe(FIRST_BACK_OFF_MS);
     });
 
 });

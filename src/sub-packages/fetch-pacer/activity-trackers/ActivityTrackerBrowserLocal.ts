@@ -1,9 +1,11 @@
 /// <reference types="chrome" />
 
 
-import type { IActivityTracker } from '../types.js';
+import type { IActivityTracker } from '../activity-tracker-types.ts';
 
-import { ChromeStorage } from '../../kv-storage/adapters/ChromeStorage.ts';
+// The node barrel carries the chrome adapter without the IndexedDB and Dexie adapters that the
+// browser barrel also loads, none of which this tracker uses.
+import { ChromeStorage } from '../../kv-storage/index-node.ts';
 import { ActivityTrackerKvStorage, type ActivityTrackerKvStorageOptions } from './ActivityTrackerKvStorage.ts';
 
 

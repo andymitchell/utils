@@ -1,15 +1,4 @@
-/** Points spent by one request, and when. */
-export type QuotaSpend = {
-    /** When the points were spent, in ms since the epoch. */
-    readonly timestamp: number;
-    readonly points: number;
-};
-
-/** A limit on spend: at most `points` within any stretch of `per_ms` milliseconds. */
-export type QuotaWindow = {
-    readonly points: number;
-    readonly per_ms: number;
-};
+import type { QuotaSpend, QuotaWindow } from '../pace-tracker-types.ts';
 
 /**
  * The earliest moment a request costing `points` fits inside every quota window, given what has

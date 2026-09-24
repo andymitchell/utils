@@ -46,13 +46,13 @@ export class FakeQuotaServer {
     readonly #hits: QuotaHit[] = [];
 
     /**
-     * @param latency_ms How long each answer takes, measured on the timer clock (fake timers
+     * @param latencyMs How long each answer takes, measured on the timer clock (fake timers
      * control it).
-     * @param refuse The true limit to enforce. Omit for a service that never refuses.
+     * @param refusal The true limit to enforce. Omit for a service that never refuses.
      */
     constructor(
-        private readonly latency_ms: number,
-        private readonly refuse?: QuotaRefusalRule
+        private readonly latencyMs: number,
+        private readonly refusal?: QuotaRefusalRule
     ) {}
 
     /** Every request received so far, oldest first. */
@@ -68,12 +68,12 @@ export class FakeQuotaServer {
         // Read before any await, so the record is the moment of arrival.
         const ts = Date.now();
         this.#hits.push({ ts, points });
-        const refused = this.refuse !== undefined && this.#sumEndingAt(ts, this.refuse.per_ms) > this.refuse.limit;
+        const refused = this.refusal !== undefined && this.#sumEndingAt(ts, this.refusal.per_ms) > this.refusal.limit;
 
-        await new Promise<void>(resolve => setTimeout(resolve, this.latency_ms));
+        await new Promise<void>(resolve => setTimeout(resolve, this.latencyMs));
 
         if (refused) {
-            const retryAfterS = this.refuse?.retry_after_s;
+            const retryAfterS = this.refusal?.retry_after_s;
             return new Response(null, { status: 429, headers: retryAfterS === undefined ? {} : { 'Retry-After': String(retryAfterS) } });
         }
         return new Response(null, { status: 200 });
@@ -82,16 +82,16 @@ export class FakeQuotaServer {
     /**
      * The most points received inside any one window of the given length.
      *
-     * @param per_ms Window length in ms.
+     * @param perMs Window length in ms.
      * @returns The busiest window's total, evaluated at every arrival; 0 when nothing has arrived.
      *
      * @remarks
-     * A window ending at time `t` holds arrivals in `(t − per_ms, t]`: one that arrived exactly
-     * `per_ms` earlier has already left. Only windows ending on an arrival need checking, because
+     * A window ending at time `t` holds arrivals in `(t − perMs, t]`: one that arrived exactly
+     * `perMs` earlier has already left. Only windows ending on an arrival need checking, because
      * a window's total can only grow when an arrival enters it.
      */
-    maxPointsInAnySlidingWindow(per_ms: number): number {
-        return this.#hits.reduce((busiest, hit) => Math.max(busiest, this.#sumEndingAt(hit.ts, per_ms)), 0);
+    maxPointsInAnySlidingWindow(perMs: number): number {
+        return this.#hits.reduce((busiest, hit) => Math.max(busiest, this.#sumEndingAt(hit.ts, perMs)), 0);
     }
 
     /**
@@ -108,9 +108,9 @@ export class FakeQuotaServer {
         return spent / ((to - from) / 1000);
     }
 
-    #sumEndingAt(end: number, per_ms: number): number {
+    #sumEndingAt(end: number, perMs: number): number {
         return this.#hits
-            .filter(hit => hit.ts > end - per_ms && hit.ts <= end)
+            .filter(hit => hit.ts > end - perMs && hit.ts <= end)
             .reduce((sum, hit) => sum + hit.points, 0);
     }
 }

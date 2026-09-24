@@ -2,12 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import FetchPacer from './FetchPacer.ts';
 import { ActivityTrackerKvStorage } from './activity-trackers/ActivityTrackerKvStorage.ts';
+import { storageKeysFor } from './activity-trackers/storageKeys.ts';
 import { FakeQuotaServer } from './testing-utils/FakeQuotaServer.ts';
 import { LaggyKvStorage } from './testing-utils/LaggyKvStorage.ts';
 import { expectBetweenNumbers, expectCloseTo } from './testing-utils/expectInRange.ts';
 import { settle } from './testing-utils/settle.ts';
 import { MemoryStorage } from '../kv-storage/index-node.ts';
-import type { IKvStorage } from '../kv-storage/types.ts';
+import type { IKvStorage } from '../kv-storage/index-types.ts';
 import type { FetchPacerOptions } from './types.ts';
 
 const ID = 'shared-resource';
@@ -76,7 +77,7 @@ describe('two pacers sharing one store for the same resource', () => {
         const store = new MemoryStorage();
         const server = new FakeQuotaServer(0);
         const a = pacerSharing(store, server);
-        const refusalPauseKey = `fetch_pacer_activity_tracker_${ID}.backoff`;
+        const refusalPauseKey = storageKeysFor(ID).backOffUntil;
 
         await settle(a.fetch('https://svc/?points=300', undefined, 300));
         expect(await store.get(refusalPauseKey)).toBeUndefined();

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { earliestAdmissibleTs, type QuotaSpend, type QuotaWindow } from './earliestAdmissibleTs.ts';
+import { earliestAdmissibleTs } from './earliestAdmissibleTs.ts';
+import type { QuotaSpend, QuotaWindow } from '../types.ts';
+import { mulberry32 } from '../testing-utils/mulberry32.ts';
 
 const NOW = 10_000;
 const HUNDRED_PER_SECOND: QuotaWindow = { points: 100, per_ms: 1000 };
@@ -96,18 +98,6 @@ describe('finding the earliest moment a request fits inside every quota window',
 });
 
 type Scenario = { spends: QuotaSpend[]; points: number; windows: QuotaWindow[]; now: number };
-
-/** Small seeded generator, so any failing scenario can be replayed from its seed. */
-function mulberry32(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-        state = (state + 0x6D2B79F5) >>> 0;
-        let t = state;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 function randomScenario(seed: number): Scenario {
     const random = mulberry32(seed);
