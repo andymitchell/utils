@@ -5,3 +5,4 @@ node_modules/
 dist/
 testing-import/
 .npmrc
+.claude/worktrees
