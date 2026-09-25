@@ -1,10 +1,10 @@
-import { onTestFinished } from "vitest";
 import { z } from "zod";
 import { promiseWithTrigger, sleep } from "../../../index-browser.ts";
 import { MemoryStorage } from "../adapters/MemoryStorage.ts";
 import type { IKvStorage, IKvStorageNamespaced } from "../types.ts";
 import type { TypedStorage } from "../TypedStorage.ts";
 import { GatedStorage } from "./GatedStorage.ts";
+import { nextMacrotask, recordUnhandledRejections } from "./unhandledRejections.ts";
 
 /**
  * Hang guard for tests whose failure mode is an event that never arrives: they fail fast
@@ -30,15 +30,6 @@ async function setAndHear(store: IKvStorageNamespaced, key: string, value: unkno
     const heard = nextChangeTo(store, key);
     await store.set(key, value);
     await heard;
-}
-
-/** Collects every promise rejection nothing handles, until the current test finishes. */
-function recordUnhandledRejections(): unknown[] {
-    const reasons: unknown[] = [];
-    const record = (reason: unknown) => reasons.push(reason);
-    process.on('unhandledRejection', record);
-    onTestFinished(() => { process.off('unhandledRejection', record) });
-    return reasons;
 }
 
 /** A namespaced store that can also read every value at once, as the typed stores can. */
@@ -122,7 +113,7 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
             await expect(rawStorage.set(rawKey!, 'not json')).resolves.toBeUndefined();
             // Gives the store time to deal with the unreadable value: a readable one written after it is heard first.
             await setAndHear(store, 'readable', 'val2');
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await nextMacrotask();
 
             expect(heard).toEqual(['readable']);
             expect(unhandled).toEqual([]);

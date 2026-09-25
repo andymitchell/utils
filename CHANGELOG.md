@@ -54,6 +54,9 @@ selected changes.
   cannot be decrypted is not announced; it previously caused an unhandled rejection.
 - `kv-storage`: `SecureTypedStorage` saves large values. One of 1 MB previously failed with
   "Maximum call stack size exceeded".
+- `kv-storage`: a `DeferredKvStorage` whose picker fails raises no unhandled rejection, and its
+  `dispose()` succeeds. A picker that throws is reported through every call, as one that rejects
+  is; it previously made the constructor throw.
 
 ## 0.34.0 - 2026-09-24
 
