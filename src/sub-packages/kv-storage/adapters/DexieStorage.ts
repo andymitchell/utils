@@ -20,9 +20,12 @@ import { openKeyChangeChannel, type KeyChangeChannel } from './keyChangeChannel.
  *
  * @remarks
  * A store missing from the database is added with an upgrade when the store is first used. Other
- * connections to the database (including other stores' ones) close and reopen for it. Within one
- * context, stores of the same database open one at a time, so each sees the others' additions.
- * Two contexts adding different stores to one database at the same moment are not coordinated.
+ * connections to the database (including other stores' ones) close and reopen for it. Stores of
+ * the same database open one at a time, so each sees the others' additions: across tabs, workers
+ * and frames where Web Locks exist (every current browser), and within one context elsewhere.
+ * A context running a version of this library without that coordination does not take part. While
+ * a connection that never closes blocks an upgrade, other opens of that database wait behind it,
+ * as IndexedDB itself makes them wait.
  *
  * Every call settles: a write resolves once it is committed, and rejects if it cannot be. When
  * something else deletes or upgrades the database, the store steps aside and reopens on its next
@@ -168,14 +171,23 @@ async function readSchema(dbName: string, fakeIdb?: FakeIdb): Promise<{ version:
 }
 
 /**
- * The latest open of each database, which the next one waits for.
+ * Runs `work`, an open of `dbName`, once no other open of that database is running: in any tab,
+ * worker or frame where Web Locks exist, and otherwise within this context only.
  *
  * Adding a store is an upgrade decided from the schema read just before it, so opens that
- * overlap would each miss the store the other adds.
+ * overlap would each miss the store the other adds, and one would wait forever on the other.
  */
+function oneAtATime<R>(dbName: string, work: () => Promise<R>): Promise<R> {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+        return navigator.locks.request(`kv-storage-open:${dbName}`, work);
+    }
+    return oneAtATimeInThisContext(dbName, work);
+}
+
+/** The latest open of each database in this context, which the next one waits for. */
 const openings = new Map<string, Promise<void>>();
 
-function oneAtATime<R>(dbName: string, work: () => Promise<R>): Promise<R> {
+function oneAtATimeInThisContext<R>(dbName: string, work: () => Promise<R>): Promise<R> {
     const result = (openings.get(dbName) ?? Promise.resolve()).then(work);
     const settled = result.then(() => {}, () => {});
     openings.set(dbName, settled);

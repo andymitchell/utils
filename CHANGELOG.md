@@ -51,7 +51,9 @@ selected changes.
 - `kv-storage`: `IdbStorage` given `custom_indexeddb` never touches the global `indexedDB`, so
   it works where there is none. It previously threw a `ReferenceError` there.
 - `kv-storage`: `DexieStorage` stores with different store names in one database all work when
-  first used at the same moment. One previously never settled.
+  first used at the same moment, in one context or in different tabs, workers and frames. One
+  previously never settled. Coordination across contexts uses Web Locks, and a context running
+  an earlier version does not take part.
 - `kv-storage`: `SecureTypedStorage` announces a removed key (`CHANGE` with no `newValue`). It
   previously announced no removals.
 - `kv-storage`: a value in a `TypedStorage` namespace that is not JSON, written straight to the
