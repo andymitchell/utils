@@ -29,6 +29,11 @@ selected changes.
 - `kv-storage`: `getAll` on `TypedStorage` and `SecureTypedStorage` reads every value at once. It
   previously read them one after another.
 
+### Added
+
+- `kv-storage`: `MockChromeStorageArea` takes a `quota_bytes` option, refusing any write that
+  would exceed it as a browser does, and reports `getBytesInUse` as a browser counts it.
+
 ### Fixed
 
 - `kv-storage`: an `IdbStorage` write or removal that cannot be committed (e.g. the quota is
@@ -57,6 +62,10 @@ selected changes.
 - `kv-storage`: a `DeferredKvStorage` whose picker fails raises no unhandled rejection, and its
   `dispose()` succeeds. A picker that throws is reported through every call, as one that rejects
   is; it previously made the constructor throw.
+- `kv-storage`: a `ChromeStorage` write refused for quota rejects with an error named
+  `QuotaExceededError`, as IndexedDB names one, reporting the bytes in use where the browser can
+  count them, with the browser's error as its `cause`. The browser's error previously reached the
+  caller as it was, because the adapter's own quota check could never run.
 
 ## 0.34.0 - 2026-09-24
 

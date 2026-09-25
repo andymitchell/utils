@@ -2,12 +2,27 @@
 import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import type { IKvStorage, KvRawStorageEventMap } from "../types.ts";
 
+/**
+ * A key-value store kept in a Chrome extension storage area, `chrome.storage.local` unless
+ * another is given.
+ *
+ * `CHANGE` is emitted for every change to the area, including those made by other parts of the
+ * extension (popup, service worker, other tabs).
+ *
+ * @example
+ * const storage = new ChromeStorage(chrome.storage.session);
+ * await storage.set('key1', 'val1');
+ */
 export class ChromeStorage implements IKvStorage {
 
     #storage:chrome.storage.StorageArea;
     #unsubscribes:Function[] = [];
     events = new TypedCancelableEventEmitter<KvRawStorageEventMap>()
 
+    /**
+     * @param storage The area to keep values in. Only the default reads the `chrome` global, so
+     * any area (e.g. a `MockChromeStorageArea` in tests) works where there is none.
+     */
     constructor(storage:chrome.storage.StorageArea = chrome.storage.local) {
         this.#storage = storage;
 
@@ -22,19 +37,39 @@ export class ChromeStorage implements IKvStorage {
         })
     }
 
+    /**
+     * Stores `value` under `key`.
+     *
+     * @returns Resolves once the storage area has stored it. Rejects if the area refuses the
+     * write, leaving the previous value in place. A write refused for quota rejects with an error
+     * named `QuotaExceededError` (as IndexedDB names one), reporting the bytes in use where the
+     * area can count them, with the browser's own error as its `cause`.
+     */
     async set(key: string, value: string): Promise<void> {
-        
-        
-        await this.#storage.set({ [key]: value })
-
-        if( typeof chrome!=='undefined' ) { 
-            const lastErrorMessage = chrome?.runtime.lastError?.message;
-            if( lastErrorMessage?.toLowerCase().includes("quota") ) {
-                const bytesInUse = await this.#storage.getBytesInUse();
-                throw new Error(`Could not write due to exceeding quota. Bytes in use: ${bytesInUse}. lastError: ${lastErrorMessage}`);
-            }
+        try {
+            await this.#storage.set({ [key]: value });
+        } catch (error) {
+            throw isQuotaError(error) ? await this.#quotaExceeded(error) : error;
         }
+    }
 
+    /** Describes a write refused for quota, with the bytes in use where the area can count them. */
+    async #quotaExceeded(cause: Error): Promise<Error> {
+        const bytesInUse = await this.#bytesInUse();
+        const inUse = bytesInUse === undefined ? '' : ` (${bytesInUse} bytes in use)`;
+        const error = new Error(`The storage area is full${inUse}: ${cause.message}`, { cause });
+        error.name = 'QuotaExceededError';
+        return error;
+    }
+
+    async #bytesInUse(): Promise<number | undefined> {
+        // Not every browser's storage areas can count their bytes; the error is still worth reporting without it.
+        if (typeof this.#storage.getBytesInUse !== 'function') return undefined;
+        try {
+            return await this.#storage.getBytesInUse(null);
+        } catch {
+            return undefined;
+        }
     }
     async get(key: string): Promise<string | undefined> {
         
@@ -70,5 +105,10 @@ export class ChromeStorage implements IKvStorage {
         this.#unsubscribes = [];
     }
 
+}
+
+/** Whether a write was refused for quota: browsers name the quota in the message (e.g. "QUOTA_BYTES quota exceeded"). */
+function isQuotaError(error: unknown): error is Error {
+    return error instanceof Error && /quota/i.test(error.message);
 }
 
