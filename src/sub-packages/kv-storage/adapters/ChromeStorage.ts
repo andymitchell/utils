@@ -48,13 +48,20 @@ export class ChromeStorage implements IKvStorage {
         await this.#storage.remove(key)
     }
 
+    /**
+     * Lists the stored keys.
+     *
+     * @param keyNamespace When given, only keys starting with it are listed.
+     *
+     * @remarks
+     * Where the browser can list keys on their own (Chrome 130+), no values are read. Elsewhere
+     * the whole storage area is read to find its keys.
+     */
     async getAllKeys(keyNamespace?:string):Promise<string[]> {
-        
-        
-        const all = await this.#storage.get(null);
-        let keys = Object.keys(all);
-        if( keyNamespace ) keys = keys.filter(x => x.startsWith(keyNamespace));
-        return keys;
+        const keys = typeof this.#storage.getKeys === 'function'
+            ? await this.#storage.getKeys()
+            : Object.keys(await this.#storage.get(null));
+        return keys.filter(key => !keyNamespace || key.startsWith(keyNamespace));
     }
 
     async dispose() {

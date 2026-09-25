@@ -1,18 +1,25 @@
 import { commonAdapterTests } from "../testing-helpers/commonAdapterTests.ts";
+import { commonIdbAdapterTests } from "../testing-helpers/commonIdbAdapterTests.ts";
+import { IDBKeyRange } from "fake-indexeddb";
 import { DexieStorage } from "./DexieStorage.ts";
 import "fake-indexeddb/auto";
 import { fakeIdb } from "../../fake-idb/index.ts";
 
+// Change notices travel between every store in the process with the same name, so each test gets its own.
+let testCount = 0;
+const uniqueName = (name: string) => `${name}-${++testCount}`;
+
 commonAdapterTests(
     () => {
-        const custom_indexeddb = fakeIdb(); // fakeIdb();
-        return new DexieStorage('testDb',  {custom_indexeddb})
+        const custom_indexeddb = fakeIdb();
+        return new DexieStorage(uniqueName('testDb'),  {custom_indexeddb})
     },
     () => {
         const custom_indexeddb = fakeIdb();
+        const dbName = uniqueName('testDb');
         return {
-            store1: new DexieStorage('testDb', {custom_indexeddb}),
-            store2: new DexieStorage('testDb', {custom_indexeddb})
+            store1: new DexieStorage(dbName, {custom_indexeddb}),
+            store2: new DexieStorage(dbName, {custom_indexeddb})
         }
     },
     () => {
@@ -21,9 +28,10 @@ commonAdapterTests(
                 name: 'different stores',
                 generator: () => {
                     const custom_indexeddb = fakeIdb();
+                    const dbName = uniqueName('testDb');
                     return {
-                        store1: new DexieStorage('testDb', {custom_indexeddb: custom_indexeddb, custom_store_name: 'store1' }),
-                        store2: new DexieStorage('testDb', {custom_indexeddb: custom_indexeddb, custom_store_name: 'store2' })
+                        store1: new DexieStorage(dbName, {custom_indexeddb: custom_indexeddb, custom_store_name: 'store1' }),
+                        store2: new DexieStorage(dbName, {custom_indexeddb: custom_indexeddb, custom_store_name: 'store2' })
                     };
                 }
             },
@@ -33,8 +41,8 @@ commonAdapterTests(
                 generator: () => {
                     const custom_indexeddb = fakeIdb();
                     return {
-                        store1: new DexieStorage('db1', {custom_indexeddb: custom_indexeddb}),
-                        store2: new DexieStorage('db2', {custom_indexeddb: custom_indexeddb})
+                        store1: new DexieStorage(uniqueName('db1'), {custom_indexeddb: custom_indexeddb}),
+                        store2: new DexieStorage(uniqueName('db2'), {custom_indexeddb: custom_indexeddb})
                     };
                 }
             }
@@ -43,3 +51,21 @@ commonAdapterTests(
         ]
     }
 );
+
+commonIdbAdapterTests((dbName, factory) => new DexieStorage(dbName, {custom_indexeddb: {indexedDB: factory, IDBKeyRange}}));
+
+describe('several stores in one database', () => {
+
+    test('stores first used at the same moment all work, each keeping its own data', async () => {
+        const custom_indexeddb = fakeIdb();
+        const dbName = uniqueName('many-stores');
+        const stores = ['store1', 'store2', 'store3'].map(custom_store_name => new DexieStorage(dbName, {custom_indexeddb, custom_store_name}));
+        try {
+            await Promise.all(stores.map((store, index) => store.set('key1', `val${index}`)));
+
+            expect(await Promise.all(stores.map(store => store.get('key1')))).toEqual(['val0', 'val1', 'val2']);
+        } finally {
+            await Promise.all(stores.map(store => store.dispose()));
+        }
+    }, 1000);
+});

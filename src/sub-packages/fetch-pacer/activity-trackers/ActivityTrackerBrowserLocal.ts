@@ -18,8 +18,9 @@ import { ActivityTrackerKvStorage, type ActivityTrackerKvStorageOptions } from '
  *
  * @remarks
  * Behaves exactly as {@link ActivityTrackerKvStorage}. Every read lists the keys belonging to
- * the resource, which the chrome storage adapter does by reading the whole storage area, so
- * each check costs more the more unrelated data that area holds.
+ * the resource. Where the browser can list keys on their own (Chrome 130+) that reads no values;
+ * elsewhere it reads the whole storage area, so each check costs more the more unrelated data
+ * that area holds.
  */
 export class ActivityTrackerBrowserLocal extends ActivityTrackerKvStorage implements IActivityTracker {
 

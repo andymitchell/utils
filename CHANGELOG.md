@@ -4,7 +4,41 @@ Notable changes to `@andymitchell/utils`, newest first, in the style of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Releases before 0.33.0 list only
 selected changes.
 
-## Unreleased
+## 0.35.0
+
+### Changed
+
+- `kv-storage`: `IdbStorage` and `DexieStorage` send other contexts only the changed key, never
+  the value. A receiving store reads the value itself, so the `CHANGE` it emits carries the
+  value current when the notice arrives. Notices travel on a new channel: until every open tab
+  runs this version, stores on it and on earlier versions do not hear each other's changes.
+  `IdbStorage` and `DexieStorage` over the same database and store now hear each other.
+- `kv-storage`: calls to an `IdbStorage` or `DexieStorage` after `dispose()` reject. They
+  previously reopened the database.
+- `kv-storage`: `getAllKeys` reads no values in `IdbStorage` and `DexieStorage`, nor in
+  `ChromeStorage` where the browser can list keys on their own (Chrome 130+). It previously read
+  every stored value.
+
+### Fixed
+
+- `kv-storage`: an `IdbStorage` write or removal that cannot be committed (e.g. the quota is
+  full) rejects. It previously never settled, stalling any queue of writes behind it.
+- `kv-storage`: `IdbStorage` closes its connection when another connection deletes or upgrades
+  the database, and reopens on its next call. It previously blocked the delete or upgrade for as
+  long as it stayed open.
+- `kv-storage`: `IdbStorage` reopens a connection the browser has closed. Every call previously
+  failed from then on.
+- `kv-storage`: `IdbStorage` and `DexieStorage` share one connection among calls made together
+  on first use, and `dispose()` closes it even while it is still opening. Each call previously
+  opened its own, leaving all but one open.
+- `kv-storage`: `IdbStorage` opens its database whatever its version, so it reads one that
+  `DexieStorage` has upgraded. It previously failed with a `VersionError`.
+- `kv-storage`: `IdbStorage` given `custom_indexeddb` never touches the global `indexedDB`, so
+  it works where there is none. It previously threw a `ReferenceError` there.
+- `kv-storage`: `DexieStorage` stores with different store names in one database all work when
+  first used at the same moment. One previously never settled.
+
+## 0.34.0 - 2026-09-24
 
 ### Changed
 
