@@ -18,6 +18,16 @@ selected changes.
 - `kv-storage`: `getAllKeys` reads no values in `IdbStorage` and `DexieStorage`, nor in
   `ChromeStorage` where the browser can list keys on their own (Chrome 130+). It previously read
   every stored value.
+- `kv-storage`: `SecureTypedStorage` derives its key from the password once per store, and uses it
+  for every value the store writes, reads and announces. Values another store wrote cost one more
+  derivation per writer. It previously ran a 147,000-iteration derivation for every value, and
+  for every change in its namespace even with no `CHANGE` listener. Stored values stay readable
+  by earlier versions, and values they stored stay readable.
+- `kv-storage`: `TypedStorage` and `SecureTypedStorage` announce a changed value that fails the
+  schema as `newValue: undefined`, as `get` returns it. `TypedStorage` previously passed it on
+  unchecked, and `SecureTypedStorage` announced nothing.
+- `kv-storage`: `getAll` on `TypedStorage` and `SecureTypedStorage` reads every value at once. It
+  previously read them one after another.
 
 ### Fixed
 
@@ -37,6 +47,13 @@ selected changes.
   it works where there is none. It previously threw a `ReferenceError` there.
 - `kv-storage`: `DexieStorage` stores with different store names in one database all work when
   first used at the same moment. One previously never settled.
+- `kv-storage`: `SecureTypedStorage` announces a removed key (`CHANGE` with no `newValue`). It
+  previously announced no removals.
+- `kv-storage`: a value in a `TypedStorage` namespace that is not JSON, written straight to the
+  adapter, no longer fails that write, and is not announced. In `SecureTypedStorage`, a value that
+  cannot be decrypted is not announced; it previously caused an unhandled rejection.
+- `kv-storage`: `SecureTypedStorage` saves large values. One of 1 MB previously failed with
+  "Maximum call stack size exceeded".
 
 ## 0.34.0 - 2026-09-24
 

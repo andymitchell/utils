@@ -1,58 +1,51 @@
-/**
- * Resources:
- *
- * https://www.youtube.com/watch?v=lbt2_M1hZeg
- *
- */
-
 import { type ZodType } from "zod"
 import type { IKvStorage, IKvStorageNamespaced, KvRawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 import { prettifyZodErrorAsJson } from "../prettify-zod-error/prettifyZodError.ts";
+import { createSecretBox, type SecretBox } from "./secretBox.ts";
+import { decodeTypedValue, readAll } from "./typedValues.ts";
 
+const NS_HASH_CHARS = 8
+const NS_SEPARATOR = "|:|"
 
-
-
-const { crypto } = globalThis
-
-const u8ToHex = (a: ArrayBufferLike) =>
-    Array.from(new Uint8Array(a), (v) => v.toString(16).padStart(2, "0")).join("")
-
-const u8ToBase64 = (a: ArrayBufferLike) =>
-    globalThis.btoa(String.fromCharCode.apply(null, [...new Uint8Array(a)]))
-
-const base64ToU8 = (base64: string) =>
-    Uint8Array.from(globalThis.atob(base64), (c) => c.charCodeAt(0))
-
-const DEFAULT_ITERATIONS = 147_000
-const DEFAULT_SALT_SIZE = 16
-const DEFAULT_IV_SIZE = 32
-const DEFAULT_NS_SIZE = 8
-const DEFAULT_NS_SEPARATOR = "|:|"
-
-
+/**
+ * A typed key-value store that encrypts every value with a password before handing it to an
+ * underlying adapter (e.g. `ChromeStorage`, `IdbStorage`).
+ *
+ * Values are JSON-encoded, then encrypted with AES-GCM. Keys stay readable, prefixed with a
+ * namespace so several stores can share one adapter. Stores with the same password and namespace
+ * over the same adapter share the same data.
+ *
+ * @example
+ * const secrets = new SecureTypedStorage(new ChromeStorage(), password, z.object({ token: z.string() }), 'auth');
+ * secrets.events.on('CHANGE', ({ key, newValue }) => console.log(key, newValue));
+ * await secrets.set('session', { token: 'abc' });
+ * await secrets.get('session'); // { token: 'abc' }
+ *
+ * @remarks
+ * The key is derived from the password once per store, which is deliberately slow (tens of
+ * milliseconds, more on phones); after that, reads, writes and change events cost one AES
+ * operation each. Values written by another store cost one extra derivation for that writer.
+ *
+ * `CHANGE` carries what `get` would return: `undefined` for a removed key or a value that fails
+ * the schema. A value `get` would reject (another password, not JSON) announces nothing.
+ */
 export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
     #adapter:IKvStorage;
     #schema?: ZodType<T>;
+    #box: SecretBox;
     #unsubscribes:Function[] = []
     events = new TypedCancelableEventEmitter<KvRawStorageEventMap<T>>();
-    
-    #encoder = new TextEncoder()
-    #decoder = new TextDecoder()
 
-    #keyFx = "PBKDF2"
-    #hashAlgo = "SHA-256"
-    #cipherMode = "AES-GCM"
-    #cipherSize = 256
-
+    /** The prefix every key has in the adapter, including the separator. */
     protected keyNamespace:Promise<string>
-    
-    #passwordKey: Promise<CryptoKey>
-    
-    get #prefixSize() {
-        return DEFAULT_SALT_SIZE + DEFAULT_IV_SIZE
-    }
 
+    /**
+     * @param adapter Where the encrypted values are kept.
+     * @param password Encrypts every value. Stores need the same password to read each other's values.
+     * @param schema When given, `set` rejects values that fail it, and `get` returns `undefined` for them.
+     * @param namespace Prefixes every key in the adapter. Defaults to one derived from the password.
+     */
     constructor(
         adapter:IKvStorage,
         password: string,
@@ -61,65 +54,49 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
     ) {
         this.#adapter = adapter;
         this.#schema = schema;
+        this.#box = createSecretBox(password);
+        this.keyNamespace = namespace ? Promise.resolve(`${namespace}${NS_SEPARATOR}`) : namespaceFromPassword(password);
 
-
-        const passwordBuffer = this.#encoder.encode(password)
-        this.#passwordKey = crypto.subtle.importKey(
-            "raw",
-            passwordBuffer,
-            { name: this.#keyFx },
-            false, // Not exportable
-            ["deriveKey"]
-        )
-
-        this.keyNamespace = new Promise(async resolve => {
-            if (!namespace) {
-                const hashBuffer = await crypto.subtle.digest(
-                    this.#hashAlgo,
-                    passwordBuffer
-                )
-    
-                resolve(`${u8ToHex(hashBuffer).slice(-DEFAULT_NS_SIZE)}${DEFAULT_NS_SEPARATOR}`)
-            } else {
-                resolve(`${namespace}${DEFAULT_NS_SEPARATOR}`)
-            }
-        })
-
-        this.#unsubscribes.push(this.#adapter.events.onCancelable('CHANGE', async (event) => {
-            if( event.key.startsWith(await this.keyNamespace) ) {
-                // TODO Share this code with .get:
-                const boxBase64 = event.newValue;
-                if (boxBase64 !== undefined && boxBase64 !== null) {
-                    const rawValue = await this.#decrypt(boxBase64)
-                    const value = JSON.parse(rawValue);
-                    if( this.#schema && !this.#schema.safeParse(value).success ) {
-                        return;
-                    }
-                    this.events.emit('CHANGE', {
-                        key: await this.#removeNamespacedKey(event.key),
-                        newValue: value
-                    })
-                }
-                
-            }
-        }))
+        this.#unsubscribes.push(this.#adapter.events.onCancelable('CHANGE', event => void this.#announce(event)))
     }
 
-
-    get = async (key: string):Promise<T | undefined> => {
-        const nsKey = await this.#getNamespacedKey(key)
-        const boxBase64 = await this.#adapter.get(nsKey)
-        if (boxBase64 !== undefined && boxBase64 !== null) {
-            const rawValue = await this.#decrypt(boxBase64)
-            const value = JSON.parse(rawValue);
-            if( this.#schema && !this.#schema.safeParse(value).success ) {
-                return undefined;
-            }
-            return value;
+    /** Emits `CHANGE` for a change the adapter reports in this store's namespace. */
+    async #announce({ key: nsKey, newValue: stored }: { key: string, newValue?: string }) {
+        const keyNamespace = await this.keyNamespace;
+        if (!nsKey.startsWith(keyNamespace) || this.events.listenerCount('CHANGE') === 0) return;
+        let newValue: T | undefined;
+        try {
+            newValue = await this.#decode(stored);
+        } catch {
+            // `get` rejects this value too (another password, or not JSON): there is no value to report,
+            // and the write that stored it has already succeeded, so the change is not announced.
+            return;
         }
-        return undefined
+        this.events.emit('CHANGE', { key: nsKey.slice(keyNamespace.length), newValue });
     }
 
+    /** Decrypts and decodes a value as stored in the adapter; rejects if it cannot be read. */
+    async #decode(stored: string | undefined | null): Promise<T | undefined> {
+        if (stored === undefined || stored === null) return undefined;
+        const decoded = decodeTypedValue(await this.#box.open(stored), this.#schema);
+        if (!decoded.ok) throw decoded.error;
+        return decoded.value;
+    }
+
+    /**
+     * @returns The value under `key`, or `undefined` if there is none or it fails the schema.
+     * Rejects if the stored value cannot be decrypted with this password or is not JSON.
+     */
+    get = async (key: string):Promise<T | undefined> => {
+        return await this.#decode(await this.#adapter.get(await this.#getNamespacedKey(key)));
+    }
+
+    /**
+     * Encrypts and stores `value` under `key`.
+     *
+     * @returns Resolves once the adapter has stored it. Rejects, storing nothing, if `value`
+     * fails the schema; the error's `cause.schemaFailSummary` lists each failing field's path.
+     */
     set = async (key: string, value: T) => {
         if( this.#schema ) {
             const result = this.#schema.safeParse(value);
@@ -129,116 +106,47 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
             }
         }
         const nsKey = await this.#getNamespacedKey(key)
-        const jsonValue = JSON.stringify(value)
-        const boxBase64 = await this.#encrypt(jsonValue)
-        return await this.#adapter.set(nsKey, boxBase64)
+        const sealed = await this.#box.seal(JSON.stringify(value))
+        return await this.#adapter.set(nsKey, sealed)
     }
 
+    /** Deletes `key`. */
     remove = async (key: string) => {
         const nsKey = await this.#getNamespacedKey(key)
         return await this.#adapter.remove(nsKey)
     }
 
+    /** @returns Every key in this store's namespace, without the namespace prefix. */
     getAllKeys = async (): Promise<string[]> => {
         const keyNamespace = await this.keyNamespace;
         const nsKeys = await this.#adapter.getAllKeys(keyNamespace);
         return nsKeys.map(nsKey => nsKey.replace(keyNamespace, ''));
     }
 
+    /**
+     * Reads every value in this store's namespace at once, rather than one after another.
+     *
+     * @returns Every key in the namespace with its value, leaving out keys whose value fails the
+     * schema. Rejects if any value cannot be read, as `get` does.
+     */
     getAll = async (): Promise<Record<string, T>> => {
-        const keys = await this.getAllKeys();
-        const result: Record<string, T> = {};
-        for (const key of keys) {
-            const value = await this.get(key);
-            if (value !== undefined ) {
-                result[key] = value;
-            }
-        }
-        return result;
+        return await readAll(await this.getAllKeys(), this.get);
     }
 
 
     #getNamespacedKey = async (key: string) => `${await this.keyNamespace}${key}`;
-    #removeNamespacedKey = async (nsKey: string) => nsKey.replace(await this.keyNamespace, '');
 
-
-    /**
-     *
-     * @param boxBase64 A box contains salt, iv and encrypted data
-     * @returns decrypted data
-     */
-    #decrypt = async (boxBase64: string) => {
-        const boxBuffer = base64ToU8(boxBase64)
-
-        const salt = boxBuffer.slice(0, DEFAULT_SALT_SIZE)
-        const iv = boxBuffer.slice(DEFAULT_SALT_SIZE, this.#prefixSize)
-        const encryptedDataBuffer = boxBuffer.slice(this.#prefixSize)
-        const aesKey = await this.#deriveKey(salt, await this.#passwordKey!, ["decrypt"])
-
-        const decryptedDataBuffer = await crypto.subtle.decrypt(
-            {
-                name: this.#cipherMode,
-                iv
-            },
-            aesKey,
-            encryptedDataBuffer
-        )
-        return this.#decoder.decode(decryptedDataBuffer)
-    }
-
-    #encrypt = async (rawData: string) => {
-        const salt = crypto.getRandomValues(new Uint8Array(DEFAULT_SALT_SIZE))
-        const iv = crypto.getRandomValues(new Uint8Array(DEFAULT_IV_SIZE))
-        const aesKey = await this.#deriveKey(salt, await this.#passwordKey!, ["encrypt"])
-
-        const encryptedDataBuffer = new Uint8Array(
-            await crypto.subtle.encrypt(
-                {
-                    name: this.#cipherMode,
-                    iv
-                },
-                aesKey,
-                this.#encoder.encode(rawData)
-            )
-        )
-
-        const boxBuffer = new Uint8Array(
-            this.#prefixSize + encryptedDataBuffer.byteLength
-        )
-
-        boxBuffer.set(salt, 0)
-        boxBuffer.set(iv, DEFAULT_SALT_SIZE)
-        boxBuffer.set(encryptedDataBuffer, this.#prefixSize)
-
-        
-        const boxBase64 = u8ToBase64(boxBuffer.buffer)
-        return boxBase64
-    }
-
-    #deriveKey = (
-        salt: Uint8Array,
-        passwordKey: CryptoKey,
-        keyUsage: KeyUsage[]
-    ) =>
-        crypto.subtle.deriveKey(
-            {
-                name: this.#keyFx,
-                hash: this.#hashAlgo,
-                salt,
-                iterations: DEFAULT_ITERATIONS
-            },
-            passwordKey,
-            {
-                name: this.#cipherMode,
-                length: this.#cipherSize
-            },
-            false,
-            keyUsage
-        )
-
+    /** Stops listening to the adapter and removes every listener. The adapter is left open. */
     async dispose() {
         this.events.removeAllListeners();
         this.#unsubscribes.forEach(x => x());
         this.#unsubscribes = [];
     }
+}
+
+/** A namespace unique to the password, so stores with different passwords don't collide. */
+async function namespaceFromPassword(password: string): Promise<string> {
+    const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+    const hex = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(-NS_HASH_CHARS)}${NS_SEPARATOR}`;
 }
