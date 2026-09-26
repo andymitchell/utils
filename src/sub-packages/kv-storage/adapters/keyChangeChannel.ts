@@ -1,5 +1,6 @@
 import type { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
-import type { KvRawStorageEventMap } from "../types.ts";
+import type { KvChangeEvent, KvRawStorageEventMap } from "../types.ts";
+import { inOrder } from "../inOrder.ts";
 
 /** Sends change notices to other contexts, and turns theirs into local `CHANGE` events. */
 export type KeyChangeChannel = {
@@ -33,7 +34,9 @@ type KeyNotice = { key: string };
  *
  * @remarks
  * Because a receiver reads when the notice arrives, it emits the value current at that moment,
- * which may be newer than the write that sent the notice.
+ * which may be newer than the write that sent the notice. It emits changes in the order their
+ * notices arrived, whichever read finishes first, so the last value it emits for a key is never
+ * older than the one before. A listener that throws surfaces as an unhandled rejection.
  */
 export function openKeyChangeChannel<T>(options: {
     dbName: string,
@@ -43,16 +46,15 @@ export function openKeyChangeChannel<T>(options: {
 }): KeyChangeChannel {
     const { dbName, storeName, events, read } = options;
     const channel = new BroadcastChannel(`kv-storage-keys:${dbName}:${storeName}`);
+    // Reads may finish in any order; emitting in the order notices arrived keeps an older value from landing last.
+    const emitInOrder = inOrder<KvChangeEvent<T>>(change => events.emit('CHANGE', change));
 
-    channel.onmessage = async (event: MessageEvent<unknown>) => {
+    channel.onmessage = (event: MessageEvent<unknown>) => {
         if (!isKeyNotice(event.data) || events.listenerCount('CHANGE') === 0) return;
         const { key } = event.data;
-        try {
-            events.emit('CHANGE', { key, newValue: await read(key) });
-        } catch {
-            // The store was disposed or cannot reach its database: there is no current value to report,
-            // and the writer has already succeeded, so the notice is dropped.
-        }
+        // A read that fails (the store was disposed or cannot reach its database) is skipped: there is no
+        // current value to report, and the writer has already succeeded.
+        emitInOrder(read(key).then(newValue => ({ key, newValue })));
     };
 
     return {

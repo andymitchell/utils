@@ -1,9 +1,10 @@
 import { type ZodType } from "zod"
-import type { IKvStorage, IKvStorageNamespaced, KvRawStorageEventMap } from "./types.ts";
+import type { IKvStorage, IKvStorageNamespaced, KvChangeEvent, KvRawStorageEventMap } from "./types.ts";
 import { TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 import { prettifyZodErrorAsJson } from "../prettify-zod-error/prettifyZodError.ts";
 import { createSecretBox, type SecretBox } from "./secretBox.ts";
 import { decodeTypedValue, readAll } from "./typedValues.ts";
+import { inOrder } from "./inOrder.ts";
 
 const NS_HASH_CHARS = 8
 const NS_SEPARATOR = "|:|"
@@ -28,7 +29,9 @@ const NS_SEPARATOR = "|:|"
  * operation each. Values written by another store cost one extra derivation for that writer.
  *
  * `CHANGE` carries what `get` would return: `undefined` for a removed key or a value that fails
- * the schema. A value `get` would reject (another password, not JSON) announces nothing.
+ * the schema. A value `get` would reject (another password, not JSON, or one the schema throws
+ * on) announces nothing. Changes are announced in the order they were made, so a value from a
+ * writer the store has not met before holds back the announcements after it for one derivation.
  */
 export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
     #adapter:IKvStorage;
@@ -57,22 +60,29 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
         this.#box = createSecretBox(password);
         this.keyNamespace = namespace ? Promise.resolve(`${namespace}${NS_SEPARATOR}`) : namespaceFromPassword(password);
 
-        this.#unsubscribes.push(this.#adapter.events.onCancelable('CHANGE', event => void this.#announce(event)))
+        this.#unsubscribes.push(this.#adapter.events.onCancelable('CHANGE', event => this.#announceInOrder(this.#readChange(event))))
     }
 
-    /** Emits `CHANGE` for a change the adapter reports in this store's namespace. */
-    async #announce({ key: nsKey, newValue: stored }: { key: string, newValue?: string }) {
+    /**
+     * Emits each change worth announcing. Decrypting takes time, so changes are emitted in the
+     * order the adapter reported them, or a quick one (a removal) could overtake an earlier one.
+     */
+    #announceInOrder = inOrder<KvChangeEvent<T> | undefined>(change => {
+        if (change) this.events.emit('CHANGE', change);
+    });
+
+    /**
+     * What to announce for a change the adapter reports: nothing outside this store's namespace or
+     * with no one listening, otherwise the key and what `get` would return.
+     *
+     * Rejects for a value `get` rejects too (another password, not JSON, or the schema throws on
+     * it): there is no value to report, and the write that stored it has already succeeded, so the
+     * change is not announced.
+     */
+    async #readChange({ key: nsKey, newValue: stored }: KvChangeEvent<string>): Promise<KvChangeEvent<T> | undefined> {
         const keyNamespace = await this.keyNamespace;
-        if (!nsKey.startsWith(keyNamespace) || this.events.listenerCount('CHANGE') === 0) return;
-        let newValue: T | undefined;
-        try {
-            newValue = await this.#decode(stored);
-        } catch {
-            // `get` rejects this value too (another password, or not JSON): there is no value to report,
-            // and the write that stored it has already succeeded, so the change is not announced.
-            return;
-        }
-        this.events.emit('CHANGE', { key: nsKey.slice(keyNamespace.length), newValue });
+        if (!nsKey.startsWith(keyNamespace) || this.events.listenerCount('CHANGE') === 0) return undefined;
+        return { key: nsKey.slice(keyNamespace.length), newValue: await this.#decode(stored) };
     }
 
     /** Decrypts and decodes a value as stored in the adapter; rejects if it cannot be read. */
@@ -85,7 +95,8 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
 
     /**
      * @returns The value under `key`, or `undefined` if there is none or it fails the schema.
-     * Rejects if the stored value cannot be decrypted with this password or is not JSON.
+     * Rejects if the stored value cannot be decrypted with this password, is not JSON, or the
+     * schema throws on it.
      */
     get = async (key: string):Promise<T | undefined> => {
         return await this.#decode(await this.#adapter.get(await this.#getNamespacedKey(key)));

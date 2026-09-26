@@ -1,7 +1,10 @@
 import { type TypedCancelableEventEmitter } from "../typed-cancelable-event-emitter/index.ts";
 
+/** A change to one key: its new value, or no `newValue` once it is removed. */
+export type KvChangeEvent<T = any> = {key: string, newValue?: T};
+
 export type KvRawStorageEventMap<T = any> = {
-    CHANGE: (event:{key: string, newValue?: T}) => void
+    CHANGE: (event: KvChangeEvent<T>) => void
 }
 
 export interface IKvStorage<T = any> {

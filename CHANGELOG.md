@@ -10,7 +10,8 @@ selected changes.
 
 - `kv-storage`: `IdbStorage` and `DexieStorage` send other contexts only the changed key, never
   the value. A receiving store reads the value itself, so the `CHANGE` it emits carries the
-  value current when the notice arrives. Notices travel on a new channel: until every open tab
+  value current when the notice arrives; it emits changes in the order their notices arrive,
+  whichever read finishes first. Notices travel on a new channel: until every open tab
   runs this version, stores on it and on earlier versions do not hear each other's changes.
   `IdbStorage` and `DexieStorage` over the same database and store now hear each other.
 - `kv-storage`: calls to an `IdbStorage` or `DexieStorage` after `dispose()` reject. They
@@ -25,7 +26,8 @@ selected changes.
   by earlier versions, and values they stored stay readable.
 - `kv-storage`: `TypedStorage` and `SecureTypedStorage` announce a changed value that fails the
   schema as `newValue: undefined`, as `get` returns it. `TypedStorage` previously passed it on
-  unchecked, and `SecureTypedStorage` announced nothing.
+  unchecked, and `SecureTypedStorage` announced nothing. A value the schema throws on (e.g. in a
+  transform) is not announced, as `get` rejects it, and never fails the write that stored it.
 - `kv-storage`: `getAll` on `TypedStorage` and `SecureTypedStorage` reads every value at once. It
   previously read them one after another.
 
@@ -54,8 +56,9 @@ selected changes.
   first used at the same moment, in one context or in different tabs, workers and frames. One
   previously never settled. Coordination across contexts uses Web Locks, and a context running
   an earlier version does not take part.
-- `kv-storage`: `SecureTypedStorage` announces a removed key (`CHANGE` with no `newValue`). It
-  previously announced no removals.
+- `kv-storage`: `SecureTypedStorage` announces a removed key (`CHANGE` with no `newValue`), and
+  announces every change in the order it was made. It previously announced no removals, and
+  could announce changes out of order.
 - `kv-storage`: a value in a `TypedStorage` namespace that is not JSON, written straight to the
   adapter, no longer fails that write, and is not announced. In `SecureTypedStorage`, a value that
   cannot be decrypted is not announced; it previously caused an unhandled rejection.

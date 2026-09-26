@@ -107,6 +107,30 @@ export function upgradeDatabase(factory: IDBFactory, name: string, version: numb
 }
 
 /**
+ * Stores a value straight into an existing database, as another client of it would, with any key
+ * IndexedDB accepts (e.g. a number).
+ */
+export function putDirectly(factory: IDBFactory, name: string, storeName: string, key: IDBValidKey, value: unknown): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const request = factory.open(name);
+        request.onsuccess = () => {
+            const db = request.result;
+            const transaction = db.transaction(storeName, 'readwrite');
+            transaction.objectStore(storeName).put(value, key);
+            transaction.oncomplete = () => {
+                db.close();
+                resolve();
+            };
+            transaction.onabort = () => {
+                db.close();
+                reject(transaction.error);
+            };
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
  * Makes every transaction that writes or deletes `key` abort after its request succeeds — what
  * the browser does when the disk or the origin's quota is full at commit time.
  */

@@ -1,7 +1,7 @@
 import { IDBFactory } from "fake-indexeddb";
 import { vi } from "vitest";
 import type { IKvStorage } from "../types.ts";
-import { countValueReads, deleteDatabase, failCommitsFor, forceClose, upgradeDatabase, watchConnections } from "./idbProbes.ts";
+import { countValueReads, deleteDatabase, failCommitsFor, forceClose, putDirectly, upgradeDatabase, watchConnections } from "./idbProbes.ts";
 
 /**
  * Hang guard for tests whose failure mode is a promise that never settles: they fail fast
@@ -182,6 +182,17 @@ export function commonIdbAdapterTests(create: (dbName: string, factory: IDBFacto
                     const listed = await store.getAllKeys(prefix);
                     expect([...listed].sort()).toEqual(keys.filter(key => key.startsWith(prefix)).sort());
                 }
+            });
+
+            test('lists a key another client stored as a number as a string, and filters it by prefix', async () => {
+                const { firstOpen } = watchConnections(factory);
+                const store = newStore();
+                await store.set('a1', 'value');
+                await putDirectly(factory, await firstOpen, 'kv_store', 42, 'value');
+
+                expect([...await store.getAllKeys()].sort()).toEqual(['42', 'a1']);
+                expect(await store.getAllKeys('4')).toEqual(['42']);
+                expect(await store.getAllKeys('a')).toEqual(['a1']);
             });
         });
 

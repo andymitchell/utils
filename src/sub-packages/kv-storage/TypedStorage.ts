@@ -21,7 +21,7 @@ import { decodeTypedValue, readAll, type DecodedValue } from "./typedValues.ts";
  *
  * @remarks
  * `CHANGE` carries what `get` would return: `undefined` for a removed key or a value that fails
- * the schema. A value that is not JSON (which `get` rejects) announces nothing.
+ * the schema. A value `get` rejects (not JSON, or one the schema throws on) announces nothing.
  */
 export class TypedStorage<T> implements IKvStorageNamespaced<T> {
     #adapter:IKvStorage;
@@ -52,8 +52,9 @@ export class TypedStorage<T> implements IKvStorageNamespaced<T> {
     #announce({ key: nsKey, newValue: stored }: { key: string, newValue?: string }) {
         if (!nsKey.startsWith(this.#keyNamespace) || this.events.listenerCount('CHANGE') === 0) return;
         const decoded = this.#decode(stored);
-        // `get` rejects a value that is not JSON too: there is no value to report, and the write that
-        // stored it has already succeeded (and must not fail for it), so the change is not announced.
+        // `get` rejects this value too (not JSON, or the schema throws on it): there is no value to report,
+        // and the write that stored it has already succeeded (and must not fail for it), so the change is
+        // not announced.
         if (!decoded.ok) return;
         this.events.emit('CHANGE', { key: this.#removeNamespacedKey(nsKey), newValue: decoded.value });
     }
@@ -65,7 +66,7 @@ export class TypedStorage<T> implements IKvStorageNamespaced<T> {
 
     /**
      * @returns The value under `key`, or `undefined` if there is none or it fails the schema.
-     * Rejects if the stored value is not JSON.
+     * Rejects if the stored value is not JSON or the schema throws on it.
      */
     get = async (key: string):Promise<T | undefined> => {
         const decoded = this.#decode(await this.#adapter.get(this.#getNamespacedKey(key)));
@@ -108,7 +109,7 @@ export class TypedStorage<T> implements IKvStorageNamespaced<T> {
      * Reads every value in this store's namespace at once, rather than one after another.
      *
      * @returns Every key in the namespace with its value, leaving out keys whose value fails the
-     * schema. Rejects if any value is not JSON, as `get` does.
+     * schema. Rejects if any value cannot be read, as `get` does.
      */
     getAll = async (): Promise<Record<string, T>> => {
         return await readAll(await this.getAllKeys(), this.get);

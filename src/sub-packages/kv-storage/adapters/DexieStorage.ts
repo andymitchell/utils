@@ -131,11 +131,13 @@ export class DexieStorage<T = any> implements IKvStorage<T> {
      * Lists the stored keys, without reading any values.
      *
      * @param namespace When given, only keys starting with it are listed.
-     * @returns The keys in ascending order.
+     * @returns The keys in the database's order, each as a string (a key another client stored as,
+     * say, a number is listed as its string form).
      */
     async getAllKeys(namespace?: string): Promise<string[]> {
         const table = await this.#table();
-        const keys = await table.toCollection().primaryKeys();
+        // Other clients of the database may have stored keys that are not strings, whatever the table's type says.
+        const keys = (await table.toCollection().primaryKeys()).map(String);
         return keys.filter(key => !namespace || key.startsWith(namespace));
     }
 

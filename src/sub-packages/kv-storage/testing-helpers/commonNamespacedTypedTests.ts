@@ -25,6 +25,19 @@ function nextChangeTo(store: IKvStorageNamespaced, key: string): Promise<ChangeE
     });
 }
 
+/** Resolves with the next `count` `CHANGE`s the store emits, in the order it emits them. */
+function nextChanges(store: IKvStorageNamespaced, count: number): Promise<ChangeEvent[]> {
+    return new Promise(resolve => {
+        const heard: ChangeEvent[] = [];
+        const cancel = store.events.onCancelable('CHANGE', event => {
+            heard.push(event);
+            if (heard.length < count) return;
+            cancel();
+            resolve(heard);
+        });
+    });
+}
+
 /** Sets `key`, resolving once the store has announced the change (some stores announce asynchronously). */
 async function setAndHear(store: IKvStorageNamespaced, key: string, value: unknown): Promise<void> {
     const heard = nextChangeTo(store, key);
@@ -87,6 +100,28 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
             expect(await store.get('key1')).toBeUndefined();
         }, HANG_GUARD_MS);
 
+        test('a listener hears every change in the order it was made', async () => {
+            const store = generator('ns1', new MemoryStorage());
+            // Every way a quick change could overtake a slower one before it: a set after a set, a
+            // removal after a set, a set after a removal, with changes to another key in between.
+            const changes: ChangeEvent[] = [
+                { key: 'key1', newValue: 'a' },
+                { key: 'key1', newValue: 'b' },
+                { key: 'key2', newValue: 'c' },
+                { key: 'key1', newValue: undefined },
+                { key: 'key2', newValue: undefined },
+                { key: 'key1', newValue: 'd' },
+            ];
+            const heard = nextChanges(store, changes.length);
+
+            for (const { key, newValue } of changes) {
+                if (newValue === undefined) await store.remove(key);
+                else await store.set(key, newValue);
+            }
+
+            expect(await heard).toEqual(changes);
+        }, HANG_GUARD_MS);
+
         if (options?.include_schema) {
             test('a changed value that fails the schema is announced with no value', async () => {
                 const rawStorage = new MemoryStorage();
@@ -119,6 +154,29 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
             expect(unhandled).toEqual([]);
             await expect(store.get('unreadable')).rejects.toThrow();
         }, HANG_GUARD_MS);
+
+        if (options?.include_schema) {
+            test('a stored value the schema throws on neither fails the write that stored it nor reaches a listener', async () => {
+                const rawStorage = new MemoryStorage();
+                // Parses a string holding JSON, so checking a string that holds none throws.
+                const store = generator('ns1', rawStorage, z.string().transform(text => JSON.parse(text)));
+                const schemalessWriter = generator('ns1', rawStorage);
+                const heard: string[] = [];
+                store.events.on('CHANGE', event => heard.push(event.key));
+                const unhandled = recordUnhandledRejections();
+
+                await expect(schemalessWriter.set('unreadable', 'plain text')).resolves.toBeUndefined();
+                // Gives the store time to deal with the unreadable value: a readable one written after it is heard first.
+                const readableHeard = nextChangeTo(store, 'readable');
+                await schemalessWriter.set('readable', '{"name":"Ada"}');
+                await readableHeard;
+                await nextMacrotask();
+
+                expect(heard).toEqual(['readable']);
+                expect(unhandled).toEqual([]);
+                await expect(store.get('unreadable')).rejects.toThrow();
+            }, HANG_GUARD_MS);
+        }
     });
 
 
