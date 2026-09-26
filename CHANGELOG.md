@@ -4,6 +4,16 @@ Notable changes to `@andymitchell/utils`, newest first, in the style of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Releases before 0.33.0 list only
 selected changes.
 
+## 0.35.1
+
+### Fixed
+
+- `kv-storage`: a `SecureTypedStorage` change whose value cannot be read (another password, not
+  JSON), arriving while an earlier change is still being announced, no longer raises an unhandled
+  rejection. The same holds for an `IdbStorage` or `DexieStorage` change from another context whose
+  value cannot be read back. It was already skipped rather than announced; it was also reported as
+  unhandled ("Uncaught (in promise)" in a browser, a failed Vitest run).
+
 ## 0.35.0
 
 ### Changed

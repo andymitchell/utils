@@ -155,6 +155,24 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
             await expect(store.get('unreadable')).rejects.toThrow();
         }, HANG_GUARD_MS);
 
+        test('a stored value that cannot be read raises no unhandled rejection while an earlier change is still being announced', async () => {
+            const rawStorage = new MemoryStorage();
+            const store = generator('ns1', rawStorage);
+            const heard: string[] = [];
+            store.events.on('CHANGE', event => heard.push(event.key));
+            const unhandled = recordUnhandledRejections();
+
+            // Not waiting to hear 'earlier', so its announcement may still be in progress when the unreadable value lands.
+            await store.set('earlier', 'val1');
+            const [rawKey] = await rawStorage.getAllKeys();
+            await rawStorage.set(rawKey!, 'not json');
+            await setAndHear(store, 'readable', 'val2');
+            await nextMacrotask();
+
+            expect(unhandled).toEqual([]);
+            expect(heard).toEqual(['earlier', 'readable']);
+        }, HANG_GUARD_MS);
+
         if (options?.include_schema) {
             test('a stored value the schema throws on neither fails the write that stored it nor reaches a listener', async () => {
                 const rawStorage = new MemoryStorage();

@@ -22,6 +22,9 @@
 export function inOrder<T>(deliver: (value: T) => void): (result: Promise<T>) => void {
     let previous: Promise<unknown> = Promise.resolve();
     return result => {
+        // Handled from the moment it is queued: a result that rejects before its turn would
+        // otherwise be reported as an unhandled rejection. At its turn it is skipped.
+        result.catch(() => {});
         const turn = previous.then(() => result);
         previous = turn.catch(() => {});
         void turn.then(deliver, () => {});
