@@ -6,11 +6,11 @@
 import { TypedCancelableEventEmitter } from "../../typed-cancelable-event-emitter/index.ts";
 import { uid } from "../../uid/uid.ts";
 import { calculateTimings } from "../common/calculateTimings.ts";
-import { appendToErrorMessage } from "../common/appendToErrorMessage.ts";
-import { descriptorTextForError } from "../common/descriptorTextForError.ts";
 import preventCompletionFactory from "../common/preventCompletionFactory.ts";
+import { settleJob } from "../common/settleJob.ts";
+import { QueueDisposedError } from "../common/QueueDisposedError.ts";
 import { MAX_RUNTIME_MS } from "../consts.ts";
-import type { HaltPromise, IQueue, JobItem, OnRun, QueueConstructorOptions, QueueEvents, QueueTimings } from "../types.ts";
+import type { HaltPromise, IQueue, JobItem, JobOutcome, OnRun, QueueConstructorOptions, QueueEvents, QueueTimings } from "../types.ts";
 
 
 
@@ -67,7 +67,7 @@ export class QueueMemory implements IQueue {
     }
 
     async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?: () => void):Promise<T> {
-        if( this.disposed ) throw new Error(`Queue [${this.id}] with client ID ${this.client_id} is disposed, so cannot add a job.`); 
+        if( this.disposed ) throw new QueueDisposedError(this.id, descriptor);
         return new Promise<T>(async (resolve, reject) => {
             const q:QueueItem = {
                 job_id: uid(),
@@ -89,7 +89,7 @@ export class QueueMemory implements IQueue {
     
             if( halt ) halt.then(() => {
                 q.halted = true;
-                this.completeItem(q, undefined, "Externally halted.")
+                this.completeItem(q, {type: 'queue_reason', reason: "Externally halted."})
             });
         })
     }
@@ -105,7 +105,7 @@ export class QueueMemory implements IQueue {
         const queue = [...this.queue];
         this.queue = [];
         queue.forEach(q => {
-            q.resolve(null);
+            q.reject(new QueueDisposedError(this.id, q.descriptor));
         })
     }
 
@@ -148,28 +148,20 @@ export class QueueMemory implements IQueue {
                 delay(delayMs);
                 return;
             }
-            this.completeItem(q, output);
+            this.completeItem(q, {type: 'returned', output});
         } catch(e) {
-            this.completeItem(q, undefined, e);
+            this.completeItem(q, {type: 'threw', error: e});
         }
     }
 
-    private completeItem(q:QueueItem, output: any, error?:any) {
+    private completeItem(q:QueueItem, outcome: JobOutcome) {
         if( this.disposed ) return;
         
         if( !q.halted && this.queue[0]!==q ) {
             throw new Error("Something went wrong in queue");
         }
 
-        if( error instanceof Error ) {
-            // Appended defensively: an error thrown while reporting an error would escape before
-            // the job below is ever settled, leaving its caller waiting on it forever.
-            appendToErrorMessage(error, descriptorTextForError(q.descriptor));
-        } else if( typeof error==='string' ) {
-            error += descriptorTextForError(q.descriptor);
-        }
-    
-        error? q.reject(error) : q.resolve(output);
+        settleJob(q, outcome);
         this.queue = this.queue.filter(x => x!==q);
         this.next();
     }
@@ -198,14 +190,14 @@ export class QueueMemory implements IQueue {
 
                 if( preventCompletionContainer.getDelayMs()===undefined ) {
                     // Clear it
-                    this.completeItem(item, output);
+                    this.completeItem(item, {type: 'returned', output});
                 } else {
                     // Let it continue to run as normal
                 }
 
                 
             } catch(e) {
-                this.completeItem(item, undefined, e);
+                this.completeItem(item, {type: 'threw', error: e});
             }
             
             return;

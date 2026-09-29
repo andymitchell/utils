@@ -1,5 +1,6 @@
 
 import { QueueMemory } from "../memory/QueueMemory.ts";
+import { QueueDisposedError } from "./QueueDisposedError.ts";
 import type { QueueFunction, Testing } from "../types.ts";
 
 
@@ -17,7 +18,7 @@ export class QueueWorkspace {
     }
 
     enqueue:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?) => {
-        if( this.disposed ) throw new Error("QueueWorkspace is disposed. Can't enqueue.");
+        if( this.disposed ) throw new QueueDisposedError(queueName, descriptor);
         if( !this.queueMemorys[queueName] ) this.queueMemorys[queueName] = new QueueMemory(queueName);
         return this.queueMemorys[queueName]!.enqueue(onRun, descriptor, halt, enqueuedCallback);
     }

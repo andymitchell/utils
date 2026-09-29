@@ -4,6 +4,39 @@ Notable changes to `@andymitchell/utils`, newest first, in the style of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Releases before 0.33.0 list only
 selected changes.
 
+## 0.36.0
+
+### Changed
+
+- `queue`: disposing a queue rejects every job it still holds, running or waiting, with a
+  `QueueDisposedError`. They previously resolved with `null`, which their `Promise<T>` did not
+  allow for. A job enqueued without awaiting or catching it now raises an unhandled rejection if
+  its queue is disposed first.
+- `queue`: enqueueing on a disposed queue (`QueueMemory`, `QueueIDB`, or any `BaseItemQueue`,
+  such as `QueueSql`) or workspace (`QueueWorkspace`, `QueueWorkspaceIDB`) throws a
+  `QueueDisposedError`. It was a plain `Error`.
+- `queue`: the queue's own reasons for ending a job (`"Externally halted."`,
+  `"Started, but timed out"`, `"Item never started, timed out"`) name the job only when it has a
+  descriptor. They previously ended in `" [descriptor: undefined]"`.
+
+### Added
+
+- `queue`: `QueueDisposedError`, with the `queueId` and the job's `descriptor`.
+
+### Fixed
+
+- `queue`: a job's caller receives exactly what the job threw: the same value, unchanged. Queues
+  added `" [descriptor: …]"` to the message of a thrown `Error` and to a thrown string, so a
+  caller matching on the message got something the job never threw.
+- `queue`: a job that throws a falsy value (`undefined`, `null`, `0`, `''`, `false`) rejects. It
+  previously resolved as though it had succeeded.
+- `queue`: in a `BaseItemQueue` (`QueueIDB`, `QueueSql`), a job that failed and then could not be
+  marked complete rejects with its own error, and the store's failure is logged. It previously
+  rejected with the store's error, with the job's message appended to it. A job that succeeded
+  but could not be marked complete rejects with the store's error, unchanged.
+- `queue`: disposing a `BaseItemQueue` (`QueueIDB`, `QueueSql`) again is harmless. A second
+  `QueueIDB.dispose()` previously rejected, as its database was already closed.
+
 ## 0.35.1
 
 ### Fixed

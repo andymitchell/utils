@@ -1,14 +1,14 @@
 
 import preventCompletionFactory from "../../preventCompletionFactory.ts";
-import type { HaltPromise, IQueue, JobItem, OnRun, QueueConstructorOptions, QueueEvents, QueueTimings } from "../../../types.ts";
+import type { HaltPromise, IQueue, JobItem, JobOutcome, OnRun, QueueConstructorOptions, QueueEvents, QueueTimings } from "../../../types.ts";
 import type { IQueueIo, BaseItemDurable } from "./types.ts";
 import { uid } from "../../../../uid/uid.ts";
 import { promiseWithTrigger } from "../../../../../main/misc.ts";
 import { MAX_RUNTIME_MS } from "../../../consts.ts";
 import { calculateTimings } from "../../calculateTimings.ts";
 import { TypedCancelableEventEmitter } from "../../../../typed-cancelable-event-emitter/index.ts";
-import { appendToErrorMessage } from "../../appendToErrorMessage.ts";
-import { descriptorTextForError } from "../../descriptorTextForError.ts";
+import { settleJob } from "../../settleJob.ts";
+import { QueueDisposedError } from "../../QueueDisposedError.ts";
 
 type LockingRequest = {id: string, details: string, promise:Promise<void>};
 
@@ -30,6 +30,7 @@ export class BaseItemQueue implements IQueue {
     protected lockingRequests:LockingRequest[] = [];
     protected disposers: Function[] = [];
     protected disposed:boolean;
+    private disposing?:Promise<void>;
 
     constructor(id:string, queueIo: IQueueIo, options?:QueueConstructorOptions) {
         this.queueIo = queueIo;
@@ -57,7 +58,7 @@ export class BaseItemQueue implements IQueue {
 
 
     async enqueue<T>(onRun:OnRun<T>, descriptor?: string, halt?: HaltPromise, enqueuedCallback?:() => void):Promise<T> {
-        if( this.disposed ) throw new Error(`QueueIDB [${this.id}] is disposed, so cannot add a job.`);
+        if( this.disposed ) throw new QueueDisposedError(this.id, descriptor);
         const job_id = uid();
 
         return new Promise(async (resolve, reject) => {
@@ -100,7 +101,7 @@ export class BaseItemQueue implements IQueue {
             
             if( halt ) {
                 halt.then(async () => {
-                    await this.completeItem(item, undefined, "Externally halted.", true);
+                    await this.completeItem(item, {type: 'queue_reason', reason: "Externally halted."}, true);
                 });
             }
         
@@ -205,49 +206,38 @@ export class BaseItemQueue implements IQueue {
                 return {delayed_until_ts: Date.now()+delayMs};
             }
 
-            this.completeItem(item, output, undefined);
+            this.completeItem(item, {type: 'returned', output});
         } catch(e) {
-            this.completeItem(item, undefined, e);
+            this.completeItem(item, {type: 'threw', error: e});
         }
 
     }
 
-    private async completeItem(item:BaseItemDurable, output:unknown, error:unknown, force?: boolean) {
+    private async completeItem(item:BaseItemDurable, outcome:JobOutcome, force?: boolean) {
         const job = this.jobs[item.job_id];
+        delete this.jobs[item.job_id];
 
+        let storeFailure: {error: unknown} | undefined;
         try {
-            delete this.jobs[item.job_id];
-
-            // Mark it complete 
-            
             await this.queueIo.completeItem(item, force);
-            
         } catch(e) {
-            const originalErrorText =  error? `[Original Error: ${error instanceof Error? error.message : error}]` : '';
-            if( e instanceof Error ) {
-                appendToErrorMessage(e, ` ${originalErrorText}`);
-                error = e;
-            } else {
-                error = new Error(`Unknown error during complete. ${originalErrorText}`);
-            }
+            storeFailure = {error: e};
         }
 
+        // Nobody is waiting on a job the queue has already let go of (e.g. it was disposed).
+        if( !job ) return;
 
-        if( job ) {
-            if( error ) {
-                if( error instanceof Error ) {
-                    // Appended defensively: an error thrown while reporting an error would escape
-                    // before the job below is ever settled, leaving its caller waiting forever.
-                    appendToErrorMessage(error, descriptorTextForError(item.descriptor));
-                } else if( typeof error==='string' ) {
-                    error += descriptorTextForError(item.descriptor);
-                }
-                job.reject(error);
-            } else {
-                job.resolve(output);
+        if( storeFailure ) {
+            if( outcome.type==='returned' ) {
+                // The job's work is done but could not be recorded, so its caller must not be told all is well.
+                settleJob(job, {type: 'threw', error: storeFailure.error});
+                return;
             }
+            // The job had already failed, and that failure is the one its caller hears.
+            console.warn(`QueueIDB [${this.id}] could not mark a failed job as complete.`, {descriptor: item.descriptor, storeError: storeFailure.error});
         }
-        
+
+        settleJob(job, outcome);
     }
 
 
@@ -275,10 +265,10 @@ export class BaseItemQueue implements IQueue {
                 } else if( item.started_at && !item.completed_at && item.started_at<startedCutoff ) {
                     console.warn(`QueueIDB [${this.id}] a started item timed out, which should never happen. ${clientIdText}`, {item});
                     this.queueIo.emitter.emit('RUNNING_TOO_LONG', {job: item});
-                    await this.completeItem(item, undefined, "Started, but timed out", true);
+                    await this.completeItem(item, {type: 'queue_reason', reason: "Started, but timed out"}, true);
                 } else if( !item.started_at && !item.completed_at && item.created_at<notStartedCutoff ) {
                     console.warn(`QueueIDB [${this.id}] an item never started, which should never happen. ${clientIdText}`, {item});
-                    await this.completeItem(item, undefined, "Item never started, timed out", true);
+                    await this.completeItem(item, {type: 'queue_reason', reason: "Item never started, timed out"}, true);
                 }
             }
 
@@ -296,8 +286,22 @@ export class BaseItemQueue implements IQueue {
         }
     }
 
-    
-    async dispose() {
+    /**
+     * Stops the queue for good, and releases what it holds in its store.
+     *
+     * Every job still held, whether running or waiting, is rejected with a `QueueDisposedError`,
+     * and so is any job enqueued afterwards. A job's function that was already running is not
+     * interrupted, and disposal finishes once it has.
+     *
+     * @returns A promise that resolves once disposal is complete. Calling it again returns the same
+     * promise, so disposing twice is harmless.
+     */
+    dispose():Promise<void> {
+        if( !this.disposing ) this.disposing = this.disposeOnce();
+        return this.disposing;
+    }
+
+    private async disposeOnce() {
         this.disposed = true;
 
         
@@ -309,7 +313,7 @@ export class BaseItemQueue implements IQueue {
         const jobs = Object.values(this.jobs);
         this.jobs = {};
         jobs.forEach(job => {
-            job.resolve(null);
+            job.reject(new QueueDisposedError(this.id, job.descriptor));
         })
 
 

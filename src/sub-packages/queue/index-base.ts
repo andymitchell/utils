@@ -11,3 +11,5 @@ export type {
     BaseItem,
     BaseItemDurable
 }
+
+export * from './index-errors.ts';

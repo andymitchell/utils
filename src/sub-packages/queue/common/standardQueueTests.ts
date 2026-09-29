@@ -1,9 +1,136 @@
 
 import { promiseWithTrigger, sleep } from "../../../main/misc.ts";
 import type { IQueue, QueueConstructorOptions, QueueFunction } from "../types.ts";
+import { QueueDisposedError } from "./QueueDisposedError.ts";
+import { RESOLVED, rejectionOf } from "./rejectionOf.ts";
 
 export function standardQueueTests(test: jest.It, expect: jest.Expect, createQueueFunction: () => QueueFunction, createQueue: (options?:QueueConstructorOptions) => Promise<IQueue>) {
-    
+
+    describe('a job that fails: its caller receives exactly what it threw', () => {
+
+        test('the same error, with its message unchanged', async () => {
+            const queue = createQueueFunction();
+            const thrown = new Error('vault down');
+
+            const withoutDescriptor = await rejectionOf(queue('TEST_RUN', async () => { throw thrown; }));
+            const withDescriptor = await rejectionOf(queue('TEST_RUN', async () => { throw thrown; }, 'sign-in'));
+
+            expect(withoutDescriptor).toBe(thrown);
+            expect(withDescriptor).toBe(thrown);
+            expect(thrown.message).toBe('vault down');
+            expect(Object.keys(thrown)).toEqual([]);
+        })
+
+        const thrownValues: Array<{kind: string, value: () => unknown}> = [
+            {kind: 'an Error', value: () => new Error('vault down')},
+            {kind: 'a DOMException, whose message cannot be written to', value: () => new DOMException('The operation was aborted', 'AbortError')},
+            {kind: 'a frozen Error', value: () => Object.freeze(new Error('frozen'))},
+            {kind: 'a string', value: () => 'vault down'},
+            {kind: 'a number', value: () => 42},
+            {kind: 'a plain object', value: () => ({code: 'VAULT_DOWN'})},
+            {kind: 'undefined', value: () => undefined},
+            {kind: 'null', value: () => null},
+            {kind: 'zero', value: () => 0},
+            {kind: 'an empty string', value: () => ''},
+            {kind: 'false', value: () => false},
+        ];
+        for( const {kind, value} of thrownValues ) {
+            test(`rejects with ${kind}, as the very same value, and runs the next job`, async () => {
+                const queue = createQueueFunction();
+                const thrown = value();
+
+                const failing = rejectionOf(queue('TEST_RUN', async () => { throw thrown; }, 'failing job'));
+                const following = queue('TEST_RUN', async () => 'ran anyway');
+
+                expect(Object.is(await failing, thrown)).toBe(true);
+                expect(await following).toBe('ran anyway');
+            })
+        }
+
+    })
+
+    describe('a job the queue halts: its caller hears why, in the queue\'s own words', () => {
+
+        async function rejectionOfHaltedJob(descriptor?: string): Promise<unknown> {
+            const queue = createQueueFunction();
+            const started = promiseWithTrigger<void>();
+            const release = promiseWithTrigger<void>();
+            const halt = promiseWithTrigger<void>();
+
+            const job = rejectionOf(queue('TEST_RUN', async () => {
+                started.trigger();
+                await release.promise;
+            }, descriptor, halt.promise));
+
+            await started.promise;
+            halt.trigger();
+            const rejection = await job;
+            release.trigger();
+            return rejection;
+        }
+
+        test('naming the job, when it has a descriptor', async () => {
+            expect(await rejectionOfHaltedJob('send-email')).toBe('Externally halted. [descriptor: send-email]');
+        })
+
+        test('with no placeholder, when it has no descriptor', async () => {
+            expect(await rejectionOfHaltedJob()).toBe('Externally halted.');
+        })
+
+    })
+
+    describe('a queue that is disposed: no caller is left with a result it did not ask for', () => {
+
+        test('rejects the job it is running and every job waiting, each naming its job', async () => {
+            const queue = await createQueue();
+            const started = promiseWithTrigger<void>();
+            const release = promiseWithTrigger<void>();
+
+            const running = rejectionOf(queue.enqueue(async () => {
+                started.trigger();
+                await release.promise;
+                return 'finished';
+            }, 'running job'));
+            const waiting = rejectionOf(queue.enqueue(async () => 'never runs', 'waiting job'));
+            const waitingUnnamed = rejectionOf(queue.enqueue(async () => 'never runs'));
+
+            await started.promise;
+            const disposed = queue.dispose();
+            release.trigger();
+            await disposed;
+
+            const rejections = [await running, await waiting, await waitingUnnamed];
+            for( const rejection of rejections ) {
+                expect(rejection).toBeInstanceOf(QueueDisposedError);
+                expect(rejection).toMatchObject({name: 'QueueDisposedError'});
+            }
+            expect(rejections.map(x => x instanceof QueueDisposedError? x.descriptor : RESOLVED)).toEqual(['running job', 'waiting job', undefined]);
+        }, 1000*15)
+
+        test('rejects a job enqueued afterwards, naming it', async () => {
+            const queue = await createQueue();
+            await queue.dispose();
+
+            const rejection = await rejectionOf(queue.enqueue(async () => 'never runs', 'late job'));
+
+            expect(rejection).toBeInstanceOf(QueueDisposedError);
+            expect(rejection).toMatchObject({name: 'QueueDisposedError', descriptor: 'late job'});
+        }, 1000*15)
+
+        test('can be disposed again, harmlessly', async () => {
+            const queue = await createQueue();
+            await queue.enqueue(async () => 'done');
+
+            const [first, second] = await Promise.allSettled([queue.dispose(), queue.dispose()]);
+            const third = await rejectionOf(queue.dispose());
+
+            expect(first.status).toBe('fulfilled');
+            expect(second.status).toBe('fulfilled');
+            expect(third).toBe(RESOLVED);
+        }, 1000*15)
+
+    })
+
     test('Queue basic', async () => {
 
         const queue = createQueueFunction();
@@ -154,7 +281,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
             }
         }
         
-        expect(error!.message).toBe("Bad Test ABC [descriptor: undefined]");
+        expect(error!.message).toBe("Bad Test ABC");
     })
 
 
@@ -186,7 +313,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
         expect(state.run2>0).toBe(true);
         expect(state.run2>state.run1).toBe(true);
 
-        expect(error!.message).toBe("Bad Test ABC 2 [descriptor: undefined]");
+        expect(error!.message).toBe("Bad Test ABC 2");
     })
 
     test('Queue throws non-async error', async () => {
@@ -204,7 +331,7 @@ export function standardQueueTests(test: jest.It, expect: jest.Expect, createQue
             }
         }
         
-        expect(error!.message).toBe("Bad Test ABC 3 [descriptor: undefined]");
+        expect(error!.message).toBe("Bad Test ABC 3");
     })
     
     

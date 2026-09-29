@@ -23,3 +23,4 @@ export {
 }
 
 export * from './index-types.ts';
+export * from './index-errors.ts';

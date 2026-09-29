@@ -2,6 +2,7 @@
 import { QueueWorkspace } from "../common/QueueWorkspace.ts";
 import type { QueueFunction } from "../types.ts";
 import { QueueIDB, type TestingIDB } from "./QueueIDB.ts";
+import { QueueDisposedError } from "../common/QueueDisposedError.ts";
 
 
 export class QueueWorkspaceIDB extends QueueWorkspace {
@@ -17,7 +18,7 @@ export class QueueWorkspaceIDB extends QueueWorkspace {
 
 
     enqueueIDB:QueueFunction = (queueName, onRun, descriptor?, halt?, enqueuedCallback?, options?) => {
-        if( this.disposed ) throw new Error("QueueWorkspace is disposed. Can't enqueue.");
+        if( this.disposed ) throw new QueueDisposedError(queueName, descriptor);
         if( !this.queueIDBs[queueName] ) this.queueIDBs[queueName] = new QueueIDB(queueName, options, this.testing);
         return this.queueIDBs[queueName]!.enqueue(onRun, descriptor, halt, enqueuedCallback);
     }
