@@ -4,6 +4,14 @@ Notable changes to `@andymitchell/utils`, newest first, in the style of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Releases before 0.33.0 list only
 selected changes.
 
+## 0.37.0
+
+### Fixed
+
+- `serialize-error`: `serializeError` keeps an error whose cause is a plain value (a string,
+  number, boolean, bigint or symbol), and an error-like object whose `cause` is present but
+  `undefined`. These came back as an `internal-error` stub that lost the message and cause.
+
 ## 0.36.0
 
 ### Changed

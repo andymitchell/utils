@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { serializeError } from './serializeError.ts';
+import { SerializableErrorSchema } from './schemas.ts';
 
 
 describe('serializeError', () => {
@@ -160,5 +161,55 @@ describe('serializeError', () => {
 
         const serialized = serializeError(nonSerializable);
         expect(serialized.message).toContain('An error occurred that could not be serialized');
+    });
+
+    describe('an error whose cause is a plain value', () => {
+        it('keeps the error and its string cause', () => {
+            const error = new Error('Request failed', { cause: 'socket hang up' });
+
+            const serialized = serializeError(error);
+
+            expect(serialized.type).toBe('Error');
+            expect(serialized.name).toBe('Error');
+            expect(serialized.message).toBe('Request failed');
+            expect(serialized.stack).toBe(error.stack);
+            expect(serialized.cause_raw).toBe('socket hang up');
+            expect(serialized.cause).toEqual({ type: 'string', message: 'socket hang up', raw: 'socket hang up' });
+        });
+
+        it.each([
+            ['a string', 'socket hang up'],
+            ['an empty string', ''],
+            ['a number', 42],
+            ['zero', 0],
+            ['false', false],
+            ['a bigint', 10n],
+            ['a symbol', Symbol('reason')],
+        ])('keeps the error, and describes its cause, when the cause is %s', (_label, cause) => {
+            const serialized = serializeError(new Error('Request failed', { cause }));
+
+            expect(serialized.type).toBe('Error');
+            expect(serialized.message).toBe('Request failed');
+            expect(serialized.cause?.message).toBe(String(cause));
+            expect(SerializableErrorSchema.safeParse(serialized).success).toBe(true);
+            expect(() => JSON.stringify(serialized)).not.toThrow();
+        });
+
+        it('keeps an error-like object and its string cause', () => {
+            const serialized = serializeError({ message: 'Request failed', cause: 'socket hang up' });
+
+            expect(serialized.type).toBe('object');
+            expect(serialized.message).toBe('Request failed');
+            expect(serialized.cause_raw).toBe('socket hang up');
+            expect(serialized.cause?.message).toBe('socket hang up');
+        });
+
+        it('keeps an error-like object whose cause is present but undefined', () => {
+            const serialized = serializeError({ message: 'Request failed', cause: undefined });
+
+            expect(serialized.type).toBe('object');
+            expect(serialized.message).toBe('Request failed');
+            expect(serialized.cause?.type).toBe('undefined');
+        });
     });
 });

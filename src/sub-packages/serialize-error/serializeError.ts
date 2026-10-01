@@ -1,4 +1,4 @@
-import { cloneToJsonSafe } from "@andymitchell/clone-to-json-safe";
+import { cloneToJsonSafe, cloneToJsonSafeUnknown } from "@andymitchell/clone-to-json-safe";
 import type { SerializableError } from "./types.ts";
 
 
@@ -7,11 +7,11 @@ import type { SerializableError } from "./types.ts";
  *
  * This function handles typical JavaScript `Error` instances, objects with error-like properties,
  * strings, and even non-serializable values. The output is safe to log, send over the wire, or
- * store, since it removes or deep-clones unsafe or circular structures (via `cloneToJsonSafe`).
+ * store, since it removes or deep-clones unsafe or circular structures.
  *
  * ### Supported Inputs
- * - `Error` instances: preserves name, message, stack, and cause.
- * - Plain objects: attempts to extract common error-like properties (`message`, `stack`, `cause`, `name`).
+ * - `Error` instances: preserves name, message, stack, and cause. The cause may be any value, including a string.
+ * - Plain objects: attempts to extract common error-like properties (`message`, `stack`, `cause`, `name`). The cause may be any value.
  * - Strings: returned as the `message`.
  * - Anything else: JSON-stringifies it (or uses a fallback message).
  *
@@ -39,6 +39,20 @@ import type { SerializableError } from "./types.ts";
  *
  * @example
  * ```ts
+ * const err = new Error("Request failed", { cause: "socket hang up" });
+ * const safeErr = serializeError(err);
+ * // {
+ * //   name: "Error",
+ * //   message: "Request failed",
+ * //   stack: "...",
+ * //   cause_raw: "socket hang up",
+ * //   cause: { message: "socket hang up", raw: "socket hang up", type: "string" },
+ * //   ...
+ * // }
+ * ```
+ *
+ * @example
+ * ```ts
  * const err = { message: "Boom", cause: { code: 500 } };
  * const safeErr = serializeError(err);
  * // {
@@ -58,7 +72,7 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
                 name: error.name,
                 message: error.message,
                 stack: error.stack,
-                cause_raw: cloneToJsonSafe(error.cause ?? {}, { skip_circular: true }),
+                cause_raw: cloneToJsonSafeUnknown(error.cause ?? {}, { skip_circular: true }),
                 cause: _serializeError(error.cause),
                 raw: cloneToJsonSafe(error, { skip_circular: true }),
                 type: 'Error'
@@ -77,7 +91,7 @@ function _serializeError(error: unknown, canRecurseOnError = true): Serializable
                 }
             }
             if ('cause' in error) {
-                serializable.cause_raw = cloneToJsonSafe((error as any).cause, { skip_circular: true });
+                serializable.cause_raw = cloneToJsonSafeUnknown((error as any).cause, { skip_circular: true });
                 serializable.cause = _serializeError(error.cause);
             }
             if ('stack' in error && typeof (error as any).stack === 'string') {
