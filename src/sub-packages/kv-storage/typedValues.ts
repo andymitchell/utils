@@ -1,10 +1,11 @@
 import type { ZodType } from "zod";
+import { UnreadableValueError } from "./UnreadableValueError.ts";
 
 /**
  * What a typed store makes of a stored JSON value: the value, `undefined` when it fails the
  * schema, or the error that stopped it being read.
  */
-export type DecodedValue<T> = { ok: true, value: T | undefined } | { ok: false, error: Error };
+export type DecodedValue<T> = { ok: true, value: T | undefined } | { ok: false, error: UnreadableValueError };
 
 /**
  * Turns a stored JSON string back into a value, checking it against `schema`. Never throws.
@@ -12,14 +13,14 @@ export type DecodedValue<T> = { ok: true, value: T | undefined } | { ok: false, 
  * @param json The string as stored.
  * @param schema When given, a value that does not match it decodes to `undefined`.
  * @returns `{ ok: true, value }` with the value as stored (`undefined` for a schema failure),
- * or `{ ok: false, error }` when `json` is not JSON or checking it throws (e.g. a schema's
- * transform throws on it).
+ * or `{ ok: false, error }` with an `UnreadableValueError` when `json` is not JSON or checking
+ * it throws (e.g. a schema's transform throws on it). The error's `cause` is what was thrown.
  *
  * @example
  * decodeTypedValue('{"name":"Ada"}', z.object({ name: z.string() })); // { ok: true, value: { name: 'Ada' } }
  * decodeTypedValue('{"age":2}', z.object({ name: z.string() }));      // { ok: true, value: undefined }
- * decodeTypedValue('not json');                                        // { ok: false, error: SyntaxError }
- * decodeTypedValue('"plain text"', z.string().transform(text => JSON.parse(text))); // { ok: false, error: SyntaxError }
+ * decodeTypedValue('not json');                                        // { ok: false, error: UnreadableValueError }
+ * decodeTypedValue('"plain text"', z.string().transform(text => JSON.parse(text))); // { ok: false, error: UnreadableValueError }
  */
 export function decodeTypedValue<T>(json: string, schema?: ZodType<T>): DecodedValue<T> {
     try {
@@ -29,7 +30,7 @@ export function decodeTypedValue<T>(json: string, schema?: ZodType<T>): DecodedV
         if (schema && !schema.safeParse(value).success) return { ok: true, value: undefined };
         return { ok: true, value: value as T };
     } catch (error) {
-        return { ok: false, error: error instanceof Error ? error : new Error(String(error)) };
+        return { ok: false, error: new UnreadableValueError('The value is not JSON, or the schema threw on it.', { cause: error }) };
     }
 }
 

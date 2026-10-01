@@ -6,6 +6,19 @@ selected changes.
 
 ## 0.37.0
 
+### Changed
+
+- `kv-storage`: `TypedStorage` and `SecureTypedStorage` reject `get` and `getAll` with an
+  `UnreadableValueError` when a stored value cannot be read (sealed with another password,
+  damaged, not JSON, or the schema throws on it). A failure of the adapter still rejects with the
+  adapter's own error, so a caller can tell a damaged value from a storage fault. Both previously
+  rejected with whatever the failing step threw.
+
+### Added
+
+- `kv-storage`: `UnreadableValueError`, the reason a stored value cannot be read, with the
+  underlying failure as its `cause`.
+
 ### Fixed
 
 - `serialize-error`: `serializeError` keeps an error whose cause is a plain value (a string,

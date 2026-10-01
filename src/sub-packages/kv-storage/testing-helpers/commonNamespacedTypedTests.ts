@@ -3,6 +3,7 @@ import { promiseWithTrigger, sleep } from "../../../index-browser.ts";
 import { MemoryStorage } from "../adapters/MemoryStorage.ts";
 import type { IKvStorage, IKvStorageNamespaced } from "../types.ts";
 import type { TypedStorage } from "../TypedStorage.ts";
+import { UnreadableValueError } from "../UnreadableValueError.ts";
 import { GatedStorage } from "./GatedStorage.ts";
 import { nextMacrotask, recordUnhandledRejections } from "./unhandledRejections.ts";
 
@@ -43,6 +44,17 @@ async function setAndHear(store: IKvStorageNamespaced, key: string, value: unkno
     const heard = nextChangeTo(store, key);
     await store.set(key, value);
     await heard;
+}
+
+/** An in-memory adapter whose reads all reject with `failure`, as a storage that has failed does. Writes go through. */
+class FailingReadStorage extends MemoryStorage {
+    constructor(readonly failure: Error) {
+        super();
+    }
+
+    override async get(): Promise<string | undefined> {
+        throw this.failure;
+    }
 }
 
 /** A namespaced store that can also read every value at once, as the typed stores can. */
@@ -152,7 +164,7 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
 
             expect(heard).toEqual(['readable']);
             expect(unhandled).toEqual([]);
-            await expect(store.get('unreadable')).rejects.toThrow();
+            await expect(store.get('unreadable')).rejects.toBeInstanceOf(UnreadableValueError);
         }, HANG_GUARD_MS);
 
         test('a stored value that cannot be read raises no unhandled rejection while an earlier change is still being announced', async () => {
@@ -192,7 +204,7 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
 
                 expect(heard).toEqual(['readable']);
                 expect(unhandled).toEqual([]);
-                await expect(store.get('unreadable')).rejects.toThrow();
+                await expect(store.get('unreadable')).rejects.toBeInstanceOf(UnreadableValueError);
             }, HANG_GUARD_MS);
         }
     });
@@ -233,6 +245,29 @@ export function commonNamespacedTypedTests(generator: (namespace?:string, adapte
                 expect(Object.keys(all).sort()).toEqual(['valid1', 'valid2']);
             });
         }
+    });
+
+    describe('telling a damaged value from a failed storage', () => {
+
+        test("getAll rejects with UnreadableValueError when one stored value cannot be read", async () => {
+            const rawStorage = new MemoryStorage();
+            const store = generator('ns1', rawStorage);
+            await store.set('readable', 'val1');
+            await store.set('damaged', 'val2');
+            const damagedRawKey = (await rawStorage.getAllKeys()).find(key => key.endsWith('damaged'));
+            await rawStorage.set(damagedRawKey!, 'not json');
+
+            await expect(store.getAll()).rejects.toBeInstanceOf(UnreadableValueError);
+        });
+
+        test("an adapter's own read failure reaches get and getAll unchanged", async () => {
+            const failure = new Error('The storage failed');
+            const store = generator('ns1', new FailingReadStorage(failure));
+            await store.set('key1', 'val1');
+
+            await expect(store.get('key1')).rejects.toBe(failure);
+            await expect(store.getAll()).rejects.toBe(failure);
+        });
     });
 
     test('namespace check', async () => {

@@ -32,6 +32,10 @@ const NS_SEPARATOR = "|:|"
  * the schema. A value `get` would reject (another password, not JSON, or one the schema throws
  * on) announces nothing. Changes are announced in the order they were made, so a value from a
  * writer the store has not met before holds back the announcements after it for one derivation.
+ *
+ * A stored value that cannot be read (another password, damaged, not JSON, or the schema throws
+ * on it) makes `get` reject with an `UnreadableValueError`; reading it again gives the same
+ * result. A failure of the adapter rejects with the adapter's own error, and may pass.
  */
 export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
     #adapter:IKvStorage;
@@ -95,8 +99,9 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
 
     /**
      * @returns The value under `key`, or `undefined` if there is none or it fails the schema.
-     * Rejects if the stored value cannot be decrypted with this password, is not JSON, or the
-     * schema throws on it.
+     * Rejects with an `UnreadableValueError` if the stored value cannot be decrypted with this
+     * password, is not JSON, or the schema throws on it. A failure of the adapter rejects with
+     * the adapter's own error.
      */
     get = async (key: string):Promise<T | undefined> => {
         return await this.#decode(await this.#adapter.get(await this.#getNamespacedKey(key)));
@@ -138,7 +143,8 @@ export class SecureTypedStorage<T> implements IKvStorageNamespaced<T> {
      * Reads every value in this store's namespace at once, rather than one after another.
      *
      * @returns Every key in the namespace with its value, leaving out keys whose value fails the
-     * schema. Rejects if any value cannot be read, as `get` does.
+     * schema. Rejects if any value cannot be read, as `get` does: with an `UnreadableValueError`
+     * for a value that cannot be read, or the adapter's own error.
      */
     getAll = async (): Promise<Record<string, T>> => {
         return await readAll(await this.getAllKeys(), this.get);

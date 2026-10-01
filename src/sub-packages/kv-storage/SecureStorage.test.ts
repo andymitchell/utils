@@ -2,6 +2,8 @@ import { vi } from "vitest";
 import { z } from "zod";
 import { MemoryStorage } from "./adapters/MemoryStorage.ts";
 import { SecureTypedStorage } from "./SecureTypedStorage.ts"
+import { createSecretBox } from "./secretBox.ts";
+import { UnreadableValueError } from "./UnreadableValueError.ts";
 import { commonNamespacedTypedTests } from "./testing-helpers/commonNamespacedTypedTests.ts";
 
 const PASSWORD = '123';
@@ -184,7 +186,47 @@ describe('SecureTypedStorage', () => {
 
             const intruder = new SecureTypedStorage<string>(adapter, 'not the password', undefined, 'ns');
 
-            await expect(intruder.get(keys[0]!)).rejects.toThrow();
+            await expect(intruder.get(keys[0]!)).rejects.toBeInstanceOf(UnreadableValueError);
+        });
+    });
+
+    describe('telling a damaged value from a failed storage', () => {
+
+        /** A store that holds `raw`, exactly as given, under the key 'damaged'. */
+        async function storeHolding(raw: string) {
+            const adapter = new MemoryStorage();
+            await adapter.set('ns|:|damaged', raw);
+            return new SecureTypedStorage<unknown>(adapter, PASSWORD, undefined, 'ns');
+        }
+
+        test('a value that is not base64 is unreadable', async () => {
+            const store = await storeHolding('not-a-sealed-value');
+
+            await expect(store.get('damaged')).rejects.toBeInstanceOf(UnreadableValueError);
+        });
+
+        test('a value too short to have been sealed is unreadable', async () => {
+            const store = await storeHolding(btoa('too short'));
+
+            await expect(store.get('damaged')).rejects.toBeInstanceOf(UnreadableValueError);
+        });
+
+        test("a value sealed with the store's password that is not JSON is unreadable", async () => {
+            const store = await storeHolding(await createSecretBox(PASSWORD).seal('not json'));
+
+            await expect(store.get('damaged')).rejects.toBeInstanceOf(UnreadableValueError);
+        });
+
+        test('a key derivation failure reaches get unchanged, and the next get succeeds', async () => {
+            const adapter = new MemoryStorage();
+            const keys = await storeValues(adapter, 1);
+            // Another store, so reading the value needs a key derived for its writer.
+            const reader = new SecureTypedStorage<string>(adapter, PASSWORD, undefined, 'ns');
+            const failure = new Error('The platform could not derive a key');
+            vi.spyOn(crypto.subtle, 'deriveKey').mockRejectedValueOnce(failure);
+
+            await expect(reader.get(keys[0]!)).rejects.toBe(failure);
+            expect(await reader.get(keys[0]!)).toBe(`value of ${keys[0]}`);
         });
     });
 })

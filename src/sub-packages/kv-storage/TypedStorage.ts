@@ -22,6 +22,10 @@ import { decodeTypedValue, readAll, type DecodedValue } from "./typedValues.ts";
  * @remarks
  * `CHANGE` carries what `get` would return: `undefined` for a removed key or a value that fails
  * the schema. A value `get` rejects (not JSON, or one the schema throws on) announces nothing.
+ *
+ * A stored value that cannot be read (not JSON, or the schema throws on it) makes `get` reject
+ * with an `UnreadableValueError`; reading it again gives the same result. A failure of the
+ * adapter rejects with the adapter's own error, and may pass.
  */
 export class TypedStorage<T> implements IKvStorageNamespaced<T> {
     #adapter:IKvStorage;
@@ -66,7 +70,8 @@ export class TypedStorage<T> implements IKvStorageNamespaced<T> {
 
     /**
      * @returns The value under `key`, or `undefined` if there is none or it fails the schema.
-     * Rejects if the stored value is not JSON or the schema throws on it.
+     * Rejects with an `UnreadableValueError` if the stored value is not JSON or the schema
+     * throws on it. A failure of the adapter rejects with the adapter's own error.
      */
     get = async (key: string):Promise<T | undefined> => {
         const decoded = this.#decode(await this.#adapter.get(this.#getNamespacedKey(key)));
@@ -109,7 +114,8 @@ export class TypedStorage<T> implements IKvStorageNamespaced<T> {
      * Reads every value in this store's namespace at once, rather than one after another.
      *
      * @returns Every key in the namespace with its value, leaving out keys whose value fails the
-     * schema. Rejects if any value cannot be read, as `get` does.
+     * schema. Rejects if any value cannot be read, as `get` does: with an `UnreadableValueError`
+     * for a value that cannot be read, or the adapter's own error.
      */
     getAll = async (): Promise<Record<string, T>> => {
         return await readAll(await this.getAllKeys(), this.get);

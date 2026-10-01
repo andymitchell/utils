@@ -4,6 +4,8 @@
  * https://www.youtube.com/watch?v=lbt2_M1hZeg
  */
 
+import { UnreadableValueError } from "./UnreadableValueError.ts";
+
 const ITERATIONS = 147_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 32;
@@ -26,8 +28,9 @@ export type SecretBox = {
     seal(text: string): Promise<string>;
     /**
      * Decrypts a sealed value, whichever box (or build) sealed it with the same password.
-     * @returns The original text. Rejects if the value is malformed, was sealed with another
-     * password, or has been tampered with.
+     * @returns The original text. Rejects with `UnreadableValueError` if the value is malformed,
+     * was sealed with another password, or has been tampered with. Rejects with the platform's
+     * own error if a key cannot be derived for it; the next call tries again.
      */
     open(sealed: string): Promise<string>;
 };
@@ -94,14 +97,39 @@ export function createSecretBox(password: string): SecretBox {
         },
 
         async open(sealedBase64) {
-            const sealed = fromBase64(sealedBase64);
-            // Refused before any key is derived for it.
-            if (sealed.byteLength < HEADER_BYTES + TAG_BYTES) throw new Error('The value is not a sealed value.');
-            const salt = sealed.slice(0, SALT_BYTES);
-            const iv = sealed.slice(SALT_BYTES, HEADER_BYTES);
-            const text = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await keyFor(salt), sealed.slice(HEADER_BYTES));
+            // A malformed value is refused before any key is derived for it.
+            const { salt, iv, ciphertext } = splitSealed(sealedBase64);
+            // A derivation failure is the platform's, not the value's, so it passes through unchanged.
+            const key = await keyFor(salt);
+            let text: ArrayBuffer;
+            try {
+                text = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+            } catch (error) {
+                throw new UnreadableValueError('The value was sealed with another password, or has been changed.', { cause: error });
+            }
             return new TextDecoder().decode(text);
         }
+    };
+}
+
+/**
+ * Splits a sealed value into the parts `seal` joined.
+ *
+ * @returns The salt, IV and ciphertext. Throws `UnreadableValueError` if the value is not base64,
+ * or too short to hold a header and an authentication tag.
+ */
+function splitSealed(sealedBase64: string): { salt: Uint8Array<ArrayBuffer>, iv: Uint8Array<ArrayBuffer>, ciphertext: Uint8Array<ArrayBuffer> } {
+    let sealed: Uint8Array<ArrayBuffer>;
+    try {
+        sealed = fromBase64(sealedBase64);
+    } catch (error) {
+        throw new UnreadableValueError('The value is not a sealed value.', { cause: error });
+    }
+    if (sealed.byteLength < HEADER_BYTES + TAG_BYTES) throw new UnreadableValueError('The value is not a sealed value.');
+    return {
+        salt: sealed.slice(0, SALT_BYTES),
+        iv: sealed.slice(SALT_BYTES, HEADER_BYTES),
+        ciphertext: sealed.slice(HEADER_BYTES)
     };
 }
 
